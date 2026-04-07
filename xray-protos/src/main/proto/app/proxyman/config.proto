@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package xray.app.proxyman;
+option csharp_namespace = "Xray.App.Proxyman";
+option go_package = "github.com/xtls/xray-core/app/proxyman";
+option java_package = "com.xray.app.proxyman";
+option java_multiple_files = true;
+
+import "common/net/address.proto";
+import "common/net/port.proto";
+import "transport/internet/config.proto";
+import "common/serial/typed_message.proto";
+
+message InboundConfig {}
+
+message SniffingConfig {
+  bool enabled = 1;
+  repeated string destination_override = 2;
+  repeated string domains_excluded = 3;
+  bool metadata_only = 4;
+  bool route_only = 5;
+}
+
+message ReceiverConfig {
+  xray.common.net.PortList port_list = 1;
+  xray.common.net.IPOrDomain listen = 2;
+  xray.transport.internet.StreamConfig stream_settings = 3;
+  bool receive_original_destination = 4;
+  reserved 5;
+  SniffingConfig sniffing_settings = 6;
+}
+
+message InboundHandlerConfig {
+  string tag = 1;
+  xray.common.serial.TypedMessage receiver_settings = 2;
+  xray.common.serial.TypedMessage proxy_settings = 3;
+}
+
+message OutboundConfig {}
+
+message SenderConfig {
+  xray.common.net.IPOrDomain via = 1;
+  xray.transport.internet.StreamConfig stream_settings = 2;
+  xray.transport.internet.ProxyConfig proxy_settings = 3;
+  MultiplexingConfig multiplex_settings = 4;
+  string via_cidr = 5;
+  xray.transport.internet.DomainStrategy target_strategy = 6;
+}
+
+message MultiplexingConfig {
+  bool enabled = 1;
+  int32 concurrency = 2;
+  int32 xudpConcurrency = 3;
+  string xudpProxyUDP443 = 4;
+}

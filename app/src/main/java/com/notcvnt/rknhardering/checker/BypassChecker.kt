@@ -6,7 +6,7 @@ import com.notcvnt.rknhardering.probe.IfconfigClient
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyScanner
 import com.notcvnt.rknhardering.probe.ScanMode
-import com.notcvnt.rknhardering.probe.XrayApiEndpoint
+import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -56,7 +56,7 @@ object BypassChecker {
         }
 
         val proxyEndpoint: ProxyEndpoint? = proxyDeferred.await()
-        val xrayApiEndpoint: XrayApiEndpoint? = xrayDeferred.await()
+        val xrayApiScanResult: XrayApiScanResult? = xrayDeferred.await()
 
         // Report proxy scan result
         if (proxyEndpoint != null) {
@@ -71,13 +71,23 @@ object BypassChecker {
         }
 
         // Report xray API result
-        if (xrayApiEndpoint != null) {
-            findings.add(
-                Finding(
-                    "Xray gRPC API: ${formatHostPort(xrayApiEndpoint.host, xrayApiEndpoint.port)}",
-                    true
-                )
-            )
+        if (xrayApiScanResult != null) {
+            val ep = xrayApiScanResult.endpoint
+            findings.add(Finding("Xray gRPC API: ${formatHostPort(ep.host, ep.port)}", true))
+            for (outbound in xrayApiScanResult.outbounds.take(10)) {
+                val detail = buildString {
+                    append("  ${outbound.tag}")
+                    outbound.protocolName?.let { append(" [$it]") }
+                    if (outbound.address != null && outbound.port != null) {
+                        append(" → ${outbound.address}:${outbound.port}")
+                    }
+                    outbound.sni?.let { append(", sni=$it") }
+                }
+                findings.add(Finding(detail, true))
+            }
+            if (xrayApiScanResult.outbounds.size > 10) {
+                findings.add(Finding("  ...ещё ${xrayApiScanResult.outbounds.size - 10} аутбаундов", true))
+            }
         } else {
             findings.add(Finding("Xray gRPC API: не обнаружен", false))
         }
@@ -120,13 +130,13 @@ object BypassChecker {
             }
         }
 
-        val detected = proxyEndpoint != null || xrayApiEndpoint != null
+        val detected = proxyEndpoint != null || xrayApiScanResult != null
 
         BypassResult(
             proxyEndpoint = proxyEndpoint,
             directIp = directIp,
             proxyIp = proxyIp,
-            xrayApiEndpoint = xrayApiEndpoint,
+            xrayApiScanResult = xrayApiScanResult,
             findings = findings,
             detected = detected,
         )

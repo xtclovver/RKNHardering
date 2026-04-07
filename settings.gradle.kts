@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "RKNHardering"
 include(":app")
+include(":xray-protos")
  

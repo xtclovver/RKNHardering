@@ -18,6 +18,23 @@ data class XrayApiEndpoint(
     val port: Int,
 )
 
+data class XrayOutboundSummary(
+    val tag: String,
+    val protocolName: String?,
+    val address: String?,
+    val port: Int?,
+    val uuid: String?,
+    val sni: String?,
+    val publicKey: String?,
+    val senderSettingsType: String?,
+    val proxySettingsType: String?,
+)
+
+data class XrayApiScanResult(
+    val endpoint: XrayApiEndpoint,
+    val outbounds: List<XrayOutboundSummary>,
+)
+
 data class XrayScanProgress(
     val host: String,
     val scanned: Int,
@@ -25,23 +42,20 @@ data class XrayScanProgress(
     val currentPort: Int,
 )
 
-/**
- * Scans localhost for open Xray gRPC API endpoints.
- * Detects by sending an HTTP/2 connection preface and checking for a valid server response.
- * Does not require protobuf/gRPC dependencies.
- */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class XrayApiScanner(
     private val loopbackHosts: List<String> = listOf("127.0.0.1", "::1"),
     private val scanRange: IntRange = 1024..65535,
     private val connectTimeoutMs: Int = 200,
+    private val grpcDeadlineMs: Long = 2000,
     private val maxConcurrency: Int = 100,
     private val progressUpdateEvery: Int = 512,
 ) {
+    private val clients = loopbackHosts.associateWith { XrayApiClient(it) }
 
     suspend fun findXrayApi(
         onProgress: suspend (XrayScanProgress) -> Unit,
-    ): XrayApiEndpoint? = withContext(Dispatchers.IO) {
+    ): XrayApiScanResult? = withContext(Dispatchers.IO) {
         val portsTotal = (scanRange.last - scanRange.first + 1).coerceAtLeast(0)
         val total = portsTotal * loopbackHosts.size
 
@@ -65,12 +79,12 @@ class XrayApiScanner(
         scannedOffset: Int,
         total: Int,
         onProgress: suspend (XrayScanProgress) -> Unit,
-    ): XrayApiEndpoint? = coroutineScope {
+    ): XrayApiScanResult? = coroutineScope {
         val portsTotal = (scanRange.last - scanRange.first + 1).coerceAtLeast(0)
         if (portsTotal <= 0) return@coroutineScope null
 
         val scanned = AtomicInteger(0)
-        val found = AtomicReference<XrayApiEndpoint?>(null)
+        val found = AtomicReference<XrayApiScanResult?>(null)
 
         val dispatcher = Dispatchers.IO.limitedParallelism(max(1, maxConcurrency))
 
@@ -102,9 +116,12 @@ class XrayApiScanner(
                         )
                     }
 
-                    if (isGrpcEndpoint(host, port)) {
-                        found.compareAndSet(null, XrayApiEndpoint(host, port))
-                        return@launch
+                    if (isTcpPortOpen(host, port)) {
+                        val result = tryListOutbounds(host, port)
+                        if (result != null) {
+                            found.compareAndSet(null, result)
+                            return@launch
+                        }
                     }
 
                     port += maxConcurrency
@@ -126,45 +143,19 @@ class XrayApiScanner(
         found.get()
     }
 
-    /**
-     * Detect a gRPC (HTTP/2) server by sending the HTTP/2 connection preface
-     * and checking if the server responds with a valid SETTINGS frame.
-     */
-    private fun isGrpcEndpoint(host: String, port: Int): Boolean {
+    private suspend fun tryListOutbounds(host: String, port: Int): XrayApiScanResult? {
+        val client = clients.getValue(host)
+        client.listOutbounds(port, deadlineMs = grpcDeadlineMs).getOrNull()?.let { return it }
+        val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
+        return client.listOutbounds(port, deadlineMs = retryDeadline).getOrNull()
+    }
+
+    private fun isTcpPortOpen(host: String, port: Int): Boolean {
         return try {
             Socket().use { socket ->
                 socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
-                socket.soTimeout = connectTimeoutMs
-                socket.tcpNoDelay = true
-
-                // HTTP/2 connection preface: magic + SETTINGS frame (empty)
-                val preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".toByteArray(Charsets.US_ASCII)
-                // Empty SETTINGS frame: length=0, type=4, flags=0, stream=0
-                val settingsFrame = byteArrayOf(
-                    0x00, 0x00, 0x00, // length = 0
-                    0x04,             // type = SETTINGS
-                    0x00,             // flags = 0
-                    0x00, 0x00, 0x00, 0x00 // stream ID = 0
-                )
-
-                val out = socket.getOutputStream()
-                out.write(preface)
-                out.write(settingsFrame)
-                out.flush()
-
-                // Read response frame header (9 bytes)
-                val header = ByteArray(9)
-                var offset = 0
-                while (offset < 9) {
-                    val read = socket.getInputStream().read(header, offset, 9 - offset)
-                    if (read <= 0) return false
-                    offset += read
-                }
-
-                // Check if it's a SETTINGS frame (type=4)
-                val frameType = header[3].toInt() and 0xFF
-                frameType == 0x04
             }
+            true
         } catch (_: Exception) {
             false
         }
