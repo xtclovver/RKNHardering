@@ -113,8 +113,12 @@ object BypassChecker {
 
             // MTProto probe: if SOCKS5 proxy found but HTTP didn't work through it,
             // check if it forwards Telegram DC traffic (MTProto-only proxy like tg-ws-proxy).
+            // Skip if the port is already identified as Xray/V2Ray — that proxy is a full SOCKS5
+            // tunnel, not an MTProto-only one; failed IP fetch just means the test site was blocked.
             // Informational only — does not contribute to verdict scoring.
-            if (proxyEndpoint.type == ProxyType.SOCKS5 && proxyIp == null) {
+            val isXrayPort = VpnAppCatalog.familiesForPort(proxyEndpoint.port)
+                .contains(VpnAppCatalog.FAMILY_XRAY)
+            if (proxyEndpoint.type == ProxyType.SOCKS5 && proxyIp == null && !isXrayPort) {
                 onProgress?.invoke(Progress("MTProto probe", "Проверка Telegram DC через прокси..."))
                 val mtResult = MtProtoProber.probe(proxyEndpoint.host, proxyEndpoint.port)
                 if (mtResult.reachable) {
