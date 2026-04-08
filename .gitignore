@@ -13,6 +13,7 @@
 /captures
 .externalNativeBuild
 .cxx
+.superpowers
 .android/
 .android-home/
 .android-user-home/
