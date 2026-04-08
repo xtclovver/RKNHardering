@@ -185,7 +185,7 @@ object GeoIpChecker {
         return CategoryResult(
             name = "GeoIP",
             detected = false,
-            findings = listOf(Finding(message)),
+            findings = listOf(Finding("Ошибка GeoIP: $message")),
         )
     }
 

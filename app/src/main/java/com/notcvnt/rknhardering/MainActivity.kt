@@ -27,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.notcvnt.rknhardering.checker.BypassChecker
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.VpnCheckRunner
 import com.notcvnt.rknhardering.model.BypassResult
@@ -91,6 +92,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textVerdict: TextView
     private lateinit var geoIpInfoSection: LinearLayout
     private lateinit var geoIpDivider: View
+    private val bypassProgressLines = linkedMapOf<BypassChecker.ProgressLine, String>()
+    private val bypassProgressOrder = listOf(
+        BypassChecker.ProgressLine.BYPASS,
+        BypassChecker.ProgressLine.XRAY_API,
+        BypassChecker.ProgressLine.UNDERLYING_NETWORK,
+    )
 
     private val prefs by lazy { getSharedPreferences("rknhardering_prefs", MODE_PRIVATE) }
 
@@ -316,8 +323,14 @@ class MainActivity : AppCompatActivity() {
             iconBypass.setImageResource(R.drawable.ic_help)
             statusBypass.text = "Сканирование..."
             statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
-            textBypassProgress.visibility = View.VISIBLE
-            textBypassProgress.text = "Подготовка..."
+            resetBypassProgress()
+            updateBypassProgress(
+                BypassChecker.Progress(
+                    line = BypassChecker.ProgressLine.BYPASS,
+                    phase = "Split tunnel bypass",
+                    detail = "Подготовка...",
+                ),
+            )
             findingsBypass.removeAllViews()
         }
 
@@ -325,7 +338,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val result = VpnCheckRunner.run(this@MainActivity, settings) { progress ->
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        textBypassProgress.text = "${progress.phase}: ${progress.detail}"
+                        updateBypassProgress(progress)
                     }
                 }
                 progressBar.visibility = View.GONE
@@ -336,7 +349,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 btnStopCheck.visibility = View.GONE
                 btnRunCheck.isEnabled = true
-                textBypassProgress.visibility = View.GONE
+                resetBypassProgress()
                 statusBypass.text = "Отменено"
                 statusBypass.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.verdict_yellow))
                 throw e
@@ -380,7 +393,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         card.visibility = View.VISIBLE
 
-        bindCardStatus(category.detected, category.needsReview, icon, status)
+        bindCardStatus(category.detected, category.needsReview, icon, status, hasError = category.hasError)
 
         if (card.id == R.id.cardGeoIp) {
             val infoFindings = category.findings.filter { it.source == null }
@@ -679,7 +692,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun displayBypass(bypass: BypassResult, privacyMode: Boolean = false) {
         cardBypass.visibility = View.VISIBLE
-        textBypassProgress.visibility = View.GONE
+        resetBypassProgress()
 
         bindCardStatus(bypass.detected, bypass.needsReview, iconBypass, statusBypass)
 
@@ -689,16 +702,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateBypassProgress(progress: BypassChecker.Progress) {
+        bypassProgressLines[progress.line] = "${progress.phase}: ${progress.detail}"
+        renderBypassProgress()
+    }
+
+    private fun resetBypassProgress() {
+        bypassProgressLines.clear()
+        textBypassProgress.text = ""
+        textBypassProgress.visibility = View.GONE
+    }
+
+    private fun renderBypassProgress() {
+        val text = bypassProgressOrder
+            .mapNotNull { bypassProgressLines[it] }
+            .joinToString(separator = "\n")
+        textBypassProgress.text = text
+        textBypassProgress.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+    }
+
     private fun bindCardStatus(
         detected: Boolean,
         needsReview: Boolean,
         icon: ImageView,
         status: TextView,
+        hasError: Boolean = false,
     ) {
         when {
             detected -> {
                 icon.setImageResource(R.drawable.ic_warning)
                 status.text = "Обнаружено"
+            }
+            hasError -> {
+                icon.setImageResource(R.drawable.ic_error)
+                status.text = "Ошибка"
             }
             needsReview -> {
                 icon.setImageResource(R.drawable.ic_help)
@@ -709,12 +746,13 @@ class MainActivity : AppCompatActivity() {
                 status.text = "Чисто"
             }
         }
-        status.setTextColor(ContextCompat.getColor(this, statusColorRes(detected, needsReview)))
+        status.setTextColor(ContextCompat.getColor(this, statusColorRes(detected, needsReview, hasError)))
     }
 
-    private fun statusColorRes(detected: Boolean, needsReview: Boolean): Int {
+    private fun statusColorRes(detected: Boolean, needsReview: Boolean, hasError: Boolean = false): Int {
         return when {
             detected -> R.color.status_red
+            hasError -> R.color.status_amber
             needsReview -> R.color.status_amber
             else -> R.color.status_green
         }

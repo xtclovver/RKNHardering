@@ -81,7 +81,10 @@ data class CategoryResult(
     val evidence: List<EvidenceItem> = emptyList(),
     val matchedApps: List<MatchedVpnApp> = emptyList(),
     val activeApps: List<ActiveVpnApp> = emptyList(),
-)
+) {
+    val hasError: Boolean
+        get() = findings.any { it.description.startsWith("Ошибка GeoIP:") }
+}
 
 enum class Verdict {
     NOT_DETECTED,

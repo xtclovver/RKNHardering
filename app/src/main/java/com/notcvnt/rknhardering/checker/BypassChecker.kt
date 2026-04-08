@@ -22,7 +22,14 @@ import kotlinx.coroutines.coroutineScope
 
 object BypassChecker {
 
+    enum class ProgressLine {
+        BYPASS,
+        XRAY_API,
+        UNDERLYING_NETWORK,
+    }
+
     data class Progress(
+        val line: ProgressLine,
         val phase: String,
         val detail: String,
     )
@@ -62,14 +69,26 @@ object BypassChecker {
         val xrayScanner = XrayApiScanner()
 
         val proxyDeferred = async {
-            onProgress?.invoke(Progress("Сканирование портов", "Поиск открытых прокси на localhost..."))
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.BYPASS,
+                    phase = "Сканирование портов",
+                    detail = "Поиск открытых прокси на localhost...",
+                ),
+            )
             if (scanMode == ScanMode.POPULAR_ONLY) {
                 scanner.findOpenProxyEndpoint(
                     mode = ScanMode.POPULAR_ONLY,
                     manualPort = null,
                     onProgress = { progress ->
                         val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                        onProgress?.invoke(Progress("Популярные порты", "Порт ${progress.currentPort} ($percent%)"))
+                        onProgress?.invoke(
+                            Progress(
+                                line = ProgressLine.BYPASS,
+                                phase = "Популярные порты",
+                                detail = "Порт ${progress.currentPort} ($percent%)",
+                            ),
+                        )
                     },
                 )
             } else {
@@ -82,22 +101,46 @@ object BypassChecker {
                             com.notcvnt.rknhardering.probe.ScanPhase.FULL_RANGE -> "Полное сканирование"
                         }
                         val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                        onProgress?.invoke(Progress(phaseText, "Порт ${progress.currentPort} ($percent%)"))
+                        onProgress?.invoke(
+                            Progress(
+                                line = ProgressLine.BYPASS,
+                                phase = phaseText,
+                                detail = "Порт ${progress.currentPort} ($percent%)",
+                            ),
+                        )
                     },
                 )
             }
         }
 
         val xrayDeferred = async {
-            onProgress?.invoke(Progress("Xray API", "Поиск gRPC API на localhost..."))
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.XRAY_API,
+                    phase = "Xray API",
+                    detail = "Поиск gRPC API на localhost...",
+                ),
+            )
             xrayScanner.findXrayApi { progress ->
                 val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                onProgress?.invoke(Progress("Xray API", "${progress.host}:${progress.currentPort} ($percent%)"))
+                onProgress?.invoke(
+                    Progress(
+                        line = ProgressLine.XRAY_API,
+                        phase = "Xray API",
+                        detail = "${progress.host}:${progress.currentPort} ($percent%)",
+                    ),
+                )
             }
         }
 
         val underlyingDeferred = async {
-            onProgress?.invoke(Progress("Underlying network", "Проверка доступа к non-VPN сети..."))
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.UNDERLYING_NETWORK,
+                    phase = "Underlying network",
+                    detail = "Проверка доступа к non-VPN сети...",
+                ),
+            )
             UnderlyingNetworkProber.probe(context)
         }
 
@@ -114,7 +157,13 @@ object BypassChecker {
         var confirmedBypass = false
 
         if (proxyEndpoint != null) {
-            onProgress?.invoke(Progress("Проверка IP", "Получение прямого IP и IP через прокси..."))
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.BYPASS,
+                    phase = "Проверка IP",
+                    detail = "Получение прямого IP и IP через прокси...",
+                ),
+            )
 
             val directDeferred = async { IfconfigClient.fetchDirectIp() }
             val proxyIpDeferred = async { IfconfigClient.fetchIpViaProxy(proxyEndpoint) }
@@ -155,7 +204,13 @@ object BypassChecker {
             val isXrayPort = VpnAppCatalog.familiesForPort(proxyEndpoint.port)
                 .contains(VpnAppCatalog.FAMILY_XRAY)
             if (proxyEndpoint.type == ProxyType.SOCKS5 && proxyIp == null && !isXrayPort) {
-                onProgress?.invoke(Progress("MTProto probe", "Проверка Telegram DC через прокси..."))
+                onProgress?.invoke(
+                    Progress(
+                        line = ProgressLine.BYPASS,
+                        phase = "MTProto probe",
+                        detail = "Проверка Telegram DC через прокси...",
+                    ),
+                )
                 val mtResult = MtProtoProber.probe(proxyEndpoint.host, proxyEndpoint.port)
                 if (mtResult.reachable) {
                     val addr = mtResult.targetAddress
