@@ -24,6 +24,7 @@ enum class EvidenceSource {
     DNS,
     DUMPSYS,
     LOCATION_SIGNALS,
+    VPN_GATEWAY_LEAK,
 }
 
 enum class VpnAppKind {

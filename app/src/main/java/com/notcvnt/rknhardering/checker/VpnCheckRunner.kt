@@ -15,7 +15,7 @@ object VpnCheckRunner {
         val directDeferred = async { DirectSignsChecker.check(context) }
         val indirectDeferred = async { IndirectSignsChecker.check(context) }
         val locationDeferred = async { LocationSignalsChecker.check(context) }
-        val bypassDeferred = async { BypassChecker.check(onProgress = onBypassProgress) }
+        val bypassDeferred = async { BypassChecker.check(context = context, onProgress = onBypassProgress) }
 
         val geoIp = geoIpDeferred.await()
         val directSigns = directDeferred.await()

@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering.checker
 
+import android.content.Context
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -11,6 +12,7 @@ import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyScanner
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.ScanMode
+import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
@@ -25,6 +27,7 @@ object BypassChecker {
     )
 
     suspend fun check(
+        context: Context,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): BypassResult = coroutineScope {
         val findings = mutableListOf<Finding>()
@@ -57,11 +60,18 @@ object BypassChecker {
             }
         }
 
+        val underlyingDeferred = async {
+            onProgress?.invoke(Progress("Underlying network", "Проверка доступа к non-VPN сети..."))
+            UnderlyingNetworkProber.probe(context)
+        }
+
         val proxyEndpoint = proxyDeferred.await()
         val xrayApiScanResult = xrayDeferred.await()
+        val underlyingResult = underlyingDeferred.await()
 
         reportProxyResult(proxyEndpoint, findings, evidence)
         reportXrayApiResult(xrayApiScanResult, findings, evidence)
+        val gatewayLeak = reportUnderlyingNetworkResult(underlyingResult, findings, evidence)
 
         var directIp: String? = null
         var proxyIp: String? = null
@@ -126,7 +136,7 @@ object BypassChecker {
             }
         }
 
-        val detected = confirmedBypass || xrayApiScanResult != null
+        val detected = confirmedBypass || xrayApiScanResult != null || gatewayLeak
         val needsReview = !detected && proxyEndpoint != null
 
         BypassResult(
@@ -247,6 +257,61 @@ object BypassChecker {
                 ),
             )
         }
+    }
+
+    private fun reportUnderlyingNetworkResult(
+        result: UnderlyingNetworkProber.ProbeResult,
+        findings: MutableList<Finding>,
+        evidence: MutableList<EvidenceItem>,
+    ): Boolean {
+        if (!result.vpnActive) {
+            findings.add(Finding("Underlying network: VPN не активен, проверка не требуется"))
+            return false
+        }
+
+        if (!result.underlyingReachable) {
+            findings.add(Finding("Underlying network: non-VPN сеть недоступна (full tunnel)"))
+            return false
+        }
+
+        val description = buildString {
+            append("VPN gateway leak: приложение может обойти VPN-туннель")
+            if (result.vpnIp != null && result.underlyingIp != null) {
+                append(" (VPN IP: ${result.vpnIp}, реальный IP: ${result.underlyingIp})")
+            } else if (result.underlyingIp != null) {
+                append(" (реальный IP: ${result.underlyingIp})")
+            }
+        }
+
+        findings.add(
+            Finding(
+                description = description,
+                detected = true,
+                source = EvidenceSource.VPN_GATEWAY_LEAK,
+                confidence = EvidenceConfidence.HIGH,
+            ),
+        )
+        evidence.add(
+            EvidenceItem(
+                source = EvidenceSource.VPN_GATEWAY_LEAK,
+                detected = true,
+                confidence = EvidenceConfidence.HIGH,
+                description = "App can reach internet bypassing VPN tunnel via underlying network",
+            ),
+        )
+
+        if (result.vpnIp != null && result.underlyingIp != null && result.vpnIp != result.underlyingIp) {
+            findings.add(
+                Finding(
+                    description = "IP через VPN и underlying сеть различаются: подтверждён split tunnel",
+                    detected = true,
+                    source = EvidenceSource.VPN_GATEWAY_LEAK,
+                    confidence = EvidenceConfidence.HIGH,
+                ),
+            )
+        }
+
+        return true
     }
 
     private fun formatHostPort(host: String, port: Int): String {

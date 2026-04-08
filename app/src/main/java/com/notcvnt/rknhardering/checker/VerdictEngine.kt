@@ -31,6 +31,9 @@ object VerdictEngine {
         if (evidence.any { it.source == EvidenceSource.XRAY_API && it.detected }) {
             return Verdict.DETECTED
         }
+        if (evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected }) {
+            return Verdict.DETECTED
+        }
 
         // Location signals: Network MCC is RU + GeoIP is foreign -> DETECTED
         val networkMccIsRu = locationSignals.findings.any {
@@ -91,6 +94,7 @@ object VerdictEngine {
             EvidenceSource.LOCAL_PROXY -> 2
             EvidenceSource.XRAY_API -> 4
             EvidenceSource.SPLIT_TUNNEL_BYPASS -> 5
+            EvidenceSource.VPN_GATEWAY_LEAK -> 5
             else -> 0
         }
         return confidenceWeight + kindWeight + sourceWeight

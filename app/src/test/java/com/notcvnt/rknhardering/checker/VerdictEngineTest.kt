@@ -117,6 +117,26 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `vpn gateway leak returns detected`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(
+                evidence = listOf(
+                    evidence(
+                        source = EvidenceSource.VPN_GATEWAY_LEAK,
+                        confidence = EvidenceConfidence.HIGH,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
     fun `no evidence returns not detected`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),
@@ -245,7 +265,7 @@ class VerdictEngineTest {
         proxyIp = null,
         xrayApiScanResult = null,
         findings = emptyList(),
-        detected = evidence.any { it.source == EvidenceSource.XRAY_API || it.source == EvidenceSource.SPLIT_TUNNEL_BYPASS },
+        detected = evidence.any { it.source == EvidenceSource.XRAY_API || it.source == EvidenceSource.SPLIT_TUNNEL_BYPASS || it.source == EvidenceSource.VPN_GATEWAY_LEAK },
         evidence = evidence,
     )
 
