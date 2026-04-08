@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.probe
 enum class ScanMode {
     AUTO,
     MANUAL,
+    POPULAR_ONLY,
 }
 
 enum class ScanPhase {

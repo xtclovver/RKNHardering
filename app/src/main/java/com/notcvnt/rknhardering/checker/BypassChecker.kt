@@ -12,6 +12,7 @@ import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyScanner
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.ScanMode
+import com.notcvnt.rknhardering.probe.ScanPhase
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
@@ -28,28 +29,63 @@ object BypassChecker {
 
     suspend fun check(
         context: Context,
+        portRange: String = "full",
+        portRangeStart: Int = 1024,
+        portRangeEnd: Int = 65535,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): BypassResult = coroutineScope {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
 
-        val scanner = ProxyScanner()
+        val scanMode: ScanMode
+        val customRange: IntRange?
+        when (portRange) {
+            "popular" -> {
+                scanMode = ScanMode.POPULAR_ONLY
+                customRange = null
+            }
+            "extended" -> {
+                scanMode = ScanMode.AUTO
+                customRange = 1024..15000
+            }
+            "custom" -> {
+                scanMode = ScanMode.AUTO
+                customRange = portRangeStart..portRangeEnd
+            }
+            else -> {
+                scanMode = ScanMode.AUTO
+                customRange = null
+            }
+        }
+
+        val scanner = if (customRange != null) ProxyScanner(scanRange = customRange) else ProxyScanner()
         val xrayScanner = XrayApiScanner()
 
         val proxyDeferred = async {
             onProgress?.invoke(Progress("Сканирование портов", "Поиск открытых прокси на localhost..."))
-            scanner.findOpenProxyEndpoint(
-                mode = ScanMode.AUTO,
-                manualPort = null,
-                onProgress = { progress ->
-                    val phaseText = when (progress.phase) {
-                        com.notcvnt.rknhardering.probe.ScanPhase.POPULAR_PORTS -> "Популярные порты"
-                        com.notcvnt.rknhardering.probe.ScanPhase.FULL_RANGE -> "Полное сканирование"
-                    }
-                    val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                    onProgress?.invoke(Progress(phaseText, "Порт ${progress.currentPort} ($percent%)"))
-                },
-            )
+            if (scanMode == ScanMode.POPULAR_ONLY) {
+                scanner.findOpenProxyEndpoint(
+                    mode = ScanMode.POPULAR_ONLY,
+                    manualPort = null,
+                    onProgress = { progress ->
+                        val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                        onProgress?.invoke(Progress("Популярные порты", "Порт ${progress.currentPort} ($percent%)"))
+                    },
+                )
+            } else {
+                scanner.findOpenProxyEndpoint(
+                    mode = ScanMode.AUTO,
+                    manualPort = null,
+                    onProgress = { progress ->
+                        val phaseText = when (progress.phase) {
+                            com.notcvnt.rknhardering.probe.ScanPhase.POPULAR_PORTS -> "Популярные порты"
+                            com.notcvnt.rknhardering.probe.ScanPhase.FULL_RANGE -> "Полное сканирование"
+                        }
+                        val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                        onProgress?.invoke(Progress(phaseText, "Порт ${progress.currentPort} ($percent%)"))
+                    },
+                )
+            }
         }
 
         val xrayDeferred = async {

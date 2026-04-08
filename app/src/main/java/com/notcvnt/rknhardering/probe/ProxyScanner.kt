@@ -49,6 +49,10 @@ class ProxyScanner(
                 if (foundOnPopular != null) return foundOnPopular
                 scanFullRange(onProgress)
             }
+
+            ScanMode.POPULAR_ONLY -> {
+                scanPopularPorts(onProgress)
+            }
         }
     }
 

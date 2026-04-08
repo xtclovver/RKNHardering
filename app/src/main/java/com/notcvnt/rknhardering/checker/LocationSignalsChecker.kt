@@ -57,11 +57,11 @@ object LocationSignalsChecker {
     private const val MAX_CELL_TOWERS = 6
     private const val MAX_WIFI_ACCESS_POINTS = 12
 
-    suspend fun check(context: Context): CategoryResult = withContext(Dispatchers.IO) {
-        evaluate(collectSnapshot(context))
+    suspend fun check(context: Context, networkRequestsEnabled: Boolean = true): CategoryResult = withContext(Dispatchers.IO) {
+        evaluate(collectSnapshot(context, networkRequestsEnabled))
     }
 
-    private suspend fun collectSnapshot(context: Context): LocationSnapshot {
+    private suspend fun collectSnapshot(context: Context, networkRequestsEnabled: Boolean): LocationSnapshot {
         val fineLocationGranted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         val nearbyWifiGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             hasPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES)
@@ -110,7 +110,7 @@ object LocationSignalsChecker {
             emptyList()
         }
 
-        if (cellLookupPermissionGranted || wifiPermissionGranted) {
+        if ((cellLookupPermissionGranted || wifiPermissionGranted) && networkRequestsEnabled) {
             val lookup = BeaconDbClient(countryResolver = { lat, lon ->
                 reverseGeocodeCountry(context, lat, lon)
             }).lookup(cellCandidates, wifiCandidates)

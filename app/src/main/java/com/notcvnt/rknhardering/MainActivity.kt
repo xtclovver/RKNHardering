@@ -24,8 +24,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.VpnCheckRunner
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
@@ -38,13 +40,23 @@ import com.notcvnt.rknhardering.model.Verdict
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+fun maskIp(ip: String): String {
+    val ipv4Parts = ip.split(".")
+    if (ipv4Parts.size == 4 && ipv4Parts.all { it.toIntOrNull() != null }) {
+        return "${ipv4Parts[0]}.${ipv4Parts[1]}.*.*"
+    }
+    val ipv6Parts = ip.split(":")
+    if (ipv6Parts.size == 8) {
+        return "${ipv6Parts[0]}:${ipv6Parts[1]}:${ipv6Parts[2]}:${ipv6Parts[3]}:*:*:*:*"
+    }
+    return "*.*.*.*"
+}
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnRunCheck: MaterialButton
     private lateinit var btnStopCheck: MaterialButton
-    private lateinit var btnReRequestPermissions: MaterialButton
     private lateinit var cardRunCheckNotice: MaterialCardView
-    private lateinit var linkGithub: TextView
     private var checkJob: Job? = null
     private var hasDismissedRunCheckNotice = false
     private lateinit var progressBar: ProgressBar
@@ -90,6 +102,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val themePrefs = getSharedPreferences("rknhardering_prefs", MODE_PRIVATE)
+        SettingsActivity.applyTheme(themePrefs.getString(SettingsActivity.PREF_THEME, "system") ?: "system")
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
@@ -99,26 +113,43 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        toolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.action_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
+        }
+
         bindViews()
         hasDismissedRunCheckNotice = savedInstanceState?.getBoolean(STATE_RUN_CHECK_NOTICE_HIDDEN, false) ?: false
         updateRunCheckNoticeVisibility()
 
-        linkGithub.setOnClickListener { openGithubRepo() }
         btnRunCheck.setOnClickListener { onRunCheckClicked() }
         btnStopCheck.setOnClickListener { checkJob?.cancel() }
-        btnReRequestPermissions.setOnClickListener { reRequestPermissions() }
 
-        if (!prefs.getBoolean(PREF_RATIONALE_SHOWN, false)) {
+        if (intent.getBooleanExtra(SettingsActivity.EXTRA_REQUEST_PERMISSIONS, false)) {
+            intent.removeExtra(SettingsActivity.EXTRA_REQUEST_PERMISSIONS)
+            reRequestPermissions()
+        } else if (!prefs.getBoolean(PREF_RATIONALE_SHOWN, false)) {
             showPermissionRationale()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(SettingsActivity.EXTRA_REQUEST_PERMISSIONS, false)) {
+            reRequestPermissions()
         }
     }
 
     private fun bindViews() {
         btnRunCheck = findViewById(R.id.btnRunCheck)
         btnStopCheck = findViewById(R.id.btnStopCheck)
-        btnReRequestPermissions = findViewById(R.id.btnReRequestPermissions)
         cardRunCheckNotice = findViewById(R.id.cardRunCheckNotice)
-        linkGithub = findViewById(R.id.linkGithub)
         progressBar = findViewById(R.id.progressBar)
         cardGeoIp = findViewById(R.id.cardGeoIp)
         cardIpComparison = findViewById(R.id.cardIpComparison)
@@ -151,10 +182,6 @@ class MainActivity : AppCompatActivity() {
         textVerdict = findViewById(R.id.textVerdict)
         geoIpInfoSection = findViewById(R.id.geoIpInfoSection)
         geoIpDivider = findViewById(R.id.geoIpDivider)
-    }
-
-    private fun openGithubRepo() {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_repo_url))))
     }
 
     private fun requiredPermissions(): Array<String> {
@@ -195,7 +222,7 @@ class MainActivity : AppCompatActivity() {
             "Без этих разрешений проверка продолжит работать, но часть сигналов местоположения и Wi-Fi scan будут недоступны."
     }
 
-    private fun reRequestPermissions() {
+    internal fun reRequestPermissions() {
         val missingPermissions = requiredPermissions().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -265,22 +292,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runCheck() {
+        val splitTunnelEnabled = prefs.getBoolean(SettingsActivity.PREF_SPLIT_TUNNEL_ENABLED, true)
+        val networkRequestsEnabled = prefs.getBoolean(SettingsActivity.PREF_NETWORK_REQUESTS_ENABLED, true)
+        val portRange = prefs.getString(SettingsActivity.PREF_PORT_RANGE, "full") ?: "full"
+        val portRangeStart = prefs.getInt(SettingsActivity.PREF_PORT_RANGE_START, 1024)
+        val portRangeEnd = prefs.getInt(SettingsActivity.PREF_PORT_RANGE_END, 65535)
+
+        val settings = CheckSettings(
+            splitTunnelEnabled = splitTunnelEnabled,
+            networkRequestsEnabled = networkRequestsEnabled,
+            portRange = portRange,
+            portRangeStart = portRangeStart,
+            portRangeEnd = portRangeEnd,
+        )
+
         btnRunCheck.isEnabled = false
         btnStopCheck.visibility = View.VISIBLE
         progressBar.visibility = View.VISIBLE
         hideCards()
 
-        cardBypass.visibility = View.VISIBLE
-        iconBypass.setImageResource(R.drawable.ic_help)
-        statusBypass.text = "Сканирование..."
-        statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
-        textBypassProgress.visibility = View.VISIBLE
-        textBypassProgress.text = "Подготовка..."
-        findingsBypass.removeAllViews()
+        if (splitTunnelEnabled) {
+            cardBypass.visibility = View.VISIBLE
+            iconBypass.setImageResource(R.drawable.ic_help)
+            statusBypass.text = "Сканирование..."
+            statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+            textBypassProgress.visibility = View.VISIBLE
+            textBypassProgress.text = "Подготовка..."
+            findingsBypass.removeAllViews()
+        }
 
         checkJob = lifecycleScope.launch {
             try {
-                val result = VpnCheckRunner.run(this@MainActivity) { progress ->
+                val result = VpnCheckRunner.run(this@MainActivity, settings) { progress ->
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         textBypassProgress.text = "${progress.phase}: ${progress.detail}"
                     }
@@ -288,7 +331,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 btnStopCheck.visibility = View.GONE
                 btnRunCheck.isEnabled = true
-                displayResult(result)
+                displayResult(result, settings)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 progressBar.visibility = View.GONE
                 btnStopCheck.visibility = View.GONE
@@ -311,13 +354,19 @@ class MainActivity : AppCompatActivity() {
         cardVerdict.visibility = View.GONE
     }
 
-    private fun displayResult(result: CheckResult) {
-        displayCategory(result.geoIp, cardGeoIp, iconGeoIp, statusGeoIp, findingsGeoIp)
-        displayIpComparison(result.ipComparison)
-        displayCategory(result.directSigns, cardDirect, iconDirect, statusDirect, findingsDirect)
-        displayCategory(result.indirectSigns, cardIndirect, iconIndirect, statusIndirect, findingsIndirect)
-        displayCategory(result.locationSignals, cardLocation, iconLocation, statusLocation, findingsLocation)
-        displayBypass(result.bypassResult)
+    private fun displayResult(result: CheckResult, settings: CheckSettings) {
+        val privacyMode = prefs.getBoolean(SettingsActivity.PREF_PRIVACY_MODE, false)
+
+        if (settings.networkRequestsEnabled) {
+            displayCategory(result.geoIp, cardGeoIp, iconGeoIp, statusGeoIp, findingsGeoIp, privacyMode)
+            displayIpComparison(result.ipComparison, privacyMode)
+        }
+        displayCategory(result.directSigns, cardDirect, iconDirect, statusDirect, findingsDirect, privacyMode)
+        displayCategory(result.indirectSigns, cardIndirect, iconIndirect, statusIndirect, findingsIndirect, privacyMode)
+        displayCategory(result.locationSignals, cardLocation, iconLocation, statusLocation, findingsLocation, privacyMode)
+        if (settings.splitTunnelEnabled) {
+            displayBypass(result.bypassResult, privacyMode)
+        }
         displayVerdict(result.verdict)
     }
 
@@ -327,13 +376,12 @@ class MainActivity : AppCompatActivity() {
         icon: ImageView,
         status: TextView,
         findingsContainer: LinearLayout,
+        privacyMode: Boolean = false,
     ) {
         card.visibility = View.VISIBLE
 
         bindCardStatus(category.detected, category.needsReview, icon, status)
 
-        // GeoIP card: info fields (source==null) go to the key-value section,
-        // actual checks (source!=null) go to the findings list
         if (card.id == R.id.cardGeoIp) {
             val infoFindings = category.findings.filter { it.source == null }
             val checkFindings = category.findings.filter { it.source != null }
@@ -342,9 +390,14 @@ class MainActivity : AppCompatActivity() {
             for (finding in infoFindings) {
                 val parts = finding.description.split(": ", limit = 2)
                 if (parts.size == 2) {
-                    geoIpInfoSection.addView(createGeoInfoView(parts[0], parts[1]))
+                    val value = if (privacyMode && parts[0].trim().equals("IP", ignoreCase = true)) {
+                        maskIp(parts[1].trim())
+                    } else {
+                        parts[1]
+                    }
+                    geoIpInfoSection.addView(createGeoInfoView(parts[0], value))
                 } else {
-                    geoIpInfoSection.addView(createFindingView(finding))
+                    geoIpInfoSection.addView(createFindingView(finding, privacyMode))
                 }
             }
             val hasInfo = infoFindings.isNotEmpty() && checkFindings.isNotEmpty()
@@ -352,7 +405,7 @@ class MainActivity : AppCompatActivity() {
 
             findingsContainer.removeAllViews()
             for (finding in checkFindings) {
-                findingsContainer.addView(createFindingView(finding))
+                findingsContainer.addView(createFindingView(finding, privacyMode))
             }
             return
         }
@@ -360,11 +413,11 @@ class MainActivity : AppCompatActivity() {
         findingsContainer.removeAllViews()
         for (finding in category.findings) {
             if (finding.description.startsWith("network_mcc_ru:")) continue
-            findingsContainer.addView(createFindingView(finding))
+            findingsContainer.addView(createFindingView(finding, privacyMode))
         }
     }
 
-    private fun displayIpComparison(result: IpComparisonResult) {
+    private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
         cardIpComparison.visibility = View.VISIBLE
         bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison)
         textIpComparisonSummary.text = result.summary
@@ -374,17 +427,19 @@ class MainActivity : AppCompatActivity() {
             createIpCheckerGroupView(
                 group = result.ruGroup,
                 expanded = result.detected || result.needsReview || result.ruGroup.needsReview,
+                privacyMode = privacyMode,
             ),
         )
         ipComparisonGroups.addView(
             createIpCheckerGroupView(
                 group = result.nonRuGroup,
                 expanded = result.detected || result.needsReview || result.nonRuGroup.detected,
+                privacyMode = privacyMode,
             ),
         )
     }
 
-    private fun createFindingView(finding: Finding): View {
+    private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -412,8 +467,9 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 8.dp, 0)
         }
 
+        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
         val description = TextView(this).apply {
-            text = finding.description
+            text = descriptionText
             textSize = 13f
             val tv = TypedValue()
             this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
@@ -424,6 +480,13 @@ class MainActivity : AppCompatActivity() {
         row.addView(indicator)
         row.addView(description)
         return row
+    }
+
+    private fun maskIpsInText(text: String): String {
+        val ipv4Regex = Regex("""\b(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}\b""")
+        return ipv4Regex.replace(text) { match ->
+            "${match.groupValues[1]}.${match.groupValues[2]}.*.*"
+        }
     }
 
     private fun createGeoInfoView(label: String, value: String): View {
@@ -464,6 +527,7 @@ class MainActivity : AppCompatActivity() {
     private fun createIpCheckerGroupView(
         group: IpCheckerGroupResult,
         expanded: Boolean,
+        privacyMode: Boolean = false,
     ): View {
         val card = MaterialCardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -523,7 +587,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 8.dp, 0, 0)
         }
         group.responses.forEach { response ->
-            details.addView(createIpCheckerResponseView(response))
+            details.addView(createIpCheckerResponseView(response, privacyMode))
         }
 
         header.addView(title)
@@ -545,7 +609,7 @@ class MainActivity : AppCompatActivity() {
         return card
     }
 
-    private fun createIpCheckerResponseView(response: IpCheckerResponse): View {
+    private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 8.dp, 0, 8.dp)
@@ -564,8 +628,9 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
+        val displayIp = if (privacyMode && response.ip != null) maskIp(response.ip) else response.ip
         val value = TextView(this).apply {
-            text = response.ip ?: "Ошибка"
+            text = displayIp ?: "Ошибка"
             textSize = 13f
             typeface = Typeface.MONOSPACE
             setTextColor(
@@ -612,7 +677,7 @@ class MainActivity : AppCompatActivity() {
         return container
     }
 
-    private fun displayBypass(bypass: BypassResult) {
+    private fun displayBypass(bypass: BypassResult, privacyMode: Boolean = false) {
         cardBypass.visibility = View.VISIBLE
         textBypassProgress.visibility = View.GONE
 
@@ -620,7 +685,7 @@ class MainActivity : AppCompatActivity() {
 
         findingsBypass.removeAllViews()
         for (finding in bypass.findings) {
-            findingsBypass.addView(createFindingView(finding))
+            findingsBypass.addView(createFindingView(finding, privacyMode))
         }
     }
 
