@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
@@ -97,7 +98,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -135,6 +137,21 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/geoIpInfoSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp" />
+
+                <View
+                    android:id="@+id/geoIpDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant"
+                    android:visibility="gone" />
+
+                <LinearLayout
                     android:id="@+id/findingsGeoIp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -149,7 +166,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -201,7 +219,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -253,7 +272,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -305,7 +325,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -366,7 +387,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
             <LinearLayout
                 android:layout_width="match_parent"
