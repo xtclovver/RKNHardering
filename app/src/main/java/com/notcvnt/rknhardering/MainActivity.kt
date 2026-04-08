@@ -68,6 +68,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var findingsBypass: LinearLayout
     private lateinit var iconVerdict: ImageView
     private lateinit var textVerdict: TextView
+    private lateinit var geoIpInfoSection: LinearLayout
+    private lateinit var geoIpDivider: View
 
     private val prefs by lazy { getSharedPreferences("rknhardering_prefs", MODE_PRIVATE) }
 
@@ -130,6 +132,8 @@ class MainActivity : AppCompatActivity() {
         findingsBypass = findViewById(R.id.findingsBypass)
         iconVerdict = findViewById(R.id.iconVerdict)
         textVerdict = findViewById(R.id.textVerdict)
+        geoIpInfoSection = findViewById(R.id.geoIpInfoSection)
+        geoIpDivider = findViewById(R.id.geoIpDivider)
     }
 
     private fun openGithubRepo() {
@@ -358,6 +362,36 @@ class MainActivity : AppCompatActivity() {
 
         row.addView(indicator)
         row.addView(description)
+        return row
+    }
+
+    private fun createGeoInfoView(label: String, value: String): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 4.dp, 0, 4.dp)
+        }
+
+        val labelView = TextView(this).apply {
+            text = label
+            textSize = 11f
+            typeface = Typeface.DEFAULT_BOLD
+            isAllCaps = true
+            letterSpacing = 0.05f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.38f)
+        }
+
+        val valueView = TextView(this).apply {
+            text = value
+            textSize = 13f
+            val tv = TypedValue()
+            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
+            setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.62f)
+        }
+
+        row.addView(labelView)
+        row.addView(valueView)
         return row
     }
 
