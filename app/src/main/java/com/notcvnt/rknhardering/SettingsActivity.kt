@@ -305,8 +305,8 @@ class SettingsActivity : AppCompatActivity() {
         }
         val portsCount = mergedPorts.sumOf { it.last - it.first + 1 }
         val formattedCount = NumberFormat.getIntegerInstance().format(portsCount)
-        val portCountWord = resources.getQuantityString(R.plurals.settings_port_word, portsCount)
-        textPortRangePreview.text = getString(R.string.settings_port_range_preview, portsText, formattedCount, portCountWord)
+        val portCountLabel = resources.getQuantityString(R.plurals.settings_port_word, portsCount, formattedCount)
+        textPortRangePreview.text = getString(R.string.settings_port_range_preview, portsText, portCountLabel)
     }
 
     private fun selectedPortRange(): String {

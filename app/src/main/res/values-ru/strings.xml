@@ -111,12 +111,12 @@
 
     <string name="main_ipv6_error_ignored">IPv6-ошибка проигнорирована: </string>
 
-    <string name="settings_port_range_preview">Будут сканироваться proxy-порты localhost: %1$s (%2$s %3$s)</string>
+    <string name="settings_port_range_preview">Будут сканироваться proxy-порты localhost: %1$s (%2$s)</string>
     <plurals name="settings_port_word">
-        <item quantity="one">порт</item>
-        <item quantity="few">порта</item>
-        <item quantity="many">портов</item>
-        <item quantity="other">портов</item>
+        <item quantity="one">%1$s порт</item>
+        <item quantity="few">%1$s порта</item>
+        <item quantity="many">%1$s портов</item>
+        <item quantity="other">%1$s портов</item>
     </plurals>
 
     <!-- VerdictNarrative: ExposureStatus labels -->

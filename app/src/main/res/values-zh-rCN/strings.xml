@@ -111,9 +111,9 @@
 
     <string name="main_ipv6_error_ignored">已忽略 IPv6 错误： </string>
 
-    <string name="settings_port_range_preview">将扫描的 localhost 代理端口：%1$s（%2$s %3$s）</string>
+    <string name="settings_port_range_preview">将扫描的 localhost 代理端口：%1$s（%2$s）</string>
     <plurals name="settings_port_word">
-        <item quantity="other">个端口</item>
+        <item quantity="other">%1$s 个端口</item>
     </plurals>
 
     <string name="narrative_exposure_remote_endpoint">已发现远程节点</string>

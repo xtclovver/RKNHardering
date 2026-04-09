@@ -111,10 +111,10 @@
 
     <string name="main_ipv6_error_ignored">IPv6 error ignored: </string>
 
-    <string name="settings_port_range_preview">Localhost proxy ports to scan: %1$s (%2$s %3$s)</string>
+    <string name="settings_port_range_preview">Localhost proxy ports to scan: %1$s (%2$s)</string>
     <plurals name="settings_port_word">
-        <item quantity="one">port</item>
-        <item quantity="other">ports</item>
+        <item quantity="one">%1$s port</item>
+        <item quantity="other">%1$s ports</item>
     </plurals>
 
     <!-- VerdictNarrative: ExposureStatus labels -->
