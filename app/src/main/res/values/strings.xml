@@ -49,4 +49,13 @@
     <string name="settings_github_desc">xtclovver/RKNHardering</string>
     <string name="settings_port_range_from">От</string>
     <string name="settings_port_range_to">До</string>
+
+    <string name="main_subtitle">Самопроверка на обнаружение VPN/Proxy</string>
+    <string name="main_run_check">Запустить проверку</string>
+    <string name="main_stop_check">Остановить</string>
+    <string name="main_card_ip_comparison">Сравнение IP</string>
+    <string name="main_card_direct_signs">Прямые признаки</string>
+    <string name="main_card_indirect_signs">Косвенные признаки</string>
+    <string name="main_card_location_signals">Сигналы местоположения</string>
+    <string name="main_verdict_details">Подробнее</string>
 </resources>

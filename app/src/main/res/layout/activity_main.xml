@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 android:gravity="center"
-                android:text="Самопроверка на обнаружение VPN/Proxy"
+                android:text="@string/main_subtitle"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp" />
 
@@ -58,7 +58,7 @@
                     android:layout_weight="1.35"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Запустить проверку"
+                    android:text="@string/main_run_check"
                     android:textAllCaps="false"
                     app:icon="@drawable/ic_check_circle"
                     app:iconGravity="textStart"
@@ -73,7 +73,7 @@
                     android:layout_marginStart="8dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Остановить"
+                    android:text="@string/main_stop_check"
                     android:textAllCaps="false"
                     app:icon="@drawable/ic_stop_circle"
                     app:iconGravity="textStart"
@@ -211,7 +211,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Сравнение IP"
+                            android:text="@string/main_card_ip_comparison"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -272,7 +272,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Прямые признаки"
+                            android:text="@string/main_card_direct_signs"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -341,7 +341,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Косвенные признаки"
+                            android:text="@string/main_card_indirect_signs"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -394,7 +394,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Сигналы местоположения"
+                            android:text="@string/main_card_location_signals"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -562,7 +562,7 @@
                         android:minWidth="0dp"
                         android:paddingStart="0dp"
                         android:paddingEnd="0dp"
-                        android:text="Подробнее"
+                        android:text="@string/main_verdict_details"
                         android:textAllCaps="false"
                         android:visibility="gone" />
 
