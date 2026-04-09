@@ -11,11 +11,15 @@ import com.notcvnt.rknhardering.probe.PublicIpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 
 object IpComparisonChecker {
+
+    private const val MAX_FETCH_ATTEMPTS = 3
+    private const val RETRY_DELAY_MS = 250L
 
     private enum class IpFamily {
         IPV4,
@@ -85,7 +89,11 @@ object IpComparisonChecker {
             val responses = ENDPOINTS.map { endpoint ->
                 async {
                     val dnsRecords = PublicIpClient.resolveDnsRecords(endpoint.url, resolverConfig)
-                    val result = PublicIpClient.fetchIp(endpoint.url, timeoutMs, resolverConfig = resolverConfig)
+                    val result = fetchIpWithRetries(
+                        endpoint = endpoint.url,
+                        timeoutMs = timeoutMs,
+                        resolverConfig = resolverConfig,
+                    )
                     val error = result.exceptionOrNull()?.let(::formatError)
                     IpCheckerResponse(
                         label = endpoint.label,
@@ -105,6 +113,30 @@ object IpComparisonChecker {
             }.map { it.await() }
             evaluate(context, responses)
         }
+    }
+
+    internal suspend fun fetchIpWithRetries(
+        endpoint: String,
+        timeoutMs: Int,
+        resolverConfig: DnsResolverConfig,
+        maxAttempts: Int = MAX_FETCH_ATTEMPTS,
+        retryDelayMs: Long = RETRY_DELAY_MS,
+        fetcher: (String, Int, DnsResolverConfig) -> Result<String> = { url, timeout, resolver ->
+            PublicIpClient.fetchIp(url, timeout, resolverConfig = resolver)
+        },
+    ): Result<String> {
+        var lastError: Throwable? = null
+        repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
+            val result = fetcher(endpoint, timeoutMs, resolverConfig)
+            if (result.isSuccess) {
+                return result
+            }
+            lastError = result.exceptionOrNull() ?: lastError
+            if (attempt < maxAttempts - 1 && retryDelayMs > 0) {
+                delay(retryDelayMs)
+            }
+        }
+        return Result.failure(lastError ?: IOException("All IP attempts failed"))
     }
 
     internal fun evaluate(context: Context, responses: List<IpCheckerResponse>): IpComparisonResult {
@@ -199,12 +231,12 @@ object IpComparisonChecker {
 
         val successfulIps = responses.mapNotNull { it.ip }
         val uniqueIps = successfulIps.distinct()
-        val failureCount = responses.count { it.ip == null && !it.ignoredIpv6Error }
+        val noIpCount = responses.count { it.ip == null && !it.ignoredIpv6Error }
         val ignoredIpv6ErrorCount = responses.count { it.ip == null && it.ignoredIpv6Error }
         val families = successfulIps.mapNotNull(::detectFamily).distinct()
 
         return when {
-            uniqueIps.isEmpty() && failureCount > 0 -> IpCheckerGroupResult(
+            uniqueIps.isEmpty() && noIpCount > 0 -> IpCheckerGroupResult(
                 title = title,
                 detected = false,
                 needsReview = true,
@@ -236,16 +268,6 @@ object IpComparisonChecker {
                 needsReview = false,
                 statusLabel = context.getString(R.string.checker_ip_comp_status_mismatch),
                 summary = context.getString(R.string.checker_ip_comp_different_ips, uniqueIps.joinToString()),
-                responses = responses,
-                ignoredIpv6ErrorCount = ignoredIpv6ErrorCount,
-            )
-            failureCount > 0 -> IpCheckerGroupResult(
-                title = title,
-                detected = false,
-                needsReview = true,
-                statusLabel = context.getString(R.string.checker_ip_comp_status_partial),
-                summary = context.getString(R.string.checker_ip_comp_partial, uniqueIps.single(), failureCount, responses.size),
-                canonicalIp = uniqueIps.single(),
                 responses = responses,
                 ignoredIpv6ErrorCount = ignoredIpv6ErrorCount,
             )

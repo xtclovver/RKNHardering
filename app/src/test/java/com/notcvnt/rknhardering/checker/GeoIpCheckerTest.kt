@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.EvidenceSource
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -287,5 +288,30 @@ class GeoIpCheckerTest {
                     " (2/2: ipapi.is, iplocate.io)"
             },
         )
+    }
+
+    @Test
+    fun `no provider result is review and not error`() {
+        val result = GeoIpChecker.noProviderResult(
+            context.getString(R.string.checker_geo_error_no_provider),
+        )
+
+        assertFalse(result.detected)
+        assertTrue(result.needsReview)
+        assertFalse(result.hasError)
+        assertTrue(result.findings.all { it.needsReview && !it.isError })
+    }
+
+    @Test
+    fun `geoip fetch retries up to third attempt before succeeding`() = runBlocking {
+        var attempts = 0
+
+        val result = GeoIpChecker.fetchWithRetries(retryDelayMs = 0) {
+            attempts += 1
+            if (attempts < 3) null else "ok"
+        }
+
+        assertEquals("ok", result)
+        assertEquals(3, attempts)
     }
 }

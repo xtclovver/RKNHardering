@@ -5,6 +5,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
+import com.notcvnt.rknhardering.network.DnsResolverConfig
+import java.io.IOException
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -69,7 +72,7 @@ class IpComparisonCheckerTest {
     }
 
     @Test
-    fun `partial non-ru response stays in review even when ip differs`() {
+    fun `errors in non-ru group do not block mismatch detection`() {
         val result = IpComparisonChecker.evaluate(
             context,
             listOf(
@@ -79,9 +82,9 @@ class IpComparisonCheckerTest {
             ),
         )
 
-        assertFalse(result.detected)
-        assertTrue(result.needsReview)
-        assertEquals(context.getString(R.string.checker_ip_comp_status_partial), result.nonRuGroup.statusLabel)
+        assertTrue(result.detected)
+        assertFalse(result.needsReview)
+        assertEquals(context.getString(R.string.checker_ip_comp_status_match), result.nonRuGroup.statusLabel)
     }
 
     @Test
@@ -148,6 +151,65 @@ class IpComparisonCheckerTest {
         assertFalse(result.needsReview)
         assertEquals(context.getString(R.string.checker_ip_comp_status_match), result.nonRuGroup.statusLabel)
         assertEquals(1, result.nonRuGroup.ignoredIpv6ErrorCount)
+    }
+
+    @Test
+    fun `same ip with ordinary errors stays clean`() {
+        val result = IpComparisonChecker.evaluate(
+            context,
+            listOf(
+                response("Yandex IPv4", IpCheckerScope.RU, ip = "37.113.42.220"),
+                response("2ip.ru", IpCheckerScope.RU, error = "HTTP 403 // Forbidden"),
+                response("ifconfig.me IPv4", IpCheckerScope.NON_RU, ip = "37.113.42.220"),
+                response("ipify", IpCheckerScope.NON_RU, ip = "37.113.42.220"),
+                response("ip.sb IPv4", IpCheckerScope.NON_RU, error = "timeout"),
+            ),
+        )
+
+        assertFalse(result.detected)
+        assertFalse(result.needsReview)
+        assertEquals(context.getString(R.string.checker_ip_comp_status_match), result.ruGroup.statusLabel)
+        assertEquals(context.getString(R.string.checker_ip_comp_status_match), result.nonRuGroup.statusLabel)
+    }
+
+    @Test
+    fun `all ordinary errors without ip become no response`() {
+        val result = IpComparisonChecker.evaluate(
+            context,
+            listOf(
+                response("Yandex IPv4", IpCheckerScope.RU, error = "timeout"),
+                response("2ip.ru", IpCheckerScope.RU, error = "HTTP 403 // Forbidden"),
+                response("ifconfig.me IPv4", IpCheckerScope.NON_RU, error = "timeout"),
+                response("ipify", IpCheckerScope.NON_RU, error = "timeout"),
+            ),
+        )
+
+        assertTrue(result.needsReview)
+        assertEquals(context.getString(R.string.checker_ip_comp_status_no_response), result.ruGroup.statusLabel)
+        assertEquals(context.getString(R.string.checker_ip_comp_status_no_response), result.nonRuGroup.statusLabel)
+    }
+
+    @Test
+    fun `fetch retries up to third attempt before succeeding`() = runBlocking {
+        var attempts = 0
+
+        val result = IpComparisonChecker.fetchIpWithRetries(
+            endpoint = "https://example.com/ip",
+            timeoutMs = 1_000,
+            resolverConfig = DnsResolverConfig.system(),
+            retryDelayMs = 0,
+        ) { _, _, _ ->
+            attempts += 1
+            if (attempts < 3) {
+                Result.failure(IOException("timeout"))
+            } else {
+                Result.success("1.2.3.4")
+            }
+        }
+
+        assertTrue(result.isSuccess)
+        assertEquals(3, attempts)
+        assertEquals("1.2.3.4", result.getOrNull())
     }
 
     private fun response(

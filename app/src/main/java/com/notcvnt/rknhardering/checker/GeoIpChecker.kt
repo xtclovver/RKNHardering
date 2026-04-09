@@ -12,10 +12,15 @@ import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 object GeoIpChecker {
+
+    private const val MAX_FETCH_ATTEMPTS = 3
+    private const val RETRY_DELAY_MS = 250L
+    private const val GEOIP_TIMEOUT_MS = 10_000
 
     internal data class GeoIpSnapshot(
         val ip: String,
@@ -49,15 +54,15 @@ object GeoIpChecker {
     ): CategoryResult = withContext(Dispatchers.IO) {
         try {
             coroutineScope {
-                val ipapiIsDeferred = async { fetchIpapiIs(resolverConfig) }
-                val iplocateDeferred = async { fetchIplocate(resolverConfig) }
+                val ipapiIsDeferred = async { fetchWithRetries { fetchIpapiIs(resolverConfig) } }
+                val iplocateDeferred = async { fetchWithRetries { fetchIplocate(resolverConfig) } }
 
                 val ipapiIsResult = ipapiIsDeferred.await()
                 val iplocateResult = iplocateDeferred.await()
 
                 val providers = listOfNotNull(ipapiIsResult, iplocateResult)
                 val baseProvider = ipapiIsResult ?: iplocateResult
-                    ?: return@coroutineScope errorResult(
+                    ?: return@coroutineScope noProviderResult(
                         context.getString(R.string.checker_geo_error_no_provider),
                     )
 
@@ -72,6 +77,27 @@ object GeoIpChecker {
         } catch (e: Exception) {
             errorResult(context.getString(R.string.checker_geo_error_fetch, e.message))
         }
+    }
+
+    internal suspend fun <T> fetchWithRetries(
+        maxAttempts: Int = MAX_FETCH_ATTEMPTS,
+        retryDelayMs: Long = RETRY_DELAY_MS,
+        fetcher: suspend () -> T?,
+    ): T? {
+        repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
+            try {
+                val result = fetcher()
+                if (result != null) {
+                    return result
+                }
+            } catch (_: Exception) {
+                // Ignore transient provider errors and retry the next attempt.
+            }
+            if (attempt < maxAttempts - 1 && retryDelayMs > 0) {
+                delay(retryDelayMs)
+            }
+        }
+        return null
     }
 
     private fun fetchIpapiIs(resolverConfig: DnsResolverConfig): ProviderSnapshot? {
@@ -176,7 +202,7 @@ object GeoIpChecker {
         val response = ResolverNetworkStack.execute(
             url = url,
             method = "GET",
-            timeoutMs = 10_000,
+            timeoutMs = GEOIP_TIMEOUT_MS,
             config = resolverConfig,
         )
         if (response.code !in 200..299) {
@@ -292,6 +318,15 @@ object GeoIpChecker {
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message, isError = true)),
+        )
+    }
+
+    internal fun noProviderResult(message: String): CategoryResult {
+        return CategoryResult(
+            name = "GeoIP",
+            detected = false,
+            needsReview = true,
+            findings = listOf(Finding(message, needsReview = true)),
         )
     }
 
