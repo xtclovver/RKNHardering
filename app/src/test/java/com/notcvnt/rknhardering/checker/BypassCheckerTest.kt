@@ -7,6 +7,7 @@ import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Assert.assertEquals
 
 class BypassCheckerTest {
 
@@ -53,6 +54,58 @@ class BypassCheckerTest {
         assertTrue(detected)
         assertTrue(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK })
         assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
+    }
+
+    @Test
+    fun `tun probe success is reported as informational finding`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        BypassChecker.reportUnderlyingNetworkResult(
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = false,
+                vpnIp = "185.220.1.10",
+                underlyingIp = null,
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertTrue(
+            findings.any {
+                it.isInformational &&
+                    it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
+                    it.description.contains("185.220.1.10")
+            },
+        )
+    }
+
+    @Test
+    fun `tun probe failure is recorded when vpn active but fetch returned null`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        BypassChecker.reportUnderlyingNetworkResult(
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = false,
+                vpnIp = null,
+                underlyingIp = null,
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertTrue(
+            findings.any {
+                it.isInformational &&
+                    it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
+                    it.description.contains("недоступен")
+            },
+        )
     }
 
     @Test

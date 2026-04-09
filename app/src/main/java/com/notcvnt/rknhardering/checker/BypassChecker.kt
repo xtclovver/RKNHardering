@@ -398,6 +398,28 @@ object BypassChecker {
             }
         }
 
+        if (result.vpnActive) {
+            if (result.vpnIp != null) {
+                findings.add(
+                    Finding(
+                        description = "TUN активный зонд: запрос через VPN Network вернул IP ${result.vpnIp}" +
+                            " (TUN — живой маршрутизируемый интерфейс)",
+                        isInformational = true,
+                        source = EvidenceSource.TUN_ACTIVE_PROBE,
+                    ),
+                )
+            } else {
+                findings.add(
+                    Finding(
+                        description = "TUN активный зонд: запрос через VPN Network недоступен" +
+                            " (интерфейс заблокирован или filtered)",
+                        isInformational = true,
+                        source = EvidenceSource.TUN_ACTIVE_PROBE,
+                    ),
+                )
+            }
+        }
+
         if (result.activeNetworkIsVpn == false) {
             if (result.underlyingIp != null) {
                 findings.add(

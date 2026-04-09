@@ -143,6 +143,27 @@ class VerdictEngineTest {
         assertEquals(Verdict.NEEDS_REVIEW, verdict)
     }
 
+    @Test
+    fun `TUN_ACTIVE_PROBE evidence source exists`() {
+        val source = EvidenceSource.TUN_ACTIVE_PROBE
+        assertEquals(EvidenceSource.TUN_ACTIVE_PROBE, source)
+    }
+
+    @Test
+    fun `tun active probe alone does not change verdict`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(
+                evidence = listOf(evidence(EvidenceSource.TUN_ACTIVE_PROBE, EvidenceConfidence.LOW)),
+            ),
+        )
+
+        assertEquals(Verdict.NOT_DETECTED, verdict)
+    }
+
     private data class MatrixCase(
         val label: String,
         val geo: Boolean,

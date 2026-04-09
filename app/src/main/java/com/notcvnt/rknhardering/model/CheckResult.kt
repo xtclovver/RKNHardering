@@ -28,6 +28,7 @@ enum class EvidenceSource {
     LOCATION_SIGNALS,
     VPN_GATEWAY_LEAK,
     VPN_NETWORK_BINDING,
+    TUN_ACTIVE_PROBE,
 }
 
 enum class VpnAppKind {
