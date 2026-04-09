@@ -42,7 +42,7 @@ object InstalledVpnAppDetector {
             findings = findings,
             evidence = evidence,
             matchedApps = matchedApps.values.toList(),
-            needsReview = matchedApps.isNotEmpty(),
+            needsReview = false,
         )
     }
 
@@ -64,7 +64,7 @@ object InstalledVpnAppDetector {
             findings.add(
                 Finding(
                     description = description,
-                    needsReview = true,
+                    isInformational = true,
                     source = EvidenceSource.INSTALLED_APP,
                     confidence = confidence,
                     family = signature.family,
@@ -128,7 +128,7 @@ object InstalledVpnAppDetector {
             findings.add(
                 Finding(
                     description = description,
-                    needsReview = true,
+                    isInformational = true,
                     source = EvidenceSource.VPN_SERVICE_DECLARATION,
                     confidence = confidence,
                     family = family,

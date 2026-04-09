@@ -112,6 +112,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var geoIpDivider: View
     private lateinit var locationInfoSection: LinearLayout
     private lateinit var locationDivider: View
+    private lateinit var directInfoSection: LinearLayout
+    private lateinit var directDivider: View
     private val bypassProgressLines = linkedMapOf<BypassChecker.ProgressLine, String>()
     private val bypassProgressOrder = listOf(
         BypassChecker.ProgressLine.BYPASS,
@@ -222,6 +224,8 @@ class MainActivity : AppCompatActivity() {
         geoIpDivider = findViewById(R.id.geoIpDivider)
         locationInfoSection = findViewById(R.id.locationInfoSection)
         locationDivider = findViewById(R.id.locationDivider)
+        directInfoSection = findViewById(R.id.directInfoSection)
+        directDivider = findViewById(R.id.directDivider)
         setupResultsScrollTracking()
         updateCheckControls(isRunning = false)
     }
@@ -491,6 +495,9 @@ class MainActivity : AppCompatActivity() {
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.GONE
 
+        directInfoSection.removeAllViews()
+        directInfoSection.visibility = View.GONE
+        directDivider.visibility = View.GONE
         findingsDirect.removeAllViews()
         findingsIndirect.removeAllViews()
 
@@ -564,7 +571,7 @@ class MainActivity : AppCompatActivity() {
                     findingsDirect,
                     activeCheckPrivacyMode,
                 )
-                animateContentReveal(findingsDirect)
+                animateContentReveal(findingsDirect, directInfoSection, directDivider)
             }
             is CheckUpdate.IndirectSignsReady -> {
                 markStageCompleted(RunningStage.INDIRECT)
@@ -634,6 +641,8 @@ class MainActivity : AppCompatActivity() {
                 status = statusDirect,
                 findingsContainer = findingsDirect,
                 hint = stageLoadingMessage(stage),
+                infoSection = directInfoSection,
+                infoDivider = directDivider,
             )
             RunningStage.INDIRECT -> showCategoryLoading(
                 stage = stage,
@@ -728,6 +737,8 @@ class MainActivity : AppCompatActivity() {
                     status = statusDirect,
                     findingsContainer = findingsDirect,
                     message = stageStoppedMessage(stage),
+                    infoSection = directInfoSection,
+                    infoDivider = directDivider,
                 )
                 RunningStage.INDIRECT -> showCategoryStopped(
                     card = cardIndirect,
@@ -990,11 +1001,13 @@ class MainActivity : AppCompatActivity() {
         val infoSection = when (card.id) {
             R.id.cardGeoIp -> geoIpInfoSection
             R.id.cardLocation -> locationInfoSection
+            R.id.cardDirect -> directInfoSection
             else -> null
         }
         val infoDivider = when (card.id) {
             R.id.cardGeoIp -> geoIpDivider
             R.id.cardLocation -> locationDivider
+            R.id.cardDirect -> directDivider
             else -> null
         }
 

@@ -285,6 +285,22 @@
                     </LinearLayout>
 
                     <LinearLayout
+                        android:id="@+id/directInfoSection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp" />
+
+                    <View
+                        android:id="@+id/directDivider"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="4dp"
+                        android:background="?attr/colorOutlineVariant"
+                        android:visibility="gone" />
+
+                    <LinearLayout
                         android:id="@+id/findingsDirect"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

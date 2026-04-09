@@ -45,7 +45,6 @@ object DirectSignsChecker {
         findings += appDetection.findings
         evidence += appDetection.evidence
         matchedApps += appDetection.matchedApps
-        needsReview = needsReview || appDetection.needsReview
 
         return CategoryResult(
             name = "Прямые признаки",
