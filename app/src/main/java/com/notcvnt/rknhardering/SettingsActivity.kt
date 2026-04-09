@@ -6,12 +6,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.ChipGroup
@@ -22,6 +24,8 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.DnsResolverMode
 import com.notcvnt.rknhardering.network.DnsResolverPreset
 import com.notcvnt.rknhardering.network.DnsResolverPresets
+import com.notcvnt.rknhardering.probe.ProxyScanner
+import java.text.NumberFormat
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -33,6 +37,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var customPortRangeContainer: LinearLayout
     private lateinit var editPortStart: TextInputEditText
     private lateinit var editPortEnd: TextInputEditText
+    private lateinit var textPortRangePreview: TextView
     private lateinit var switchNetworkRequests: MaterialSwitch
     private lateinit var cardResolver: MaterialCardView
     private lateinit var chipGroupResolverMode: ChipGroup
@@ -74,6 +79,7 @@ class SettingsActivity : AppCompatActivity() {
         customPortRangeContainer = findViewById(R.id.customPortRangeContainer)
         editPortStart = findViewById(R.id.editPortStart)
         editPortEnd = findViewById(R.id.editPortEnd)
+        textPortRangePreview = findViewById(R.id.textPortRangePreview)
         switchNetworkRequests = findViewById(R.id.switchNetworkRequests)
         cardResolver = findViewById(R.id.cardResolver)
         chipGroupResolverMode = findViewById(R.id.chipGroupResolverMode)
@@ -108,6 +114,7 @@ class SettingsActivity : AppCompatActivity() {
 
         editPortStart.setText(prefs.getInt(PREF_PORT_RANGE_START, 1024).toString())
         editPortEnd.setText(prefs.getInt(PREF_PORT_RANGE_END, 65535).toString())
+        updatePortRangePreview()
 
         loadResolverSettings()
 
@@ -161,6 +168,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             prefs.edit().putString(PREF_PORT_RANGE, value).apply()
             customPortRangeContainer.visibility = if (value == "custom") View.VISIBLE else View.GONE
+            updatePortRangePreview()
         }
 
         chipGroupResolverMode.setOnCheckedStateChangeListener { _, checkedIds ->
@@ -186,6 +194,12 @@ class SettingsActivity : AppCompatActivity() {
         }
         editPortEnd.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) saveCustomPortRange()
+        }
+        editPortStart.doAfterTextChanged {
+            updatePortRangePreview()
+        }
+        editPortEnd.doAfterTextChanged {
+            updatePortRangePreview()
         }
         editResolverDirectServers.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) saveCustomResolverFields()
@@ -242,6 +256,85 @@ class SettingsActivity : AppCompatActivity() {
             .apply()
         editPortStart.setText(validStart.toString())
         editPortEnd.setText(validEnd.toString())
+    }
+
+    private fun updatePortRangePreview() {
+        val mergedPorts = mergePortRanges(
+            buildScanPortRanges(
+                portRange = selectedPortRange(),
+                customRange = currentCustomPortRange(),
+            ),
+        )
+        val portsText = mergedPorts.joinToString(", ") { range ->
+            if (range.first == range.last) {
+                range.first.toString()
+            } else {
+                "${range.first}-${range.last}"
+            }
+        }
+        val portsCount = mergedPorts.sumOf { it.last - it.first + 1 }
+        val formattedCount = NumberFormat.getIntegerInstance().format(portsCount)
+        textPortRangePreview.text = "Будут сканироваться proxy-порты localhost: $portsText ($formattedCount ${portWord(portsCount)})"
+    }
+
+    private fun selectedPortRange(): String {
+        return when (chipGroupPortRange.checkedChipId) {
+            R.id.chipPortPopular -> "popular"
+            R.id.chipPortExtended -> "extended"
+            R.id.chipPortCustom -> "custom"
+            else -> "full"
+        }
+    }
+
+    private fun currentCustomPortRange(): IntRange {
+        val start = editPortStart.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 1024
+        val end = editPortEnd.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 65535
+        return minOf(start, end)..maxOf(start, end)
+    }
+
+    private fun buildScanPortRanges(portRange: String, customRange: IntRange): List<IntRange> {
+        val ranges = ProxyScanner.DEFAULT_POPULAR_PORTS
+            .map { it..it }
+            .toMutableList()
+        when (portRange) {
+            "extended" -> ranges += 1024..15000
+            "full" -> ranges += 1024..65535
+            "custom" -> ranges += customRange
+        }
+        return ranges
+    }
+
+    private fun mergePortRanges(ranges: List<IntRange>): List<IntRange> {
+        if (ranges.isEmpty()) return emptyList()
+
+        val sortedRanges = ranges.sortedBy { it.first }
+        val mergedRanges = mutableListOf<IntRange>()
+        var currentStart = sortedRanges.first().first
+        var currentEnd = sortedRanges.first().last
+
+        for (range in sortedRanges.drop(1)) {
+            if (range.first <= currentEnd + 1) {
+                currentEnd = maxOf(currentEnd, range.last)
+            } else {
+                mergedRanges += currentStart..currentEnd
+                currentStart = range.first
+                currentEnd = range.last
+            }
+        }
+
+        mergedRanges += currentStart..currentEnd
+        return mergedRanges
+    }
+
+    private fun portWord(count: Int): String {
+        val mod100 = count % 100
+        val mod10 = count % 10
+        return when {
+            mod100 in 11..14 -> "портов"
+            mod10 == 1 -> "порт"
+            mod10 in 2..4 -> "порта"
+            else -> "портов"
+        }
     }
 
     private fun loadResolverSettings() {

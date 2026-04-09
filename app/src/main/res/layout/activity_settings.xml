@@ -204,8 +204,16 @@
                                 android:layout_height="wrap_content"
                                 android:inputType="number"
                                 android:text="65535" />
-                        </com.google.android.material.textfield.TextInputLayout>
+                            </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/textPortRangePreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

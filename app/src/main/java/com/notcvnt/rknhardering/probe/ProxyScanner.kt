@@ -15,15 +15,19 @@ import kotlin.math.max
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ProxyScanner(
     private val loopbackHosts: List<String> = listOf("127.0.0.1", "::1"),
-    private val popularPorts: List<Int> = (
-        VpnAppCatalog.localhostProxyPorts + listOf(1081, 7890, 7891)
-        ).distinct().sorted(),
+    private val popularPorts: List<Int> = DEFAULT_POPULAR_PORTS,
     private val scanRange: IntRange = 1024..65535,
     private val connectTimeoutMs: Int = 80,
     private val readTimeoutMs: Int = 120,
     private val maxConcurrency: Int = 200,
     private val progressUpdateEvery: Int = 256,
 ) {
+
+    companion object {
+        val DEFAULT_POPULAR_PORTS: List<Int> = (
+            VpnAppCatalog.localhostProxyPorts + listOf(1081, 7890, 7891)
+            ).distinct().sorted()
+    }
 
     suspend fun findOpenProxyEndpoint(
         mode: ScanMode,
