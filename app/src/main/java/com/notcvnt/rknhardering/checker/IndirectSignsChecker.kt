@@ -93,6 +93,8 @@ object IndirectSignsChecker {
         Regex("^rmnet.*"),
         Regex("^eth.*"),
         Regex("^lo$"),
+        Regex("^ccmni.*"),
+        Regex("^ccemni.*"),
     )
 
     private val KNOWN_PUBLIC_RESOLVERS = setOf(
