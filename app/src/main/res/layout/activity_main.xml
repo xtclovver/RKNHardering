@@ -453,7 +453,7 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
+                        android:gravity="top"
                         android:orientation="horizontal">
 
                         <ImageView
@@ -477,6 +477,10 @@
                             android:id="@+id/statusBypass"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:gravity="end"
+                            android:minWidth="120dp"
+                            android:textAlignment="viewEnd"
                             android:textSize="14sp" />
                     </LinearLayout>
 
@@ -486,7 +490,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:lineSpacingExtra="2dp"
-                        android:minLines="2"
+                        android:minLines="4"
                         android:textColor="?android:attr/textColorSecondary"
                         android:textSize="12sp"
                         android:visibility="gone" />
@@ -518,34 +522,40 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:orientation="vertical">
+                        android:gravity="top"
+                        android:orientation="horizontal">
 
                         <ImageView
                             android:id="@+id/iconVerdict"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
-                            android:layout_marginBottom="12dp"
+                            android:layout_marginEnd="16dp"
                             android:contentDescription="@null"
                             android:importantForAccessibility="no" />
 
-                        <TextView
-                            android:id="@+id/textVerdict"
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:layout_weight="1"
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/textVerdictExplanation"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:lineSpacingExtra="2dp"
-                            android:textColor="?android:attr/textColorSecondary"
-                            android:textSize="14sp"
-                            android:visibility="gone" />
+                            <TextView
+                                android:id="@+id/textVerdict"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/textVerdictExplanation"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:lineSpacingExtra="2dp"
+                                android:textColor="?android:attr/textColorSecondary"
+                                android:textSize="14sp"
+                                android:visibility="gone" />
+                        </LinearLayout>
                     </LinearLayout>
 
                     <View
