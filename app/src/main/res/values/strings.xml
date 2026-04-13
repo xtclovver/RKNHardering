@@ -263,6 +263,14 @@
     <string name="checker_direct_proxy_endpoint">%1$s: %2$s:%3$s</string>
     <string name="checker_direct_proxy_known_port">%1$s uses known port %2$s</string>
     <string name="checker_direct_proxy_no_valid_port">%1$s: host found without a valid port</string>
+    <string name="checker_direct_proxyinfo_default">ProxyInfo default proxy</string>
+    <string name="checker_direct_proxyinfo_network">ProxyInfo on network %1$s</string>
+    <string name="checker_direct_proxyinfo_unknown_interface">unknown interface</string>
+    <string name="checker_direct_proxyinfo_network_scan">ProxyInfo on tracked networks</string>
+    <string name="checker_direct_proxyinfo_details">%1$s: %2$s</string>
+    <string name="checker_direct_proxyinfo_invalid">%1$s: invalid proxy profile</string>
+    <string name="checker_direct_proxyinfo_unavailable">%1$s: ProxyInfo check unavailable (%2$s)</string>
+    <string name="checker_direct_proxyinfo_network_none">ProxyInfo on tracked networks: not detected</string>
 
     <!-- IndirectSignsChecker -->
     <string name="checker_indirect_category_name">Indirect signs</string>

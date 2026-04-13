@@ -261,6 +261,14 @@
     <string name="checker_direct_proxy_endpoint">%1$s: %2$s:%3$s</string>
     <string name="checker_direct_proxy_known_port">%1$s использует характерный порт %2$s</string>
     <string name="checker_direct_proxy_no_valid_port">%1$s: хост найден без валидного порта</string>
+    <string name="checker_direct_proxyinfo_default">ProxyInfo прокси по умолчанию</string>
+    <string name="checker_direct_proxyinfo_network">ProxyInfo на сети %1$s</string>
+    <string name="checker_direct_proxyinfo_unknown_interface">неизвестный интерфейс</string>
+    <string name="checker_direct_proxyinfo_network_scan">ProxyInfo на отслеживаемых сетях</string>
+    <string name="checker_direct_proxyinfo_details">%1$s: %2$s</string>
+    <string name="checker_direct_proxyinfo_invalid">%1$s: невалидный профиль proxy</string>
+    <string name="checker_direct_proxyinfo_unavailable">%1$s: проверка ProxyInfo недоступна (%2$s)</string>
+    <string name="checker_direct_proxyinfo_network_none">ProxyInfo на отслеживаемых сетях: не обнаружен</string>
 
     <!-- IndirectSignsChecker -->
     <string name="checker_indirect_category_name">Косвенные признаки</string>

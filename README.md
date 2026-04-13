@@ -96,6 +96,9 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 - `System.getProperty("http.proxyPort")` с fallback на `Proxy.getDefaultPort()`
 - `System.getProperty("socksProxyHost")`
 - `System.getProperty("socksProxyPort")`
+- `ConnectivityManager.getDefaultProxy()`
+- `ConnectivityManager.allNetworks` + `ConnectivityManager.getLinkProperties(network).httpProxy`
+- `ProxyInfo.getPacFileUrl()`, `ProxyInfo.getExclusionList()`, на API 30+ также `ProxyInfo.isValid()`
 
 Логика:
 
@@ -105,6 +108,11 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 | host есть, но порт невалиден | `needsReview = true` |
 | host есть и порт валиден | `detected = true` |
 | порт относится к известным proxy-портам | добавляется отдельная находка |
+| `ProxyInfo` содержит `PAC URL` | `detected = true` |
+| `ProxyInfo` задан на конкретной сети | в вывод добавляется отдельная строка с interface name |
+| `ProxyInfo` содержит exclusion list | exclusions показываются пользователю |
+| на API 30+ `!ProxyInfo.isValid()` | `needsReview = true` без detected-evidence |
+| на отслеживаемых сетях `ProxyInfo` не найден | добавляется агрегированная строка `ProxyInfo ...: не обнаружен` |
 
 Известные proxy-порты: `80`, `443`, `1080`, `3127`, `3128`, `4080`, `5555`, `7000`, `7044`, `8000`, `8080`, `8081`, `8082`, `8888`, `9000`, `9050`, `9051`, `9150`, `12345`, а также диапазон `16000..16100`.
 
