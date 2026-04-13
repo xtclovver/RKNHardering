@@ -1,15 +1,18 @@
 package com.notcvnt.rknhardering.probe
 
-import android.net.Network
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.network.ResolverBinding
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.Proxy
+import java.net.URL
 
 object PublicIpClient {
+    @Volatile
+    internal var fetchIpOverride: ((String, Int, Proxy?, DnsResolverConfig, ResolverBinding?) -> Result<String>)? = null
 
     data class DnsRecords(
         val ipv4Records: List<String> = emptyList(),
@@ -18,16 +21,20 @@ object PublicIpClient {
 
     private const val USER_AGENT = "curl/8.0"
     private val HTML_TAG_REGEX = Regex("""<\s*(?:!doctype|html|head|body)\b""", RegexOption.IGNORE_CASE)
+    private val HTML_SCRIPT_REGEX = Regex("""(?is)<script\b.*?</script>""")
+    private val HTML_STYLE_REGEX = Regex("""(?is)<style\b.*?</style>""")
+    private val HTML_TAG_STRIP_REGEX = Regex("""(?is)<[^>]+>""")
     private val JSON_IP_REGEX = Regex(""""ip"\s*:\s*"([^"]+)"""")
+    private val MAIL_RU_IP_REGEX = Regex("""(?i)\bip:\s*([0-9]{1,3}(?:\.[0-9]{1,3}){3})\b""")
 
     fun fetchIp(
         endpoint: String,
         timeoutMs: Int = 7000,
         proxy: Proxy? = null,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
-        network: Network? = null,
-        bindSocketOnly: Boolean = false,
+        binding: ResolverBinding? = null,
     ): Result<String> {
+        fetchIpOverride?.let { return it(endpoint, timeoutMs, proxy, resolverConfig, binding) }
         return try {
             val response = ResolverNetworkStack.execute(
                 url = endpoint,
@@ -39,8 +46,7 @@ object PublicIpClient {
                 timeoutMs = timeoutMs,
                 config = resolverConfig,
                 proxy = proxy,
-                network = network,
-                bindSocketOnly = bindSocketOnly,
+                binding = binding,
             )
             val code = response.code
             if (code !in 200..299) {
@@ -53,7 +59,7 @@ object PublicIpClient {
             if (body.isBlank()) {
                 return Result.failure(IOException("Empty response body"))
             }
-            val ip = extractIp(body)
+            val ip = extractIp(body, endpoint = endpoint)
                 ?: return Result.failure(IOException("Response does not look like an IP: $body"))
             if (!looksLikeIp(ip)) {
                 return Result.failure(IOException("Response does not look like an IP: $ip"))
@@ -64,7 +70,7 @@ object PublicIpClient {
         }
     }
 
-    internal fun extractIp(body: String): String? {
+    internal fun extractIp(body: String, endpoint: String? = null): String? {
         val trimmed = body.trim()
         JSON_IP_REGEX.find(trimmed)?.groupValues?.getOrNull(1)?.trim()
             ?.takeIf(::looksLikeIp)
@@ -76,15 +82,11 @@ object PublicIpClient {
             ?.removeSurrounding("\"")
             ?.trim()
             .orEmpty()
-        if (candidate.isBlank()) return null
-        return candidate.takeIf(::looksLikeIp)
+        if (!candidate.isBlank() && looksLikeIp(candidate)) return candidate
+        return extractMailRuIp(trimmed, endpoint)
     }
 
     internal fun formatHttpError(code: Int, body: String): String {
-        httpStatusLabel(code)?.let { label ->
-            return "HTTP $code // $label"
-        }
-
         val trimmedBody = body.trim()
         if (trimmedBody.isBlank() || looksLikeHtml(trimmedBody)) {
             return "HTTP $code"
@@ -106,11 +108,11 @@ object PublicIpClient {
     fun resolveDnsRecords(
         endpoint: String,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
-        network: Network? = null,
+        binding: ResolverBinding? = null,
     ): DnsRecords {
         return try {
             val host = java.net.URL(endpoint).host
-            val allAddresses = ResolverNetworkStack.lookup(host, resolverConfig, network)
+            val allAddresses = ResolverNetworkStack.lookup(host, resolverConfig, binding)
             DnsRecords(
                 ipv4Records = allAddresses
                     .filterIsInstance<Inet4Address>()
@@ -131,14 +133,28 @@ object PublicIpClient {
         return text.matches(Regex("""[\d.:a-fA-F]+"""))
     }
 
-    private fun httpStatusLabel(code: Int): String? {
-        return when (code) {
-            403 -> "Forbidden"
-            else -> null
-        }
-    }
-
     private fun looksLikeHtml(body: String): Boolean {
         return HTML_TAG_REGEX.containsMatchIn(body)
+    }
+
+    private fun extractMailRuIp(body: String, endpoint: String?): String? {
+        val host = endpoint
+            ?.let { runCatching { URL(it).host.lowercase() }.getOrNull() }
+            ?: return null
+        if (host != "ip.mail.ru") return null
+
+        val text = body
+            .replace(HTML_SCRIPT_REGEX, " ")
+            .replace(HTML_STYLE_REGEX, " ")
+            .replace(HTML_TAG_STRIP_REGEX, " ")
+            .replace("&nbsp;", " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+
+        return MAIL_RU_IP_REGEX.find(text)?.groupValues?.getOrNull(1)?.takeIf(::looksLikeIp)
+    }
+
+    internal fun resetForTests() {
+        fetchIpOverride = null
     }
 }

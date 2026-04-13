@@ -31,7 +31,7 @@ data class ResolverHttpResponse(
 object ResolverNetworkStack {
     private val lock = Any()
     @Volatile
-    internal var dnsFactoryOverride: ((DnsResolverConfig) -> Dns)? = null
+    internal var dnsFactoryOverride: ((DnsResolverConfig, ResolverBinding?) -> Dns)? = null
     @Volatile
     private var cachedConfig: DnsResolverConfig? = null
     @Volatile
@@ -42,9 +42,9 @@ object ResolverNetworkStack {
     fun lookup(
         hostname: String,
         config: DnsResolverConfig,
-        network: Network? = null,
+        binding: ResolverBinding? = null,
     ): List<InetAddress> {
-        return dns(config, network).lookup(hostname)
+        return dns(config, binding).lookup(hostname)
     }
 
     internal fun resetForTests() {
@@ -53,6 +53,7 @@ object ResolverNetworkStack {
             cachedDns = null
             cachedClient = null
         }
+        ResolverSocketBinder.resetForTests()
     }
 
     fun execute(
@@ -64,8 +65,7 @@ object ResolverNetworkStack {
         timeoutMs: Int,
         config: DnsResolverConfig,
         proxy: Proxy? = null,
-        network: Network? = null,
-        bindSocketOnly: Boolean = false,
+        binding: ResolverBinding? = null,
     ): ResolverHttpResponse {
         val requestBuilder = Request.Builder().url(url)
         headers.forEach { (name, value) -> requestBuilder.header(name, value) }
@@ -75,7 +75,7 @@ object ResolverNetworkStack {
             "POST" -> requestBuilder.post(requestBody ?: ByteArray(0).toRequestBody(bodyContentType?.toMediaTypeOrNull()))
             else -> requestBuilder.method(method.uppercase(), requestBody)
         }
-        val client = baseClient(config, network, bindSocketOnly = bindSocketOnly && network != null)
+        val client = baseClient(config, binding)
             .newBuilder()
             .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
@@ -96,16 +96,14 @@ object ResolverNetworkStack {
 
     private fun baseClient(
         config: DnsResolverConfig,
-        network: Network? = null,
-        bindSocketOnly: Boolean = false,
+        binding: ResolverBinding? = null,
     ): OkHttpClient {
         val normalized = config.sanitized()
-        if (network != null) {
+        if (binding != null) {
             return buildClient(
                 config = normalized,
-                dns = if (bindSocketOnly) Dns.SYSTEM else createDns(normalized, network),
-                network = network,
-                bindSocketOnly = bindSocketOnly,
+                dns = createDns(normalized, binding),
+                binding = binding,
             )
         }
         val cached = cachedConfig
@@ -126,10 +124,10 @@ object ResolverNetworkStack {
         }
     }
 
-    private fun dns(config: DnsResolverConfig, network: Network? = null): Dns {
+    private fun dns(config: DnsResolverConfig, binding: ResolverBinding? = null): Dns {
         val normalized = config.sanitized()
-        if (network != null) {
-            return createDns(normalized, network)
+        if (binding != null) {
+            return createDns(normalized, binding)
         }
         val cached = cachedConfig
         if (cached == normalized) {
@@ -149,45 +147,56 @@ object ResolverNetworkStack {
         }
     }
 
-    private fun buildClient(
+    internal fun buildClient(
         config: DnsResolverConfig,
         dns: Dns = createDns(config),
-        network: Network? = null,
-        bindSocketOnly: Boolean = false,
+        binding: ResolverBinding? = null,
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .dns(dns)
             .followRedirects(true)
             .followSslRedirects(true)
             .apply {
-                if (network != null) {
-                    if (bindSocketOnly) {
-                        socketFactory(BindSocketFactory(network))
-                    } else {
-                        socketFactory(network.socketFactory)
-                    }
+                when (binding) {
+                    is ResolverBinding.AndroidNetworkBinding -> socketFactory(binding.network.socketFactory)
+                    is ResolverBinding.OsDeviceBinding -> socketFactory(BindToDeviceSocketFactory(binding.interfaceName))
+                    null -> Unit
                 }
             }
             .build()
     }
 
-    private fun createDns(config: DnsResolverConfig, network: Network? = null): Dns {
-        dnsFactoryOverride?.let { return it(config) }
+    internal fun createDns(config: DnsResolverConfig, binding: ResolverBinding? = null): Dns {
+        dnsFactoryOverride?.let { return it(config, binding) }
+        if (binding is ResolverBinding.OsDeviceBinding && binding.dnsMode == ResolverBinding.DnsMode.SYSTEM) {
+            return Dns.SYSTEM
+        }
         return when (config.mode) {
-            DnsResolverMode.SYSTEM -> network?.let(::NetworkDns) ?: Dns.SYSTEM
+            DnsResolverMode.SYSTEM -> fallbackDns(binding)
             DnsResolverMode.DIRECT -> {
                 val servers = config.effectiveDirectServers()
-                if (servers.isEmpty()) network?.let(::NetworkDns) ?: Dns.SYSTEM else DirectDns(servers, network = network)
+                if (servers.isEmpty()) {
+                    fallbackDns(binding)
+                } else {
+                    DirectDns(servers, binding = binding)
+                }
             }
             DnsResolverMode.DOH -> {
-                val dohUrl = config.effectiveDohUrl() ?: return network?.let(::NetworkDns) ?: Dns.SYSTEM
+                val dohUrl = config.effectiveDohUrl() ?: return fallbackDns(binding)
                 val bootstrapHosts = config.effectiveDohBootstrapHosts()
                     .mapNotNull { literalToInetAddress(it) }
                 val bootstrapClient = OkHttpClient.Builder()
                     .apply {
-                        if (network != null) {
-                            socketFactory(network.socketFactory)
-                            dns(NetworkDns(network))
+                        when (binding) {
+                            is ResolverBinding.AndroidNetworkBinding -> {
+                                socketFactory(binding.network.socketFactory)
+                                dns(NetworkDns(binding.network))
+                            }
+                            is ResolverBinding.OsDeviceBinding -> {
+                                socketFactory(BindToDeviceSocketFactory(binding.interfaceName))
+                                dns(Dns.SYSTEM)
+                            }
+                            null -> Unit
                         }
                     }
                     .build()
@@ -206,18 +215,26 @@ object ResolverNetworkStack {
         if (!DnsResolverConfig.isValidIpLiteral(value)) return null
         return runCatching { InetAddress.getByName(value.trim()) }.getOrNull()
     }
+
+    private fun fallbackDns(binding: ResolverBinding?): Dns {
+        return when (binding) {
+            is ResolverBinding.AndroidNetworkBinding -> NetworkDns(binding.network)
+            else -> Dns.SYSTEM
+        }
+    }
 }
 
 /**
- * SocketFactory that calls Network.bindSocket() on each unconnected socket before it is used.
- * Only the no-arg createSocket() matters for OkHttp — it creates an unconnected socket which
- * OkHttp then connects itself. The other overloads connect immediately in the constructor so
- * bindSocket has no effect on them; they are included only to satisfy the abstract contract.
+ * SocketFactory that applies SO_BINDTODEVICE to each unconnected socket before OkHttp connects it.
+ * Only the no-arg createSocket() matters for OkHttp. The other overloads connect immediately and
+ * are present only to satisfy the abstract contract.
  */
-private class BindSocketFactory(
-    private val network: Network,
+internal class BindToDeviceSocketFactory(
+    private val interfaceName: String,
 ) : SocketFactory() {
-    override fun createSocket(): Socket = Socket().also { network.bindSocket(it) }
+    override fun createSocket(): Socket = Socket().also {
+        ResolverSocketBinder.bind(it, ResolverBinding.OsDeviceBinding(interfaceName))
+    }
     override fun createSocket(host: String, port: Int): Socket = Socket(host, port)
     override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket =
         Socket(host, port, localHost, localPort)
@@ -245,7 +262,7 @@ internal class DirectDns(
     servers: List<String>,
     private val port: Int = 53,
     private val timeoutMs: Int = 3_000,
-    private val network: Network? = null,
+    private val binding: ResolverBinding? = null,
 ) : Dns {
     private val serverAddresses = servers.mapNotNull { value ->
         runCatching { InetAddress.getByName(value.trim()) }.getOrNull()
@@ -290,7 +307,7 @@ internal class DirectDns(
         val payload = buildQuery(hostname, type, requestId)
         DatagramSocket().use { socket ->
             socket.soTimeout = timeoutMs
-            network?.bindSocket(socket)
+            ResolverSocketBinder.bind(socket, binding)
             socket.send(DatagramPacket(payload, payload.size, server, port))
 
             val responseBuffer = ByteArray(1500)

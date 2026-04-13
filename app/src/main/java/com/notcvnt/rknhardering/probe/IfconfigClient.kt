@@ -1,6 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.network.ResolverBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -14,6 +15,7 @@ object IfconfigClient {
         "https://checkip.amazonaws.com",
         "https://ipv4-internet.yandex.net/api/v0/ip",
         "https://ipv6-internet.yandex.net/api/v0/ip",
+        "https://ip.mail.ru",
     )
 
     suspend fun fetchDirectIp(
@@ -40,10 +42,24 @@ object IfconfigClient {
         ),
     )
 
+    suspend fun fetchIpViaNetwork(
+        primaryBinding: ResolverBinding.AndroidNetworkBinding,
+        fallbackBinding: ResolverBinding.OsDeviceBinding? = null,
+        timeoutMs: Int = 7000,
+        resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+    ): Result<String> = fetchIpWithFallback(
+        timeoutMs = timeoutMs,
+        resolverConfig = resolverConfig,
+        binding = primaryBinding,
+        fallbackBinding = fallbackBinding,
+    )
+
     private suspend fun fetchIpWithFallback(
         timeoutMs: Int,
         resolverConfig: DnsResolverConfig,
         proxy: Proxy? = null,
+        binding: ResolverBinding? = null,
+        fallbackBinding: ResolverBinding.OsDeviceBinding? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         var lastError: Exception? = null
         for (ep in ENDPOINTS) {
@@ -52,9 +68,23 @@ object IfconfigClient {
                 timeoutMs = timeoutMs,
                 proxy = proxy,
                 resolverConfig = resolverConfig,
+                binding = binding,
             )
             if (result.isSuccess) return@withContext result
             lastError = result.exceptionOrNull() as? Exception ?: lastError
+        }
+        if (fallbackBinding != null) {
+            for (ep in ENDPOINTS) {
+                val result = PublicIpClient.fetchIp(
+                    endpoint = ep,
+                    timeoutMs = timeoutMs,
+                    proxy = proxy,
+                    resolverConfig = resolverConfig,
+                    binding = fallbackBinding,
+                )
+                if (result.isSuccess) return@withContext result
+                lastError = result.exceptionOrNull() as? Exception ?: lastError
+            }
         }
         Result.failure(lastError ?: IOException("All IP endpoints failed"))
     }

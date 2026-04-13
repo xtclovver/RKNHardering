@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.network.ResolverBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -21,6 +22,10 @@ import java.io.IOException
  * vulnerability is present.
  */
 object UnderlyingNetworkProber {
+    private data class BoundNetwork(
+        val network: Network,
+        val interfaceName: String?,
+    )
 
     data class ProbeResult(
         val vpnActive: Boolean,
@@ -60,16 +65,20 @@ object UnderlyingNetworkProber {
             ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
 
         val allNetworks = cm.allNetworks
-        var vpnNetwork: Network? = null
-        val nonVpnNetworks = mutableListOf<Network>()
+        var vpnNetwork: BoundNetwork? = null
+        val nonVpnNetworks = mutableListOf<BoundNetwork>()
 
         for (network in allNetworks) {
             val caps = cm.getNetworkCapabilities(network) ?: continue
             if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
+            val boundNetwork = BoundNetwork(
+                network = network,
+                interfaceName = cm.getLinkProperties(network)?.interfaceName,
+            )
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
-                vpnNetwork = network
+                vpnNetwork = boundNetwork
             } else {
-                nonVpnNetworks.add(network)
+                nonVpnNetworks.add(boundNetwork)
             }
         }
 
@@ -91,7 +100,7 @@ object UnderlyingNetworkProber {
                 underlyingReachable = false,
                 vpnIp = vpnIp,
                 vpnError = vpnError,
-                vpnNetwork = vpnNetwork,
+                vpnNetwork = vpnNetwork.network,
                 activeNetworkIsVpn = activeNetworkIsVpn,
             )
         }
@@ -104,7 +113,7 @@ object UnderlyingNetworkProber {
             val result = fetchIpViaNetwork(network, resolverConfig)
             underlyingIp = result.getOrNull()
             if (underlyingIp != null) {
-                usedNetwork = network
+                usedNetwork = network.network
                 underlyingError = null
                 break
             }
@@ -118,40 +127,49 @@ object UnderlyingNetworkProber {
             underlyingIp = underlyingIp,
             vpnError = vpnError,
             underlyingError = underlyingError,
-            vpnNetwork = vpnNetwork,
+            vpnNetwork = vpnNetwork.network,
             underlyingNetwork = usedNetwork,
             activeNetworkIsVpn = activeNetworkIsVpn,
         )
     }
 
     private fun fetchIpViaNetwork(
-        network: Network,
+        boundNetwork: BoundNetwork,
         resolverConfig: DnsResolverConfig,
     ): Result<String> {
         var lastError: Exception? = null
+        val primaryBinding = ResolverBinding.AndroidNetworkBinding(boundNetwork.network)
         for (endpoint in IP_ENDPOINTS) {
             val result = PublicIpClient.fetchIp(
                 endpoint = endpoint.url,
                 timeoutMs = TIMEOUT_MS,
                 resolverConfig = resolverConfig,
-                network = network,
+                binding = primaryBinding,
             )
             if (result.isSuccess) return result
             lastError = result.exceptionOrNull() as? Exception ?: lastError
         }
-        // Fallback: use system DNS + Network.bindSocket (equivalent to curl --interface tun0).
-        // Apps excluded from VPN via per-app split tunnel cannot use network.socketFactory
-        // to reach the VPN network, but bindSocket still works because it operates at the
-        // socket level (SO_BINDTODEVICE) rather than through Android's network routing API.
+        val fallbackBinding = boundNetwork.interfaceName
+            ?.takeIf { it.isNotBlank() }
+            ?.let { ResolverBinding.OsDeviceBinding(it, dnsMode = ResolverBinding.DnsMode.SYSTEM) }
+        if (fallbackBinding == null) {
+            val message = lastError?.message?.let {
+                "$it; OS device bind fallback is unavailable because interfaceName is missing"
+            } ?: "OS device bind fallback is unavailable because interfaceName is missing"
+            return Result.failure(IOException(message))
+        }
+
+        // Fallback: keep system DNS semantics from the old second pass, but switch transport
+        // binding to real SO_BINDTODEVICE instead of Android's Network.bindSocket().
         for (endpoint in IP_ENDPOINTS) {
             val result = PublicIpClient.fetchIp(
                 endpoint = endpoint.url,
                 timeoutMs = TIMEOUT_MS,
                 resolverConfig = resolverConfig,
-                network = network,
-                bindSocketOnly = true,
+                binding = fallbackBinding,
             )
             if (result.isSuccess) return result
+            lastError = result.exceptionOrNull() as? Exception ?: lastError
         }
         return Result.failure(lastError ?: IOException("All IP endpoints failed"))
     }

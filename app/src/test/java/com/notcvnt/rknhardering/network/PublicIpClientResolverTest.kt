@@ -15,12 +15,14 @@ class PublicIpClientResolverTest {
     fun setUp() {
         ResolverNetworkStack.dnsFactoryOverride = null
         ResolverNetworkStack.resetForTests()
+        PublicIpClient.resetForTests()
     }
 
     @After
     fun tearDown() {
         ResolverNetworkStack.dnsFactoryOverride = null
         ResolverNetworkStack.resetForTests()
+        PublicIpClient.resetForTests()
     }
 
     @Test
@@ -33,7 +35,7 @@ class PublicIpClientResolverTest {
                     "resolver-test.local" to FakeDnsServer.Record(ipv4 = "127.0.0.1"),
                 ),
             ).use { dnsServer ->
-                ResolverNetworkStack.dnsFactoryOverride = {
+                ResolverNetworkStack.dnsFactoryOverride = { _, _ ->
                     DirectDns(listOf("127.0.0.1"), port = dnsServer.port, timeoutMs = 1_000)
                 }
                 ResolverNetworkStack.resetForTests()
@@ -78,7 +80,7 @@ class PublicIpClientResolverTest {
             )
 
             assertFalse(result.isSuccess)
-            assertEquals("HTTP 403 // Forbidden", result.exceptionOrNull()?.message)
+            assertEquals("HTTP 403", result.exceptionOrNull()?.message)
         }
     }
 }
