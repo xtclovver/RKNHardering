@@ -249,6 +249,14 @@
     <string name="checker_direct_proxy_endpoint">%1$s: %2$s:%3$s</string>
     <string name="checker_direct_proxy_known_port">%1$s از پورت شناخته‌شده %2$s استفاده می‌کند</string>
     <string name="checker_direct_proxy_no_valid_port">%1$s: میزبان بدون پورت معتبر پیدا شد</string>
+    <string name="checker_direct_proxyinfo_default">ProxyInfo proxy پیش‌فرض</string>
+    <string name="checker_direct_proxyinfo_network">ProxyInfo روی شبکه %1$s</string>
+    <string name="checker_direct_proxyinfo_unknown_interface">رابط نامشخص</string>
+    <string name="checker_direct_proxyinfo_network_scan">ProxyInfo روی شبکه‌های بررسی‌شده</string>
+    <string name="checker_direct_proxyinfo_details">%1$s: %2$s</string>
+    <string name="checker_direct_proxyinfo_invalid">%1$s: پروفایل proxy نامعتبر</string>
+    <string name="checker_direct_proxyinfo_unavailable">%1$s: بررسی ProxyInfo در دسترس نیست (%2$s)</string>
+    <string name="checker_direct_proxyinfo_network_none">ProxyInfo روی شبکه‌های بررسی‌شده: پیدا نشد</string>
 
     <string name="checker_indirect_category_name">نشانه‌های غیرمستقیم</string>
     <string name="checker_indirect_capability_not_vpn">Capability NOT_VPN: %1$s</string>
@@ -261,6 +269,11 @@
     <string name="checker_indirect_mtu_anomaly_nonstandard">ناهنجاری MTU: اینترفیس غیر استاندارد %1$s MTU=%2$d</string>
     <string name="checker_indirect_mtu_no_anomalies">MTU: ناهنجاری‌ای پیدا نشد</string>
     <string name="checker_indirect_mtu_error">خطا هنگام بررسی MTU: %1$s</string>
+    <string name="checker_indirect_ipsec_classification">شبکه IPsec %1$s: %2$s</string>
+    <string name="checker_indirect_ipsec_capabilities">قابلیت‌ها %1$s: NOT_VPN=%2$s، TRANSPORT_VPN=%3$s، IMS=%4$s، EIMS=%5$s، MMTEL=%6$s</string>
+    <string name="checker_indirect_ipsec_class_confirmed_vpn">تونل VPN تأیید شده</string>
+    <string name="checker_indirect_ipsec_class_carrier_ims">IMS اپراتور / VPN نیست</string>
+    <string name="checker_indirect_ipsec_class_unknown">تونل IPsec ناشناخته</string>
     <string name="checker_indirect_default_route_standard">مسیر پیش‌فرض: %1$s (استاندارد)</string>
     <string name="checker_indirect_default_route_nonstandard">مسیر پیش‌فرض از طریق اینترفیس غیر استاندارد: %1$s</string>
     <string name="checker_indirect_dedicated_routes">مسیرهای اختصاصی از طریق VPN/اینترفیس غیر استاندارد: %1$s</string>

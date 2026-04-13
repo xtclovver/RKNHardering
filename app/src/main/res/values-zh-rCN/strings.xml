@@ -248,6 +248,14 @@
     <string name="checker_direct_proxy_endpoint">%1$s：%2$s:%3$s</string>
     <string name="checker_direct_proxy_known_port">%1$s 使用了已知端口 %2$s</string>
     <string name="checker_direct_proxy_no_valid_port">%1$s：发现主机但端口无效</string>
+    <string name="checker_direct_proxyinfo_default">ProxyInfo 默认代理</string>
+    <string name="checker_direct_proxyinfo_network">网络 %1$s 上的 ProxyInfo</string>
+    <string name="checker_direct_proxyinfo_unknown_interface">未知接口</string>
+    <string name="checker_direct_proxyinfo_network_scan">已跟踪网络上的 ProxyInfo</string>
+    <string name="checker_direct_proxyinfo_details">%1$s：%2$s</string>
+    <string name="checker_direct_proxyinfo_invalid">%1$s：代理配置无效</string>
+    <string name="checker_direct_proxyinfo_unavailable">%1$s：ProxyInfo 检查不可用（%2$s）</string>
+    <string name="checker_direct_proxyinfo_network_none">已跟踪网络上的 ProxyInfo：未发现</string>
 
     <string name="checker_indirect_category_name">间接迹象</string>
     <string name="checker_indirect_capability_not_vpn">Capability NOT_VPN：%1$s</string>
@@ -260,6 +268,11 @@
     <string name="checker_indirect_mtu_anomaly_nonstandard">MTU 异常：非标准接口 %1$s MTU=%2$d</string>
     <string name="checker_indirect_mtu_no_anomalies">MTU：未发现异常</string>
     <string name="checker_indirect_mtu_error">检查 MTU 时出错：%1$s</string>
+    <string name="checker_indirect_ipsec_classification">IPsec 网络 %1$s：%2$s</string>
+    <string name="checker_indirect_ipsec_capabilities">能力 %1$s：NOT_VPN=%2$s，TRANSPORT_VPN=%3$s，IMS=%4$s，EIMS=%5$s，MMTEL=%6$s</string>
+    <string name="checker_indirect_ipsec_class_confirmed_vpn">已确认 VPN 隧道</string>
+    <string name="checker_indirect_ipsec_class_carrier_ims">运营商 IMS / 非 VPN</string>
+    <string name="checker_indirect_ipsec_class_unknown">未知 IPsec 隧道</string>
     <string name="checker_indirect_default_route_standard">默认路由：%1$s（标准）</string>
     <string name="checker_indirect_default_route_nonstandard">通过非标准接口的默认路由：%1$s</string>
     <string name="checker_indirect_dedicated_routes">通过 VPN/非标准接口的专用路由：%1$s</string>
