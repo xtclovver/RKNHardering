@@ -15,6 +15,7 @@ import kotlinx.coroutines.coroutineScope
 data class CheckSettings(
     val splitTunnelEnabled: Boolean = true,
     val networkRequestsEnabled: Boolean = true,
+    val callTransportProbeEnabled: Boolean = false,
     val resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     val portRange: String = "full",
     val portRangeStart: Int = 1024,
@@ -56,11 +57,15 @@ object VpnCheckRunner {
                 resolverConfig = settings.resolverConfig,
             )
         }
-        val bypassDeferred = if (settings.splitTunnelEnabled) {
+        val bypassEnabled = settings.splitTunnelEnabled ||
+            (settings.networkRequestsEnabled && settings.callTransportProbeEnabled)
+        val bypassDeferred = if (bypassEnabled) {
             async {
                 BypassChecker.check(
                     context = context,
                     resolverConfig = settings.resolverConfig,
+                    splitTunnelEnabled = settings.splitTunnelEnabled,
+                    callTransportProbeEnabled = settings.networkRequestsEnabled && settings.callTransportProbeEnabled,
                     portRange = settings.portRange,
                     portRangeStart = settings.portRangeStart,
                     portRangeEnd = settings.portRangeEnd,
@@ -135,6 +140,7 @@ object VpnCheckRunner {
             vpnNetworkIp = null,
             underlyingIp = null,
             xrayApiScanResult = null,
+            callTransportLeaks = emptyList(),
             findings = emptyList(),
             detected = false,
         )

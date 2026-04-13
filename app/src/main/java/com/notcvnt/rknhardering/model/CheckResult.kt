@@ -29,7 +29,48 @@ enum class EvidenceSource {
     VPN_GATEWAY_LEAK,
     VPN_NETWORK_BINDING,
     TUN_ACTIVE_PROBE,
+    TELEGRAM_CALL_TRANSPORT,
+    WHATSAPP_CALL_TRANSPORT,
 }
+
+enum class CallTransportService {
+    TELEGRAM,
+    WHATSAPP,
+}
+
+enum class CallTransportProbeKind {
+    DIRECT_UDP_STUN,
+    PROXY_ASSISTED_TELEGRAM,
+    PROXY_ASSISTED_UDP_STUN,
+}
+
+enum class CallTransportStatus {
+    NO_SIGNAL,
+    NEEDS_REVIEW,
+    UNSUPPORTED,
+    ERROR,
+}
+
+enum class CallTransportNetworkPath {
+    ACTIVE,
+    UNDERLYING,
+    LOCAL_PROXY,
+}
+
+data class CallTransportLeakResult(
+    val service: CallTransportService,
+    val probeKind: CallTransportProbeKind,
+    val networkPath: CallTransportNetworkPath,
+    val status: CallTransportStatus,
+    val targetHost: String? = null,
+    val targetPort: Int? = null,
+    val resolvedIps: List<String> = emptyList(),
+    val mappedIp: String? = null,
+    val observedPublicIp: String? = null,
+    val summary: String,
+    val confidence: EvidenceConfidence? = null,
+    val experimental: Boolean = false,
+)
 
 enum class VpnAppKind {
     TARGETED_BYPASS,
@@ -111,6 +152,7 @@ data class BypassResult(
     val vpnNetworkIp: String? = null,
     val underlyingIp: String? = null,
     val xrayApiScanResult: XrayApiScanResult?,
+    val callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
     val findings: List<Finding>,
     val detected: Boolean,
     val needsReview: Boolean = false,

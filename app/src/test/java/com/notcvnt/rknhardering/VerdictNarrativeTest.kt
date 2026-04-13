@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportProbeKind
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
@@ -255,6 +260,55 @@ class VerdictNarrativeTest {
         assertTrue(narrative.explanation.contains("did not find convincing signs"))
     }
 
+    @Test
+    fun `call transport leak is shown in discovered rows and reasons`() {
+        val narrative = VerdictNarrativeBuilder.build(
+            context = context,
+            result = result(
+                verdict = Verdict.NEEDS_REVIEW,
+                bypass = bypass(
+                    needsReview = true,
+                    callTransportLeaks = listOf(
+                        CallTransportLeakResult(
+                            service = CallTransportService.TELEGRAM,
+                            probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
+                            networkPath = CallTransportNetworkPath.ACTIVE,
+                            status = CallTransportStatus.NEEDS_REVIEW,
+                            targetHost = "149.154.167.51",
+                            targetPort = 3478,
+                            mappedIp = "198.51.100.20",
+                            observedPublicIp = "203.0.113.10",
+                            summary = "Telegram call transport via active network responded",
+                            confidence = EvidenceConfidence.MEDIUM,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_call_transport) &&
+                    it.value == "Telegram (direct UDP STUN)"
+            },
+        )
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_call_transport_target) &&
+                    it.value == "149.154.167.51:3478"
+            },
+        )
+        assertTrue(
+            narrative.discoveredRows.any {
+                it.label == context.getString(R.string.narrative_label_call_transport_public_ip) &&
+                    it.value == "203.0.113.10"
+            },
+        )
+        assertTrue(
+            narrative.reasonRows.contains(context.getString(R.string.narrative_reason_call_transport_signal)),
+        )
+    }
+
     private fun result(
         verdict: Verdict = Verdict.NOT_DETECTED,
         geoIp: CategoryResult = category(),
@@ -336,6 +390,7 @@ class VerdictNarrativeTest {
         vpnNetworkIp: String? = null,
         underlyingIp: String? = null,
         xrayApiScanResult: XrayApiScanResult? = null,
+        callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
         findings: List<Finding> = emptyList(),
         detected: Boolean = false,
         needsReview: Boolean = false,
@@ -348,6 +403,7 @@ class VerdictNarrativeTest {
         vpnNetworkIp = vpnNetworkIp,
         underlyingIp = underlyingIp,
         xrayApiScanResult = xrayApiScanResult,
+        callTransportLeaks = callTransportLeaks,
         findings = findings,
         detected = detected || evidence.any { it.detected },
         needsReview = needsReview,

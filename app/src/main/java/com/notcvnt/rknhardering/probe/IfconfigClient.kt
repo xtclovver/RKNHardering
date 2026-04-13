@@ -4,18 +4,17 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 
 object IfconfigClient {
 
     private val ENDPOINTS = listOf(
-        "https://ifconfig.me/ip",
-        "https://checkip.amazonaws.com",
-        "https://ipv4-internet.yandex.net/api/v0/ip",
-        "https://ipv6-internet.yandex.net/api/v0/ip",
-        "https://ip.mail.ru",
+        IpEndpointSpec("https://ifconfig.me/ip"),
+        IpEndpointSpec("https://checkip.amazonaws.com"),
+        IpEndpointSpec("https://ipv4-internet.yandex.net/api/v0/ip"),
+        IpEndpointSpec("https://ipv6-internet.yandex.net/api/v0/ip"),
+        IpEndpointSpec("https://ip.mail.ru"),
     )
 
     suspend fun fetchDirectIp(
@@ -61,31 +60,29 @@ object IfconfigClient {
         binding: ResolverBinding? = null,
         fallbackBinding: ResolverBinding.OsDeviceBinding? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
-        var lastError: Exception? = null
-        for (ep in ENDPOINTS) {
-            val result = PublicIpClient.fetchIp(
-                endpoint = ep,
+        val primaryResult = fetchFirstSuccessfulIp(ENDPOINTS) { endpoint ->
+            PublicIpClient.fetchIp(
+                endpoint = endpoint.url,
                 timeoutMs = timeoutMs,
                 proxy = proxy,
                 resolverConfig = resolverConfig,
                 binding = binding,
             )
-            if (result.isSuccess) return@withContext result
-            lastError = result.exceptionOrNull() as? Exception ?: lastError
         }
-        if (fallbackBinding != null) {
-            for (ep in ENDPOINTS) {
-                val result = PublicIpClient.fetchIp(
-                    endpoint = ep,
+
+        if (primaryResult.isSuccess || fallbackBinding == null) {
+            return@withContext primaryResult
+        }
+
+        val fallbackResult = fetchFirstSuccessfulIp(ENDPOINTS) { endpoint ->
+            PublicIpClient.fetchIp(
+                endpoint = endpoint.url,
                     timeoutMs = timeoutMs,
                     proxy = proxy,
                     resolverConfig = resolverConfig,
                     binding = fallbackBinding,
                 )
-                if (result.isSuccess) return@withContext result
-                lastError = result.exceptionOrNull() as? Exception ?: lastError
-            }
         }
-        Result.failure(lastError ?: IOException("All IP endpoints failed"))
+        if (fallbackResult.isSuccess) fallbackResult else primaryResult
     }
 }

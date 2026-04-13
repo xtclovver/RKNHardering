@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
-    <string name="run_check_notice">During a check, the app will make network requests to these domains:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• 2ip.ru\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nIf a custom DNS resolver is selected in settings, the app will also connect to its IP addresses or DoH domain.\n\nBy tapping "Run check", you agree that these network requests will be made from your device.\n\nThe app does not keep logs of these requests. Network access can be disabled in the app settings.</string>
+    <string name="run_check_notice">During a check, the app will make network requests to these domains:\n• api.beacondb.net\n• api.ipapi.is\n• www.iplocate.io\n• ipv4-internet.yandex.net\n• ipv6-internet.yandex.net\n• 2ip.ru\n• ifconfig.me\n• ipv4.ifconfig.me\n• ipv6.ifconfig.me\n• checkip.amazonaws.com\n• api.ipify.org\n• api-ipv4.ip.sb\n• api-ipv6.ip.sb\n\nIf a custom DNS resolver is selected in settings, the app will also connect to its IP addresses or DoH domain.\n\nIf Call transport leak probe is enabled, the app may additionally send UDP/STUN requests to bundled Telegram targets. WhatsApp targets are used only in debug or experimental builds.\n\nBy tapping "Run check", you agree that these network requests will be made from your device.\n\nThe app does not keep logs of these requests. Network access can be disabled in the app settings.</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_section_checks">Checks</string>
@@ -17,9 +17,11 @@
     <string name="settings_port_full">Full</string>
     <string name="settings_port_custom">Custom</string>
     <string name="settings_network_requests">Network requests</string>
-    <string name="settings_network_requests_desc">GeoIP, IP comparison, BeaconDB</string>
+    <string name="settings_network_requests_desc">GeoIP, IP comparison, BeaconDB, call transport probe</string>
     <string name="settings_network_disable_title">Disable network requests?</string>
-    <string name="settings_network_disable_message">If disabled:\n\n• GeoIP checks will not run\n• IP address comparison via external services will be disabled\n• Geolocation via BeaconDB (cell towers/Wi-Fi) will be disabled\n\nOnly local checks will remain available: direct signs, indirect signs, and port scanning</string>
+    <string name="settings_network_disable_message">If disabled:\n\n• GeoIP checks will not run\n• IP address comparison via external services will be disabled\n• Geolocation via BeaconDB (cell towers/Wi-Fi) will be disabled\n• Call transport leak probing will be disabled\n\nOnly local checks will remain available: direct signs, indirect signs, and port scanning</string>
+    <string name="settings_call_transport_probe">Call transport leak probe</string>
+    <string name="settings_call_transport_probe_desc">Sends additional UDP/STUN requests to bundled Telegram targets. WhatsApp tracing runs only in debug or experimental builds.</string>
     <string name="settings_network_disable_confirm">Disable</string>
     <string name="settings_dns_resolver">DNS resolver</string>
     <string name="settings_dns_resolver_desc">Used for GeoIP, IP Comparison, and BeaconDB. It does not change the Android system DNS and does not affect local DNS checks.</string>
@@ -88,7 +90,7 @@
     <string name="main_loading_direct">Looking for direct signs of VPNs, proxies, and installed clients.</string>
     <string name="main_loading_indirect">Checking interfaces, DNS, routes, and local technical signals.</string>
     <string name="main_loading_location">Collecting carrier, cell tower, and nearby Wi-Fi signals.</string>
-    <string name="main_loading_bypass">Looking for local split tunnel bypasses and available proxy endpoints.</string>
+    <string name="main_loading_bypass">Looking for local split tunnel bypasses, available proxy endpoints, and call transport signals.</string>
 
     <string name="main_stopped_scan">Scanning was stopped before this stage completed.</string>
     <string name="main_stopped_check">This stage was stopped before completion.</string>
@@ -162,6 +164,14 @@
     <string name="narrative_label_ru_checkers_ip">IP from RU checkers</string>
     <string name="narrative_label_non_ru_checkers_ip">IP from non-RU checkers</string>
     <string name="narrative_label_geo_ip">IP from GeoIP</string>
+    <string name="narrative_label_call_transport">Call transport</string>
+    <string name="narrative_label_call_transport_path">Call transport path</string>
+    <string name="narrative_label_call_transport_target">Call transport target</string>
+    <string name="narrative_label_call_transport_public_ip">Call transport public IP</string>
+    <string name="narrative_label_call_transport_mapped_ip">Call transport mapped IP</string>
+    <string name="narrative_value_call_transport_direct_udp_stun">direct UDP STUN</string>
+    <string name="narrative_value_call_transport_proxy_assisted_telegram">proxy-assisted Telegram TCP</string>
+    <string name="narrative_value_call_transport_proxy_assisted_udp_stun">proxy-assisted UDP STUN</string>
 
     <!-- VerdictNarrative: reason rows -->
     <string name="narrative_reason_xray_api">A local Xray API was found on the device and exposes outbound addresses.</string>
@@ -175,6 +185,7 @@
     <string name="narrative_reason_geo_foreign">GeoIP indicates an external or suspicious address.</string>
     <string name="narrative_reason_direct_signs">Direct signs of a local proxy/VPN were found.</string>
     <string name="narrative_reason_indirect_signs">Indirect signs of tunneling, routing changes, or DNS replacement were found.</string>
+    <string name="narrative_reason_call_transport_signal">A call transport endpoint responded and exposed mapped/public network data.</string>
     <string name="narrative_reason_fallback_detected">The verdict is based on a combination of multiple check signals.</string>
     <string name="narrative_reason_fallback_review">Signals are partial or contradictory, so manual review is needed.</string>
     <string name="narrative_reason_fallback_clean">No decisive bypass signals were found.</string>
@@ -297,6 +308,8 @@
     <string name="checker_bypass_progress_port_detail">Port %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">Looking for a gRPC API on localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">Checking access to the non-VPN network&#8230;</string>
+    <string name="checker_bypass_progress_call_transport_phase">Call transport</string>
+    <string name="checker_bypass_progress_call_transport_detail">Checking bundled Telegram and experimental call transport targets&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP check</string>
     <string name="checker_bypass_progress_ip_detail">Obtaining the direct IP and the IP via proxy&#8230;</string>
     <string name="checker_bypass_progress_mtproto_detail">Checking Telegram DC via proxy&#8230;</string>
@@ -326,6 +339,7 @@
     <string name="checker_bypass_underlying_unreachable_reason">Underlying network: the non-VPN network is unavailable (%1$s)</string>
     <string name="checker_bypass_gateway_leak">VPN gateway leak: the app can bypass the VPN tunnel (VPN IP: %1$s, real IP: %2$s)</string>
     <string name="checker_bypass_underlying_same_ip">The underlying network is reachable, but the IP matches the VPN%1$s: split tunnel not confirmed</string>
+    <string name="checker_bypass_compare_family_mismatch">Split tunnel comparison returned different IP families (VPN IP: %1$s, non-VPN IP: %2$s): manual review is needed</string>
     <string name="checker_bypass_compare_incomplete">Split tunnel comparison is incomplete (VPN IP: %1$s, non-VPN IP: %2$s): manual review is needed</string>
 
     <!-- InstalledVpnAppDetector -->

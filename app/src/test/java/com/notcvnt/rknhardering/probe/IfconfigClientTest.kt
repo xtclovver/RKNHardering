@@ -53,6 +53,27 @@ class IfconfigClientTest {
         assertEquals(ResolverBinding.DnsMode.SYSTEM, fallbackBinding.dnsMode)
     }
 
+    @Test
+    fun `fetch direct ip prefers generic or ipv4 error over trailing ipv6-only failure`() {
+        PublicIpClient.fetchIpOverride = { endpoint, _, _, _, _ ->
+            when {
+                endpoint.contains("ipv6-internet.yandex.net") ->
+                    Result.failure(IOException("Unable to resolve host \"ipv6-internet.yandex.net\""))
+                else ->
+                    Result.failure(IOException("generic timeout"))
+            }
+        }
+
+        val result = kotlinx.coroutines.runBlocking {
+            IfconfigClient.fetchDirectIp(
+                resolverConfig = DnsResolverConfig.system(),
+            )
+        }
+
+        assertTrue(result.isFailure)
+        assertEquals("generic timeout", result.exceptionOrNull()?.message)
+    }
+
     private fun newNetwork(netId: Int): Network {
         val constructor = Network::class.java.getDeclaredConstructor(Int::class.javaPrimitiveType)
         constructor.isAccessible = true

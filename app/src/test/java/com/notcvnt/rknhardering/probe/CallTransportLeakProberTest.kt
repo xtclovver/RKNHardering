@@ -220,16 +220,102 @@ class CallTransportLeakProberTest {
 
         val result = kotlinx.coroutines.runBlocking {
             CallTransportLeakProber.probeProxyAssistedTelegram(
-                ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5),
+                context = context,
+                proxyEndpoint = ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5),
             )
         }
 
-        requireNotNull(result)
-        assertEquals(CallTransportStatus.NEEDS_REVIEW, result.status)
-        assertEquals("149.154.167.51", result.targetHost)
-        assertEquals(443, result.targetPort)
-        assertNull(result.mappedIp)
-        assertEquals("203.0.113.10", result.observedPublicIp)
+        val tcpResult = result.single()
+        assertEquals(CallTransportStatus.NEEDS_REVIEW, tcpResult.status)
+        assertEquals("149.154.167.51", tcpResult.targetHost)
+        assertEquals(443, tcpResult.targetPort)
+        assertNull(tcpResult.mappedIp)
+        assertEquals("203.0.113.10", tcpResult.observedPublicIp)
+    }
+
+    @Test
+    fun `proxy assisted telegram adds udp stun signal when udp associate succeeds`() {
+        PublicIpClient.fetchIpOverride = { _, _, _, _, _ -> Result.success("203.0.113.10") }
+        CallTransportLeakProber.dependenciesOverride = CallTransportLeakProber.Dependencies(
+            loadCatalog = { _, _ ->
+                CallTransportTargetCatalog.Catalog(
+                    telegramTargets = listOf(
+                        CallTransportTargetCatalog.CallTransportTarget(
+                            service = CallTransportService.TELEGRAM,
+                            host = "149.154.167.51",
+                            port = 3478,
+                            experimental = false,
+                            enabled = true,
+                        ),
+                    ),
+                    whatsappTargets = emptyList(),
+                )
+            },
+            proxyProbe = {
+                CallTransportLeakProber.ProxyProbeOutcome(reachable = false)
+            },
+            proxyUdpStunProbe = { _, _, _ ->
+                Result.success(
+                    StunBindingClient.BindingResult(
+                        resolvedIps = listOf("149.154.167.51"),
+                        remoteIp = "149.154.167.51",
+                        remotePort = 3478,
+                        mappedIp = "198.51.100.20",
+                        mappedPort = 40000,
+                    ),
+                )
+            },
+        )
+
+        val results = kotlinx.coroutines.runBlocking {
+            CallTransportLeakProber.probeProxyAssistedTelegram(
+                context = context,
+                proxyEndpoint = ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5),
+            )
+        }
+
+        val udpResult = results.single()
+        assertEquals(CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN, udpResult.probeKind)
+        assertEquals(CallTransportNetworkPath.LOCAL_PROXY, udpResult.networkPath)
+        assertEquals(CallTransportStatus.NEEDS_REVIEW, udpResult.status)
+        assertEquals("149.154.167.51", udpResult.targetHost)
+        assertEquals("198.51.100.20", udpResult.mappedIp)
+        assertEquals("203.0.113.10", udpResult.observedPublicIp)
+    }
+
+    @Test
+    fun `proxy assisted telegram ignores udp auth failures as no signal`() {
+        CallTransportLeakProber.dependenciesOverride = CallTransportLeakProber.Dependencies(
+            loadCatalog = { _, _ ->
+                CallTransportTargetCatalog.Catalog(
+                    telegramTargets = listOf(
+                        CallTransportTargetCatalog.CallTransportTarget(
+                            service = CallTransportService.TELEGRAM,
+                            host = "149.154.167.51",
+                            port = 3478,
+                            experimental = false,
+                            enabled = true,
+                        ),
+                    ),
+                    whatsappTargets = emptyList(),
+                )
+            },
+            proxyProbe = {
+                CallTransportLeakProber.ProxyProbeOutcome(reachable = false)
+            },
+            proxyUdpStunProbe = { _, _, _ ->
+                Result.failure(Socks5UdpAssociateClient.AuthenticationRequiredException())
+            },
+        )
+
+        val results = kotlinx.coroutines.runBlocking {
+            CallTransportLeakProber.probeProxyAssistedTelegram(
+                context = context,
+                proxyEndpoint = ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5),
+            )
+        }
+
+        assertTrue(results.isEmpty())
     }
 
     @Test

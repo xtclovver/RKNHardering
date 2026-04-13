@@ -1,6 +1,11 @@
 package com.notcvnt.rknhardering.checker
 
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportProbeKind
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -177,6 +182,62 @@ class VerdictEngineTest {
         assertEquals(Verdict.NEEDS_REVIEW, verdict)
     }
 
+    @Test
+    fun `call transport leak elevates clean verdict to needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(
+                callTransportLeaks = listOf(
+                    CallTransportLeakResult(
+                        service = CallTransportService.TELEGRAM,
+                        probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
+                        networkPath = CallTransportNetworkPath.ACTIVE,
+                        status = CallTransportStatus.NEEDS_REVIEW,
+                        targetHost = "149.154.167.51",
+                        targetPort = 3478,
+                        mappedIp = "198.51.100.20",
+                        observedPublicIp = "203.0.113.10",
+                        summary = "Telegram call transport responded",
+                        confidence = EvidenceConfidence.MEDIUM,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `proxy assisted udp leak elevates clean verdict to needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(
+                callTransportLeaks = listOf(
+                    CallTransportLeakResult(
+                        service = CallTransportService.TELEGRAM,
+                        probeKind = CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
+                        networkPath = CallTransportNetworkPath.LOCAL_PROXY,
+                        status = CallTransportStatus.NEEDS_REVIEW,
+                        targetHost = "149.154.167.51",
+                        targetPort = 3478,
+                        mappedIp = "198.51.100.20",
+                        observedPublicIp = "203.0.113.10",
+                        summary = "Telegram call transport via local proxy responded",
+                        confidence = EvidenceConfidence.MEDIUM,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
     private data class MatrixCase(
         val label: String,
         val geo: Boolean,
@@ -229,6 +290,7 @@ class VerdictEngineTest {
     private fun bypass(
         evidence: List<EvidenceItem> = emptyList(),
         needsReview: Boolean = false,
+        callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
     ): BypassResult = BypassResult(
         proxyEndpoint = null,
         proxyOwner = null,
@@ -237,6 +299,7 @@ class VerdictEngineTest {
         vpnNetworkIp = null,
         underlyingIp = null,
         xrayApiScanResult = null,
+        callTransportLeaks = callTransportLeaks,
         findings = emptyList(),
         detected = evidence.any { it.detected },
         needsReview = needsReview,

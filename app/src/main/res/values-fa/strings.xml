@@ -21,6 +21,8 @@
     <string name="settings_network_disable_title">درخواست‌های شبکه غیرفعال شوند؟</string>
     <string name="settings_network_disable_message">در صورت غیرفعال شدن:\n\n• بررسی‌های GeoIP اجرا نخواهند شد\n• مقایسه IP از طریق سرویس‌های خارجی غیرفعال می‌شود\n• مکان‌یابی از طریق BeaconDB (دکل‌ها/Wi-Fi) غیرفعال می‌شود\n\nفقط بررسی‌های محلی باقی می‌مانند: نشانه‌های مستقیم، نشانه‌های غیرمستقیم و اسکن پورت</string>
     <string name="settings_network_disable_confirm">غیرفعال کردن</string>
+    <string name="settings_call_transport_probe">نشت‌های call transport</string>
+    <string name="settings_call_transport_probe_desc">درخواست‌های اضافی UDP/STUN به هدف‌های داخلی Telegram می‌فرستد. ردیابی WhatsApp فقط در buildهای debug یا experimental اجرا می‌شود.</string>
     <string name="settings_dns_resolver">DNS resolver</string>
     <string name="settings_dns_resolver_desc">برای GeoIP، IP Comparison و BeaconDB استفاده می‌شود. DNS سیستمی Android را تغییر نمی‌دهد و روی بررسی‌های محلی DNS اثری ندارد.</string>
     <string name="settings_dns_mode_system">سیستمی</string>
@@ -153,6 +155,14 @@
     <string name="narrative_label_ru_checkers_ip">IP از checkerهای RU</string>
     <string name="narrative_label_non_ru_checkers_ip">IP از checkerهای غیر RU</string>
     <string name="narrative_label_geo_ip">IP از GeoIP</string>
+    <string name="narrative_label_call_transport">Call transport</string>
+    <string name="narrative_label_call_transport_path">مسیر call transport</string>
+    <string name="narrative_label_call_transport_target">هدف call transport</string>
+    <string name="narrative_label_call_transport_public_ip">IP عمومی call transport</string>
+    <string name="narrative_label_call_transport_mapped_ip">IP نگاشته‌شده call transport</string>
+    <string name="narrative_value_call_transport_direct_udp_stun">UDP STUN مستقیم</string>
+    <string name="narrative_value_call_transport_proxy_assisted_telegram">Telegram TCP از طریق proxy</string>
+    <string name="narrative_value_call_transport_proxy_assisted_udp_stun">UDP STUN از طریق proxy</string>
 
     <string name="narrative_reason_xray_api">یک Xray API محلی روی دستگاه پیدا شد و آدرس‌های outbound را آشکار می‌کند.</string>
     <string name="narrative_reason_split_tunnel">IP مستقیم و IP از طریق proxy محلی با هم متفاوت‌اند.</string>
@@ -165,6 +175,7 @@
     <string name="narrative_reason_geo_foreign">GeoIP یک آدرس خارجی یا مشکوک را نشان می‌دهد.</string>
     <string name="narrative_reason_direct_signs">نشانه‌های مستقیم از proxy/VPN محلی پیدا شد.</string>
     <string name="narrative_reason_indirect_signs">نشانه‌های غیرمستقیم از تونل، تغییر مسیر یا جایگزینی DNS پیدا شد.</string>
+    <string name="narrative_reason_call_transport_signal">یک هدف call transport پاسخ داد و داده‌های mapped/public network را آشکار کرد.</string>
     <string name="narrative_reason_fallback_detected">این نتیجه بر پایه ترکیب چند نشانه از بررسی‌ها صادر شده است.</string>
     <string name="narrative_reason_fallback_review">نشانه‌ها ناقص یا متناقض‌اند، بنابراین بررسی دستی لازم است.</string>
     <string name="narrative_reason_fallback_clean">هیچ نشانه تعیین‌کننده‌ای از دور زدن پیدا نشد.</string>
@@ -281,6 +292,8 @@
     <string name="checker_bypass_progress_port_detail">پورت %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">در حال جست‌وجوی gRPC API روی localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">در حال بررسی دسترسی به شبکه غیر VPN&#8230;</string>
+    <string name="checker_bypass_progress_call_transport_phase">Call transport</string>
+    <string name="checker_bypass_progress_call_transport_detail">در حال بررسی هدف‌های داخلی Telegram و هدف‌های experimental مربوط به call transport&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">بررسی IP</string>
     <string name="checker_bypass_progress_ip_detail">در حال به‌دست‌آوردن IP مستقیم و IP از طریق proxy&#8230;</string>
     <string name="checker_bypass_progress_mtproto_detail">در حال بررسی Telegram DC از طریق proxy&#8230;</string>
@@ -310,6 +323,7 @@
     <string name="checker_bypass_underlying_unreachable_reason">شبکه زیربنایی: شبکه غیر VPN در دسترس نیست (%1$s)</string>
     <string name="checker_bypass_gateway_leak">VPN gateway leak: برنامه می‌تواند از تونل VPN عبور کند (IP VPN: %1$s، IP واقعی: %2$s)</string>
     <string name="checker_bypass_underlying_same_ip">شبکه underlying در دسترس است، اما IP با VPN%1$s یکسان است: split tunnel تأیید نشد</string>
+    <string name="checker_bypass_compare_family_mismatch">مقایسه split tunnel آدرس‌هایی از خانواده‌های متفاوت برگرداند (IP VPN: %1$s، IP غیر VPN: %2$s): بررسی دستی لازم است</string>
     <string name="checker_bypass_compare_incomplete">مقایسه split tunnel ناقص است (IP VPN: %1$s، IP غیر VPN: %2$s): بررسی دستی لازم است</string>
 
     <string name="checker_vpn_known_apps_none">برنامه‌های شناخته‌شده VPN/Proxy و ارائه‌دهندگان VpnService: موردی پیدا نشد</string>

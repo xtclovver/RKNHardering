@@ -21,6 +21,8 @@
     <string name="settings_network_disable_title">Отключить сетевые запросы?</string>
     <string name="settings_network_disable_message">При отключении:\n\n• GeoIP проверка не будет выполнена\n• Сравнение IP-адресов через внешние сервисы отключится\n• Геолокация через BeaconDB (вышки/Wi-Fi) отключится\n\nБудут работать только локальные проверки: прямые признаки, косвенные признаки, сканирование портов</string>
     <string name="settings_network_disable_confirm">Отключить</string>
+    <string name="settings_call_transport_probe">Утечки call transport</string>
+    <string name="settings_call_transport_probe_desc">Отправляет дополнительные UDP/STUN-запросы к встроенным Telegram-целям. Трассировка WhatsApp работает только в debug или experimental сборках.</string>
     <string name="settings_dns_resolver">DNS-резолвер</string>
     <string name="settings_dns_resolver_desc">Применяется к GeoIP, IP Comparison и BeaconDB. Не меняет системный DNS Android и не влияет на локальные DNS-проверки.</string>
     <string name="settings_dns_mode_system">Системный</string>
@@ -160,6 +162,14 @@
     <string name="narrative_label_ru_checkers_ip">IP RU-чекеров</string>
     <string name="narrative_label_non_ru_checkers_ip">IP не-RU чекеров</string>
     <string name="narrative_label_geo_ip">IP из GeoIP</string>
+    <string name="narrative_label_call_transport">Call transport</string>
+    <string name="narrative_label_call_transport_path">Путь call transport</string>
+    <string name="narrative_label_call_transport_target">Цель call transport</string>
+    <string name="narrative_label_call_transport_public_ip">Публичный IP call transport</string>
+    <string name="narrative_label_call_transport_mapped_ip">Mapped IP call transport</string>
+    <string name="narrative_value_call_transport_direct_udp_stun">прямой UDP STUN</string>
+    <string name="narrative_value_call_transport_proxy_assisted_telegram">Telegram TCP через proxy</string>
+    <string name="narrative_value_call_transport_proxy_assisted_udp_stun">UDP STUN через proxy</string>
 
     <!-- VerdictNarrative: reason rows -->
     <string name="narrative_reason_xray_api">На устройстве найден локальный Xray API, из которого читаются outbound-адреса.</string>
@@ -173,6 +183,7 @@
     <string name="narrative_reason_geo_foreign">GeoIP даёт внешний или подозрительный адрес.</string>
     <string name="narrative_reason_direct_signs">Найдены прямые признаки локального proxy/VPN.</string>
     <string name="narrative_reason_indirect_signs">Найдены косвенные признаки туннеля, маршрутов или DNS-подмены.</string>
+    <string name="narrative_reason_call_transport_signal">Цель call transport ответила и раскрыла mapped/public network data.</string>
     <string name="narrative_reason_fallback_detected">Вердикт собран из сочетания нескольких сигналов проверки.</string>
     <string name="narrative_reason_fallback_review">Сигналы частичные или противоречивые, поэтому нужен ручной разбор.</string>
     <string name="narrative_reason_fallback_clean">Решающие сигналы обхода не найдены.</string>
@@ -295,6 +306,8 @@
     <string name="checker_bypass_progress_port_detail">Порт %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">Поиск gRPC API на localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">Проверка доступа к non-VPN сети&#8230;</string>
+    <string name="checker_bypass_progress_call_transport_phase">Call transport</string>
+    <string name="checker_bypass_progress_call_transport_detail">Проверяем встроенные Telegram-цели и experimental цели call transport&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">Проверка IP</string>
     <string name="checker_bypass_progress_ip_detail">Получение прямого IP и IP через прокси&#8230;</string>
     <string name="checker_bypass_progress_mtproto_detail">Проверка Telegram DC через прокси&#8230;</string>
@@ -326,6 +339,7 @@
     <string name="checker_bypass_underlying_unreachable_reason">Underlying network: non-VPN сеть недоступна (%1$s)</string>
     <string name="checker_bypass_gateway_leak">VPN gateway leak: приложение может обойти VPN-туннель (VPN IP: %1$s, реальный IP: %2$s)</string>
     <string name="checker_bypass_underlying_same_ip">Underlying сеть доступна, но IP совпадает с VPN%1$s: split tunnel не подтверждён</string>
+    <string name="checker_bypass_compare_family_mismatch">Сравнение split tunnel вернуло адреса разных семейств (VPN IP: %1$s, non-VPN IP: %2$s): нужна ручная проверка</string>
     <string name="checker_bypass_compare_incomplete">Сравнение split tunnel неполное (VPN IP: %1$s, non-VPN IP: %2$s): нужна ручная проверка</string>
 
     <!-- InstalledVpnAppDetector -->

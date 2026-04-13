@@ -21,6 +21,15 @@ class ProxyScanner(
     private val readTimeoutMs: Int = 120,
     private val maxConcurrency: Int = 200,
     private val progressUpdateEvery: Int = 256,
+    private val probePort: suspend (String, Int, Int, Int) -> ProxyType? =
+        { host, port, connectTimeout, readTimeout ->
+            ProxyProber.probeNoAuthProxyType(
+                host = host,
+                port = port,
+                connectTimeoutMs = connectTimeout,
+                readTimeoutMs = readTimeout,
+            )
+        },
 ) {
 
     companion object {
@@ -28,6 +37,8 @@ class ProxyScanner(
             VpnAppCatalog.localhostProxyPorts + listOf(1081, 7890, 7891)
             ).distinct().sorted()
     }
+
+    private val filteredPopularPorts = popularPorts.filter { it in scanRange }
 
     suspend fun findOpenProxyEndpoint(
         mode: ScanMode,
@@ -63,13 +74,13 @@ class ProxyScanner(
     private suspend fun scanPopularPorts(
         onProgress: suspend (ScanProgress) -> Unit,
     ): ProxyEndpoint? {
-        for ((index, port) in popularPorts.withIndex()) {
+        for ((index, port) in filteredPopularPorts.withIndex()) {
             coroutineContext.ensureActive()
             onProgress(
                 ScanProgress(
                     phase = ScanPhase.POPULAR_PORTS,
                     scanned = index + 1,
-                    total = popularPorts.size,
+                    total = filteredPopularPorts.size,
                     currentPort = port,
                 ),
             )
@@ -83,7 +94,7 @@ class ProxyScanner(
         onProgress: suspend (ScanProgress) -> Unit,
     ): ProxyEndpoint? = withContext(Dispatchers.IO) {
         coroutineScope {
-            val popularSet = popularPorts.toHashSet()
+            val popularSet = filteredPopularPorts.toHashSet()
             val total = scanRange.count { it !in popularSet }
             val scanned = AtomicInteger(0)
             val found = AtomicReference<ProxyEndpoint?>(null)
@@ -136,12 +147,7 @@ class ProxyScanner(
 
     private suspend fun tryPort(port: Int): ProxyEndpoint? = withContext(Dispatchers.IO) {
         for (host in loopbackHosts) {
-            val type = ProxyProber.probeNoAuthProxyType(
-                host = host,
-                port = port,
-                connectTimeoutMs = connectTimeoutMs,
-                readTimeoutMs = readTimeoutMs,
-            ) ?: continue
+            val type = probePort(host, port, connectTimeoutMs, readTimeoutMs) ?: continue
 
             return@withContext ProxyEndpoint(host, port, type)
         }

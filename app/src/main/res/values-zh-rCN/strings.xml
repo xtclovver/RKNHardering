@@ -21,6 +21,8 @@
     <string name="settings_network_disable_title">要禁用网络请求吗？</string>
     <string name="settings_network_disable_message">禁用后：\n\n• GeoIP 检查将不会运行\n• 通过外部服务进行的 IP 比较将被禁用\n• 通过 BeaconDB（基站/Wi-Fi）进行的位置判断将被禁用\n\n届时只保留本地检查：直接迹象、间接迹象和端口扫描</string>
     <string name="settings_network_disable_confirm">禁用</string>
+    <string name="settings_call_transport_probe">Call transport 泄露探测</string>
+    <string name="settings_call_transport_probe_desc">会向内置的 Telegram 目标发送额外的 UDP/STUN 请求。WhatsApp 跟踪仅在 debug 或 experimental 构建中运行。</string>
     <string name="settings_dns_resolver">DNS resolver</string>
     <string name="settings_dns_resolver_desc">用于 GeoIP、IP Comparison 和 BeaconDB。它不会修改 Android 系统 DNS，也不会影响本地 DNS 检查。</string>
     <string name="settings_dns_mode_system">系统</string>
@@ -152,6 +154,14 @@
     <string name="narrative_label_ru_checkers_ip">RU checker 返回的 IP</string>
     <string name="narrative_label_non_ru_checkers_ip">非 RU checker 返回的 IP</string>
     <string name="narrative_label_geo_ip">GeoIP 返回的 IP</string>
+    <string name="narrative_label_call_transport">Call transport</string>
+    <string name="narrative_label_call_transport_path">Call transport 路径</string>
+    <string name="narrative_label_call_transport_target">Call transport 目标</string>
+    <string name="narrative_label_call_transport_public_ip">Call transport 公网 IP</string>
+    <string name="narrative_label_call_transport_mapped_ip">Call transport 映射 IP</string>
+    <string name="narrative_value_call_transport_direct_udp_stun">直接 UDP STUN</string>
+    <string name="narrative_value_call_transport_proxy_assisted_telegram">经代理的 Telegram TCP</string>
+    <string name="narrative_value_call_transport_proxy_assisted_udp_stun">经代理的 UDP STUN</string>
 
     <string name="narrative_reason_xray_api">设备上发现了本地 Xray API，并且可以读取 outbound 地址。</string>
     <string name="narrative_reason_split_tunnel">直接 IP 与通过本地代理获得的 IP 不同。</string>
@@ -164,6 +174,7 @@
     <string name="narrative_reason_geo_foreign">GeoIP 指示了境外或可疑地址。</string>
     <string name="narrative_reason_direct_signs">发现了本地代理/VPN 的直接迹象。</string>
     <string name="narrative_reason_indirect_signs">发现了隧道、路由变化或 DNS 替换的间接迹象。</string>
+    <string name="narrative_reason_call_transport_signal">一个 call transport 目标作出了响应，并暴露了 mapped/public network 数据。</string>
     <string name="narrative_reason_fallback_detected">该结论基于多个检查信号的组合。</string>
     <string name="narrative_reason_fallback_review">信号不完整或相互矛盾，因此需要人工复核。</string>
     <string name="narrative_reason_fallback_clean">未发现决定性的绕过迹象。</string>
@@ -280,6 +291,8 @@
     <string name="checker_bypass_progress_port_detail">端口 %1$d（%2$d%%）</string>
     <string name="checker_bypass_progress_xray_detail">正在查找 localhost 上的 gRPC API&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">正在检查非 VPN 网络访问能力&#8230;</string>
+    <string name="checker_bypass_progress_call_transport_phase">Call transport</string>
+    <string name="checker_bypass_progress_call_transport_detail">正在检查内置的 Telegram 目标和 experimental 的 call transport 目标&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP 检查</string>
     <string name="checker_bypass_progress_ip_detail">正在获取直接 IP 和经代理的 IP&#8230;</string>
     <string name="checker_bypass_progress_mtproto_detail">正在通过代理检查 Telegram DC&#8230;</string>
@@ -308,6 +321,7 @@
     <string name="checker_bypass_underlying_unreachable_reason">底层网络：非 VPN 网络不可用（%1$s）</string>
     <string name="checker_bypass_gateway_leak">VPN gateway leak：应用可以绕过 VPN 隧道（VPN IP：%1$s，真实 IP：%2$s）</string>
     <string name="checker_bypass_underlying_same_ip">Underlying 网络可达，但 IP 与 VPN%1$s 相同：split tunnel 未确认</string>
+    <string name="checker_bypass_compare_family_mismatch">Split tunnel 对比返回了不同地址族的结果（VPN IP：%1$s，非 VPN IP：%2$s），需要人工复核</string>
     <string name="checker_bypass_compare_incomplete">Split tunnel 对比不完整（VPN IP：%1$s，非 VPN IP：%2$s），需要人工复核</string>
 
     <string name="checker_vpn_known_apps_none">已知 VPN/代理应用和 VpnService 提供方：未发现</string>

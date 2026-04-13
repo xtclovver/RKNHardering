@@ -4,16 +4,22 @@ import android.content.Context
 import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.LocalProxyOwner
+import com.notcvnt.rknhardering.probe.CallTransportLeakProber
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.IfconfigClient
 import com.notcvnt.rknhardering.probe.LocalSocketInspector
 import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.probe.MtProtoProber
+import com.notcvnt.rknhardering.probe.PortScanPlanner
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyScanner
 import com.notcvnt.rknhardering.probe.ProxyType
@@ -25,6 +31,7 @@ import com.notcvnt.rknhardering.probe.XrayApiScanner
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import java.net.InetAddress
 
 object BypassChecker {
 
@@ -44,10 +51,18 @@ object BypassChecker {
         val status: ProxyOwnerStatus,
     )
 
+    private enum class IpComparisonOutcome {
+        SAME,
+        DIFFERENT,
+        FAMILY_MISMATCH,
+        INCOMPLETE,
+    }
+
     enum class ProgressLine {
         BYPASS,
         XRAY_API,
         UNDERLYING_NETWORK,
+        CALL_TRANSPORT,
     }
 
     data class Progress(
@@ -59,6 +74,8 @@ object BypassChecker {
     suspend fun check(
         context: Context,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        splitTunnelEnabled: Boolean = true,
+        callTransportProbeEnabled: Boolean = false,
         portRange: String = "full",
         portRangeStart: Int = 1024,
         portRangeEnd: Int = 65535,
@@ -67,128 +84,167 @@ object BypassChecker {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
 
-        val scanMode: ScanMode
-        val customRange: IntRange?
-        when (portRange) {
-            "popular" -> {
-                scanMode = ScanMode.POPULAR_ONLY
-                customRange = null
-            }
-            "extended" -> {
-                scanMode = ScanMode.AUTO
-                customRange = 1024..15000
-            }
-            "custom" -> {
-                scanMode = ScanMode.AUTO
-                customRange = portRangeStart..portRangeEnd
-            }
-            else -> {
-                scanMode = ScanMode.AUTO
-                customRange = null
-            }
-        }
+        val scanPlan = PortScanPlanner.buildExecutionPlan(
+            portRange = portRange,
+            portRangeStart = portRangeStart,
+            portRangeEnd = portRangeEnd,
+        )
 
-        val scanner = if (customRange != null) ProxyScanner(scanRange = customRange) else ProxyScanner()
+        val scanner = ProxyScanner(
+            popularPorts = scanPlan.popularPorts,
+            scanRange = scanPlan.scanRange,
+        )
         val xrayScanner = XrayApiScanner()
 
-        val proxyDeferred = async {
-            onProgress?.invoke(
-                Progress(
-                    line = ProgressLine.BYPASS,
-                    phase = context.getString(R.string.checker_bypass_progress_port_scan_phase),
-                    detail = context.getString(R.string.checker_bypass_progress_port_scan_detail),
-                ),
-            )
-            if (scanMode == ScanMode.POPULAR_ONLY) {
-                scanner.findOpenProxyEndpoint(
-                    mode = ScanMode.POPULAR_ONLY,
-                    manualPort = null,
-                    onProgress = { progress ->
-                        val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                        onProgress?.invoke(
-                            Progress(
-                                line = ProgressLine.BYPASS,
-                                phase = context.getString(R.string.checker_bypass_progress_popular_ports),
-                                detail = context.getString(
-                                    R.string.checker_bypass_progress_port_detail,
-                                    progress.currentPort,
-                                    percent,
-                                ),
-                            ),
-                        )
-                    },
+        val proxyDeferred = if (splitTunnelEnabled) {
+            async {
+                onProgress?.invoke(
+                    Progress(
+                        line = ProgressLine.BYPASS,
+                        phase = context.getString(R.string.checker_bypass_progress_port_scan_phase),
+                        detail = context.getString(R.string.checker_bypass_progress_port_scan_detail),
+                    ),
                 )
-            } else {
-                scanner.findOpenProxyEndpoint(
-                    mode = ScanMode.AUTO,
-                    manualPort = null,
-                    onProgress = { progress ->
-                        val phaseText = when (progress.phase) {
-                            ScanPhase.POPULAR_PORTS -> context.getString(R.string.checker_bypass_progress_popular_ports)
-                            ScanPhase.FULL_RANGE -> context.getString(R.string.checker_bypass_progress_full_scan)
-                        }
-                        val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                        onProgress?.invoke(
-                            Progress(
-                                line = ProgressLine.BYPASS,
-                                phase = phaseText,
-                                detail = context.getString(
-                                    R.string.checker_bypass_progress_port_detail,
-                                    progress.currentPort,
-                                    percent,
+                if (scanPlan.mode == ScanMode.POPULAR_ONLY) {
+                    scanner.findOpenProxyEndpoint(
+                        mode = ScanMode.POPULAR_ONLY,
+                        manualPort = null,
+                        onProgress = { progress ->
+                            val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                            onProgress?.invoke(
+                                Progress(
+                                    line = ProgressLine.BYPASS,
+                                    phase = context.getString(R.string.checker_bypass_progress_popular_ports),
+                                    detail = context.getString(
+                                        R.string.checker_bypass_progress_port_detail,
+                                        progress.currentPort,
+                                        percent,
+                                    ),
                                 ),
-                            ),
-                        )
-                    },
-                )
+                            )
+                        },
+                    )
+                } else {
+                    scanner.findOpenProxyEndpoint(
+                        mode = scanPlan.mode,
+                        manualPort = null,
+                        onProgress = { progress ->
+                            val phaseText = when (progress.phase) {
+                                ScanPhase.POPULAR_PORTS -> context.getString(R.string.checker_bypass_progress_popular_ports)
+                                ScanPhase.FULL_RANGE -> context.getString(R.string.checker_bypass_progress_full_scan)
+                            }
+                            val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                            onProgress?.invoke(
+                                Progress(
+                                    line = ProgressLine.BYPASS,
+                                    phase = phaseText,
+                                    detail = context.getString(
+                                        R.string.checker_bypass_progress_port_detail,
+                                        progress.currentPort,
+                                        percent,
+                                    ),
+                                ),
+                            )
+                        },
+                    )
+                }
             }
+        } else {
+            null
         }
 
-        val xrayDeferred = async {
-            onProgress?.invoke(
-                Progress(
-                    line = ProgressLine.XRAY_API,
-                    phase = "Xray API",
-                    detail = context.getString(R.string.checker_bypass_progress_xray_detail),
-                ),
-            )
-            xrayScanner.findXrayApi { progress ->
-                val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+        val xrayDeferred = if (splitTunnelEnabled) {
+            async {
                 onProgress?.invoke(
                     Progress(
                         line = ProgressLine.XRAY_API,
                         phase = "Xray API",
-                        detail = "${progress.host}:${progress.currentPort} ($percent%)",
+                        detail = context.getString(R.string.checker_bypass_progress_xray_detail),
                     ),
                 )
+                xrayScanner.findXrayApi { progress ->
+                    val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                    onProgress?.invoke(
+                        Progress(
+                            line = ProgressLine.XRAY_API,
+                            phase = "Xray API",
+                            detail = "${progress.host}:${progress.currentPort} ($percent%)",
+                        ),
+                    )
+                }
             }
+        } else {
+            null
         }
 
-        val underlyingDeferred = async {
-            onProgress?.invoke(
-                Progress(
-                    line = ProgressLine.UNDERLYING_NETWORK,
-                    phase = "Underlying network",
-                    detail = context.getString(R.string.checker_bypass_progress_underlying_detail),
-                ),
-            )
-            UnderlyingNetworkProber.probe(context, resolverConfig)
+        val underlyingDeferred = if (splitTunnelEnabled) {
+            async {
+                onProgress?.invoke(
+                    Progress(
+                        line = ProgressLine.UNDERLYING_NETWORK,
+                        phase = "Underlying network",
+                        detail = context.getString(R.string.checker_bypass_progress_underlying_detail),
+                    ),
+                )
+                UnderlyingNetworkProber.probe(context, resolverConfig)
+            }
+        } else {
+            null
         }
 
-        val proxyEndpoint = proxyDeferred.await()
-        val xrayApiScanResult = xrayDeferred.await()
-        val underlyingResult = underlyingDeferred.await()
+        val callTransportDeferred = if (callTransportProbeEnabled) {
+            async {
+                onProgress?.invoke(
+                    Progress(
+                        line = ProgressLine.CALL_TRANSPORT,
+                        phase = context.getString(R.string.checker_bypass_progress_call_transport_phase),
+                        detail = context.getString(R.string.checker_bypass_progress_call_transport_detail),
+                    ),
+                )
+                CallTransportLeakProber.probeDirect(
+                    context = context,
+                    resolverConfig = resolverConfig,
+                    onProgress = { service, detail ->
+                        onProgress?.invoke(
+                            Progress(
+                                line = ProgressLine.CALL_TRANSPORT,
+                                phase = service,
+                                detail = detail,
+                            ),
+                        )
+                    },
+                )
+            }
+        } else {
+            null
+        }
+
+        val proxyEndpoint = proxyDeferred?.await()
+        val xrayApiScanResult = xrayDeferred?.await()
+        val underlyingResult = underlyingDeferred?.await() ?: UnderlyingNetworkProber.ProbeResult(
+            vpnActive = false,
+            underlyingReachable = false,
+        )
         val proxyOwnerMatch = proxyEndpoint?.let { resolveProxyOwner(context, it) }
+        val callTransportLeaks = mutableListOf<CallTransportLeakResult>()
+        callTransportDeferred?.await()?.let(callTransportLeaks::addAll)
 
-        reportProxyResult(context, proxyEndpoint, proxyOwnerMatch, findings, evidence)
-        reportXrayApiResult(context, xrayApiScanResult, findings, evidence)
-        val underlyingEvaluation = reportUnderlyingNetworkResult(context, underlyingResult, findings, evidence)
+        if (splitTunnelEnabled) {
+            reportProxyResult(context, proxyEndpoint, proxyOwnerMatch, findings, evidence)
+            reportXrayApiResult(context, xrayApiScanResult, findings, evidence)
+        }
+        val underlyingEvaluation = if (splitTunnelEnabled) {
+            reportUnderlyingNetworkResult(context, underlyingResult, findings, evidence)
+        } else {
+            UnderlyingEvaluation(detected = false, needsReview = false)
+        }
+        reportCallTransportResults(context, callTransportLeaks, findings, evidence)
 
         var directIp: String? = null
         var proxyIp: String? = null
         var confirmedBypass = false
 
-        if (proxyEndpoint != null) {
+        if (splitTunnelEnabled && proxyEndpoint != null) {
             onProgress?.invoke(
                 Progress(
                     line = ProgressLine.BYPASS,
@@ -270,8 +326,23 @@ object BypassChecker {
             }
         }
 
+        if (callTransportProbeEnabled && proxyEndpoint?.type == ProxyType.SOCKS5) {
+            CallTransportLeakProber.probeProxyAssistedTelegram(
+                context = context,
+                proxyEndpoint = proxyEndpoint,
+                resolverConfig = resolverConfig,
+            ).forEach { proxyLeak ->
+                callTransportLeaks += proxyLeak
+                reportCallTransportResults(context, listOf(proxyLeak), findings, evidence)
+            }
+        }
+
         val detected = confirmedBypass || xrayApiScanResult != null || underlyingEvaluation.detected
-        val needsReview = !detected && (proxyEndpoint != null || underlyingEvaluation.needsReview)
+        val needsReview = !detected && (
+            proxyEndpoint != null ||
+                underlyingEvaluation.needsReview ||
+                callTransportLeaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
+            )
 
         BypassResult(
             proxyEndpoint = proxyEndpoint,
@@ -281,11 +352,56 @@ object BypassChecker {
             vpnNetworkIp = underlyingResult.vpnIp,
             underlyingIp = underlyingResult.underlyingIp,
             xrayApiScanResult = xrayApiScanResult,
+            callTransportLeaks = callTransportLeaks,
             findings = findings,
             detected = detected,
             needsReview = needsReview,
             evidence = evidence,
         )
+    }
+
+    private fun reportCallTransportResults(
+        context: Context,
+        results: List<CallTransportLeakResult>,
+        findings: MutableList<Finding>,
+        evidence: MutableList<EvidenceItem>,
+    ) {
+        for (result in results) {
+            when (result.status) {
+                CallTransportStatus.NEEDS_REVIEW -> {
+                    findings.add(
+                        Finding(
+                            description = result.summary,
+                            needsReview = true,
+                            source = result.service.toEvidenceSource(),
+                            confidence = result.confidence ?: EvidenceConfidence.MEDIUM,
+                        ),
+                    )
+                    evidence.add(
+                        EvidenceItem(
+                            source = result.service.toEvidenceSource(),
+                            detected = true,
+                            confidence = result.confidence ?: EvidenceConfidence.MEDIUM,
+                            description = result.summary,
+                            family = result.service.name,
+                        ),
+                    )
+                }
+                CallTransportStatus.ERROR -> {
+                    findings.add(
+                        Finding(
+                            description = result.summary,
+                            isError = true,
+                            source = result.service.toEvidenceSource(),
+                            confidence = result.confidence,
+                        ),
+                    )
+                }
+                CallTransportStatus.NO_SIGNAL,
+                CallTransportStatus.UNSUPPORTED,
+                -> Unit
+            }
+        }
     }
 
     private fun reportProxyResult(
@@ -432,8 +548,10 @@ object BypassChecker {
         val unavailable = context.getString(R.string.checker_bypass_ip_unavailable)
         val vpnIpLabel = result.vpnIp ?: unavailable
         val nonVpnIpLabel = result.underlyingIp ?: unavailable
-        val ipsAreDifferent = result.vpnIp != null && result.underlyingIp != null && result.vpnIp != result.underlyingIp
-        val hasComparableIps = result.vpnIp != null && result.underlyingIp != null
+        val ipComparison = compareIpFamilies(result.vpnIp, result.underlyingIp)
+        val ipsAreDifferent = ipComparison == IpComparisonOutcome.DIFFERENT
+        val hasComparableIps = ipComparison == IpComparisonOutcome.SAME
+        val hasMixedFamilies = ipComparison == IpComparisonOutcome.FAMILY_MISMATCH
         val reviewSource = if (result.activeNetworkIsVpn == false) {
             EvidenceSource.VPN_NETWORK_BINDING
         } else {
@@ -508,6 +626,21 @@ object BypassChecker {
                             source = EvidenceSource.VPN_NETWORK_BINDING,
                         ),
                     )
+                }
+                hasMixedFamilies -> {
+                    findings.add(
+                        Finding(
+                            description = context.getString(
+                                R.string.checker_bypass_compare_family_mismatch,
+                                vpnIpLabel,
+                                nonVpnIpLabel,
+                            ),
+                            needsReview = true,
+                            source = EvidenceSource.VPN_NETWORK_BINDING,
+                            confidence = EvidenceConfidence.LOW,
+                        ),
+                    )
+                    needsReview = true
                 }
                 result.vpnIp != null || result.underlyingIp != null -> {
                     findings.add(
@@ -592,6 +725,21 @@ object BypassChecker {
                     ),
                 )
             }
+            hasMixedFamilies -> {
+                findings.add(
+                    Finding(
+                        description = context.getString(
+                            R.string.checker_bypass_compare_family_mismatch,
+                            vpnIpLabel,
+                            nonVpnIpLabel,
+                        ),
+                        needsReview = true,
+                        source = reviewSource,
+                        confidence = EvidenceConfidence.LOW,
+                    ),
+                )
+                needsReview = true
+            }
             result.vpnIp != null || result.underlyingIp != null -> {
                 findings.add(
                     Finding(
@@ -654,7 +802,27 @@ object BypassChecker {
 
     private fun isLoopback(host: String): Boolean = host == "::1" || host.startsWith("127.")
 
+    private fun compareIpFamilies(vpnIp: String?, underlyingIp: String?): IpComparisonOutcome {
+        if (vpnIp == null || underlyingIp == null) {
+            return IpComparisonOutcome.INCOMPLETE
+        }
+        val sameFamily = runCatching {
+            InetAddress.getByName(vpnIp)::class.java == InetAddress.getByName(underlyingIp)::class.java
+        }.getOrDefault(false)
+        if (!sameFamily) {
+            return IpComparisonOutcome.FAMILY_MISMATCH
+        }
+        return if (vpnIp == underlyingIp) IpComparisonOutcome.SAME else IpComparisonOutcome.DIFFERENT
+    }
+
     private fun formatHostPort(host: String, port: Int): String {
         return if (host.contains(':')) "[$host]:$port" else "$host:$port"
+    }
+
+    private fun CallTransportService.toEvidenceSource(): EvidenceSource {
+        return when (this) {
+            CallTransportService.TELEGRAM -> EvidenceSource.TELEGRAM_CALL_TRANSPORT
+            CallTransportService.WHATSAPP -> EvidenceSource.WHATSAPP_CALL_TRANSPORT
+        }
     }
 }

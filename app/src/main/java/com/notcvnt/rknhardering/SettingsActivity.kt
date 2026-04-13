@@ -25,7 +25,7 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.DnsResolverMode
 import com.notcvnt.rknhardering.network.DnsResolverPreset
 import com.notcvnt.rknhardering.network.DnsResolverPresets
-import com.notcvnt.rknhardering.probe.ProxyScanner
+import com.notcvnt.rknhardering.probe.PortScanPlanner
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -41,6 +41,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var editPortEnd: TextInputEditText
     private lateinit var textPortRangePreview: TextView
     private lateinit var switchNetworkRequests: MaterialSwitch
+    private lateinit var cardCallTransportProbe: MaterialCardView
+    private lateinit var switchCallTransportProbe: MaterialSwitch
     private lateinit var cardResolver: MaterialCardView
     private lateinit var chipGroupResolverMode: ChipGroup
     private lateinit var chipGroupResolverPreset: ChipGroup
@@ -85,6 +87,8 @@ class SettingsActivity : AppCompatActivity() {
         editPortEnd = findViewById(R.id.editPortEnd)
         textPortRangePreview = findViewById(R.id.textPortRangePreview)
         switchNetworkRequests = findViewById(R.id.switchNetworkRequests)
+        cardCallTransportProbe = findViewById(R.id.cardCallTransportProbe)
+        switchCallTransportProbe = findViewById(R.id.switchCallTransportProbe)
         cardResolver = findViewById(R.id.cardResolver)
         chipGroupResolverMode = findViewById(R.id.chipGroupResolverMode)
         chipGroupResolverPreset = findViewById(R.id.chipGroupResolverPreset)
@@ -102,9 +106,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun loadSettings() {
         switchSplitTunnel.isChecked = prefs.getBoolean(PREF_SPLIT_TUNNEL_ENABLED, true)
         switchNetworkRequests.isChecked = prefs.getBoolean(PREF_NETWORK_REQUESTS_ENABLED, true)
+        switchCallTransportProbe.isChecked = prefs.getBoolean(PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
         switchPrivacyMode.isChecked = prefs.getBoolean(PREF_PRIVACY_MODE, false)
 
         updatePortRangeEnabled(switchSplitTunnel.isChecked)
+        updateCallTransportEnabled(switchNetworkRequests.isChecked)
 
         val portRange = prefs.getString(PREF_PORT_RANGE, "full") ?: "full"
         val chipId = when (portRange) {
@@ -149,6 +155,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         switchNetworkRequests.setOnCheckedChangeListener { _, isChecked ->
+            updateCallTransportEnabled(isChecked)
             if (!isChecked) {
                 AlertDialog.Builder(this)
                     .setTitle(R.string.settings_network_disable_title)
@@ -166,6 +173,10 @@ class SettingsActivity : AppCompatActivity() {
             } else {
                 prefs.edit { putBoolean(PREF_NETWORK_REQUESTS_ENABLED, true) }
             }
+        }
+
+        switchCallTransportProbe.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(PREF_CALL_TRANSPORT_PROBE_ENABLED, isChecked) }
         }
 
         switchPrivacyMode.setOnCheckedChangeListener { _, isChecked ->
@@ -264,6 +275,11 @@ class SettingsActivity : AppCompatActivity() {
         setViewAndChildrenEnabled(cardPortRange, enabled)
     }
 
+    private fun updateCallTransportEnabled(enabled: Boolean) {
+        cardCallTransportProbe.alpha = if (enabled) 1.0f else 0.5f
+        setViewAndChildrenEnabled(cardCallTransportProbe, enabled)
+    }
+
     private fun setViewAndChildrenEnabled(view: View, enabled: Boolean) {
         view.isEnabled = enabled
         if (view is android.view.ViewGroup) {
@@ -274,33 +290,32 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun saveCustomPortRange() {
-        val start = editPortStart.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 1024
-        val end = editPortEnd.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 65535
-        val validStart = minOf(start, end)
-        val validEnd = maxOf(start, end)
+        val normalizedRange = PortScanPlanner.normalizeCustomRange(
+            start = editPortStart.text.toString().toIntOrNull() ?: PortScanPlanner.MIN_PORT,
+            end = editPortEnd.text.toString().toIntOrNull() ?: PortScanPlanner.MAX_PORT,
+        )
         prefs.edit {
-            putInt(PREF_PORT_RANGE_START, validStart)
-            putInt(PREF_PORT_RANGE_END, validEnd)
+            putInt(PREF_PORT_RANGE_START, normalizedRange.first)
+            putInt(PREF_PORT_RANGE_END, normalizedRange.last)
         }
-        editPortStart.setText(formatPortInputValue(validStart))
-        editPortEnd.setText(formatPortInputValue(validEnd))
+        editPortStart.setText(formatPortInputValue(normalizedRange.first))
+        editPortEnd.setText(formatPortInputValue(normalizedRange.last))
     }
 
     private fun updatePortRangePreview() {
-        val mergedPorts = mergePortRanges(
-            buildScanPortRanges(
-                portRange = selectedPortRange(),
-                customRange = currentCustomPortRange(),
-            ),
+        val previewRanges = PortScanPlanner.buildPreviewRanges(
+            portRange = selectedPortRange(),
+            portRangeStart = currentCustomPortRange().first,
+            portRangeEnd = currentCustomPortRange().last,
         )
-        val portsText = mergedPorts.joinToString(", ") { range ->
+        val portsText = previewRanges.joinToString(", ") { range ->
             if (range.first == range.last) {
                 range.first.toString()
             } else {
                 "${range.first}-${range.last}"
             }
         }
-        val portsCount = mergedPorts.sumOf { it.last - it.first + 1 }
+        val portsCount = previewRanges.sumOf { it.last - it.first + 1 }
         val formattedCount = NumberFormat.getIntegerInstance().format(portsCount)
         val portCountLabel = resources.getQuantityString(R.plurals.settings_port_word, portsCount, formattedCount)
         textPortRangePreview.text = getString(R.string.settings_port_range_preview, portsText, portCountLabel)
@@ -316,43 +331,10 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun currentCustomPortRange(): IntRange {
-        val start = editPortStart.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 1024
-        val end = editPortEnd.text.toString().toIntOrNull()?.coerceIn(1024, 65535) ?: 65535
-        return minOf(start, end)..maxOf(start, end)
-    }
-
-    private fun buildScanPortRanges(portRange: String, customRange: IntRange): List<IntRange> {
-        val ranges = ProxyScanner.DEFAULT_POPULAR_PORTS
-            .map { it..it }
-            .toMutableList()
-        when (portRange) {
-            "extended" -> ranges += 1024..15000
-            "full" -> ranges += 1024..65535
-            "custom" -> ranges += customRange
-        }
-        return ranges
-    }
-
-    private fun mergePortRanges(ranges: List<IntRange>): List<IntRange> {
-        if (ranges.isEmpty()) return emptyList()
-
-        val sortedRanges = ranges.sortedBy { it.first }
-        val mergedRanges = mutableListOf<IntRange>()
-        var currentStart = sortedRanges.first().first
-        var currentEnd = sortedRanges.first().last
-
-        for (range in sortedRanges.drop(1)) {
-            if (range.first <= currentEnd + 1) {
-                currentEnd = maxOf(currentEnd, range.last)
-            } else {
-                mergedRanges += currentStart..currentEnd
-                currentStart = range.first
-                currentEnd = range.last
-            }
-        }
-
-        mergedRanges += currentStart..currentEnd
-        return mergedRanges
+        return PortScanPlanner.normalizeCustomRange(
+            start = editPortStart.text.toString().toIntOrNull() ?: PortScanPlanner.MIN_PORT,
+            end = editPortEnd.text.toString().toIntOrNull() ?: PortScanPlanner.MAX_PORT,
+        )
     }
 
     private fun loadResolverSettings() {
@@ -483,6 +465,7 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_PORT_RANGE_START = "pref_port_range_start"
         const val PREF_PORT_RANGE_END = "pref_port_range_end"
         const val PREF_NETWORK_REQUESTS_ENABLED = "pref_network_requests_enabled"
+        const val PREF_CALL_TRANSPORT_PROBE_ENABLED = "pref_call_transport_probe_enabled"
         const val PREF_DNS_RESOLVER_MODE = "pref_dns_resolver_mode"
         const val PREF_DNS_RESOLVER_PRESET = "pref_dns_resolver_preset"
         const val PREF_DNS_RESOLVER_DIRECT_SERVERS = "pref_dns_resolver_direct_servers"

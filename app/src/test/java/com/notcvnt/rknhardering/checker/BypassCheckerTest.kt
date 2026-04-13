@@ -191,6 +191,30 @@ class BypassCheckerTest {
     }
 
     @Test
+    fun `gateway leak falls back to manual review on mixed ip families`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = "2001:db8::10",
+                underlyingIp = "203.0.113.20",
+                activeNetworkIsVpn = true,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertFalse(evidence.any { it.source == EvidenceSource.VPN_GATEWAY_LEAK && it.detected })
+        assertTrue(findings.any { it.needsReview && it.description.contains("different IP families") })
+    }
+
+    @Test
     fun `gateway leak not detected when vpn ip and underlying ip are the same`() {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
@@ -236,6 +260,30 @@ class BypassCheckerTest {
         assertFalse(outcome.needsReview)
         assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
         assertTrue(findings.any { it.isInformational && it.source == EvidenceSource.VPN_NETWORK_BINDING })
+    }
+
+    @Test
+    fun `vpn network binding falls back to manual review on mixed ip families`() {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val outcome = BypassChecker.reportUnderlyingNetworkResult(
+            context = context,
+            result = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                vpnIp = "2001:db8::10",
+                underlyingIp = "203.0.113.20",
+                activeNetworkIsVpn = false,
+            ),
+            findings = findings,
+            evidence = evidence,
+        )
+
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertFalse(evidence.any { it.source == EvidenceSource.VPN_NETWORK_BINDING && it.detected })
+        assertTrue(findings.any { it.needsReview && it.description.contains("different IP families") })
     }
 
     @Test

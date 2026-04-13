@@ -61,6 +61,30 @@ object StunBindingClient {
         }
     }
 
+    internal fun probeWithDatagramExchange(
+        host: String,
+        port: Int,
+        resolvedIps: List<String> = emptyList(),
+        exchange: (ByteArray) -> Socks5UdpAssociateClient.UdpDatagram,
+    ): Result<BindingResult> {
+        return runCatching {
+            val transactionId = Random.nextBytes(12)
+            val request = buildBindingRequest(transactionId)
+            val response = exchange(request)
+            val mappedAddress = parseMappedAddress(response.payload, transactionId)
+                ?: throw IOException("STUN response did not include a mapped address")
+
+            BindingResult(
+                resolvedIps = resolvedIps,
+                remoteIp = response.sourceHost.ifBlank { host },
+                remotePort = response.sourcePort.takeIf { it > 0 } ?: port,
+                mappedIp = mappedAddress.address.hostAddress
+                    ?: throw IOException("Mapped IP is unavailable"),
+                mappedPort = mappedAddress.port,
+            )
+        }
+    }
+
     private fun sendBindingRequest(
         host: String,
         port: Int,

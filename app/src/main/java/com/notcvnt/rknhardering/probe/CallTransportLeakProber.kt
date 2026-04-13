@@ -13,6 +13,7 @@ import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
+import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
@@ -66,6 +67,10 @@ object CallTransportLeakProber {
                 observedPublicIp = proxyIp,
             )
         },
+        val proxyUdpStunProbe: suspend (ProxyEndpoint, CallTransportTargetCatalog.CallTransportTarget, DnsResolverConfig) -> Result<StunBindingClient.BindingResult> =
+            { proxyEndpoint, target, resolverConfig ->
+                probeProxyAssistedUdpStun(proxyEndpoint, target, resolverConfig)
+            },
     )
 
     internal data class ProxyProbeOutcome(
@@ -183,33 +188,68 @@ object CallTransportLeakProber {
     }
 
     suspend fun probeProxyAssistedTelegram(
+        context: Context,
         proxyEndpoint: ProxyEndpoint,
-    ): CallTransportLeakResult? = withContext(Dispatchers.IO) {
+        resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+    ): List<CallTransportLeakResult> = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
         if (proxyEndpoint.type != ProxyType.SOCKS5) {
-            return@withContext null
+            return@withContext emptyList()
         }
-        runCatching {
-            dependencies.proxyProbe(proxyEndpoint)
-        }.getOrNull()?.takeIf { it.reachable }?.let { proxyOutcome ->
-            CallTransportLeakResult(
-                service = CallTransportService.TELEGRAM,
-                probeKind = CallTransportProbeKind.PROXY_ASSISTED_TELEGRAM,
-                networkPath = CallTransportNetworkPath.LOCAL_PROXY,
-                status = CallTransportStatus.NEEDS_REVIEW,
-                targetHost = proxyOutcome.targetHost,
-                targetPort = proxyOutcome.targetPort,
-                observedPublicIp = proxyOutcome.observedPublicIp,
-                summary = buildProxySummary(
-                    proxyEndpoint = proxyEndpoint,
+
+        val results = mutableListOf<CallTransportLeakResult>()
+        var cachedProxyPublicIp: String? = null
+        suspend fun fetchProxyPublicIp(): String? {
+            if (cachedProxyPublicIp != null) return cachedProxyPublicIp
+            cachedProxyPublicIp = runCatching {
+                IfconfigClient.fetchIpViaProxy(proxyEndpoint, resolverConfig = resolverConfig).getOrNull()
+            }.getOrNull()
+            return cachedProxyPublicIp
+        }
+
+        runCatching { dependencies.proxyProbe(proxyEndpoint) }
+            .getOrNull()
+            ?.takeIf { it.reachable }
+            ?.let { proxyOutcome ->
+                cachedProxyPublicIp = proxyOutcome.observedPublicIp ?: cachedProxyPublicIp
+                results += CallTransportLeakResult(
+                    service = CallTransportService.TELEGRAM,
+                    probeKind = CallTransportProbeKind.PROXY_ASSISTED_TELEGRAM,
+                    networkPath = CallTransportNetworkPath.LOCAL_PROXY,
+                    status = CallTransportStatus.NEEDS_REVIEW,
                     targetHost = proxyOutcome.targetHost,
                     targetPort = proxyOutcome.targetPort,
-                    publicIp = proxyOutcome.observedPublicIp,
-                ),
-                confidence = EvidenceConfidence.MEDIUM,
-                experimental = false,
-            )
-        }
+                    observedPublicIp = proxyOutcome.observedPublicIp,
+                    summary = buildProxySummary(
+                        proxyEndpoint = proxyEndpoint,
+                        targetHost = proxyOutcome.targetHost,
+                        targetPort = proxyOutcome.targetPort,
+                        publicIp = proxyOutcome.observedPublicIp,
+                    ),
+                    confidence = EvidenceConfidence.MEDIUM,
+                    experimental = false,
+                )
+            }
+
+        val telegramTargets = runCatching {
+            dependencies.loadCatalog(context, false).telegramTargets
+        }.getOrDefault(emptyList())
+
+        probeServiceTargets(
+            service = CallTransportService.TELEGRAM,
+            targets = telegramTargets,
+            path = PathDescriptor(path = CallTransportNetworkPath.LOCAL_PROXY),
+            fetchPublicIp = {
+                fetchProxyPublicIp()?.let { Result.success(it) }
+                    ?: Result.failure(IllegalStateException("Proxy public IP is unavailable"))
+            },
+            stunProbe = { target ->
+                dependencies.proxyUdpStunProbe(proxyEndpoint, target, resolverConfig)
+            },
+            probeKind = CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
+        )?.let(results::add)
+
+        results
     }
 
     private suspend fun probeServiceTargets(
@@ -217,8 +257,9 @@ object CallTransportLeakProber {
         targets: List<CallTransportTargetCatalog.CallTransportTarget>,
         path: PathDescriptor,
         fetchPublicIp: suspend () -> Result<String>,
-        stunProbe: (CallTransportTargetCatalog.CallTransportTarget) -> Result<StunBindingClient.BindingResult>,
+        stunProbe: suspend (CallTransportTargetCatalog.CallTransportTarget) -> Result<StunBindingClient.BindingResult>,
         experimental: Boolean = false,
+        probeKind: CallTransportProbeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
     ): CallTransportLeakResult? {
         for (target in targets) {
             val binding = stunProbe(target)
@@ -237,7 +278,7 @@ object CallTransportLeakProber {
                 }
                 return CallTransportLeakResult(
                     service = service,
-                    probeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
+                    probeKind = probeKind,
                     networkPath = path.path,
                     status = status,
                     targetHost = target.host,
@@ -320,6 +361,38 @@ object CallTransportLeakProber {
         }
         val base = "Telegram call transport via local SOCKS5 proxy $proxyLabel: $targetLabel is reachable"
         return if (publicIp.isNullOrBlank()) base else "$base (public IP: $publicIp)"
+    }
+
+    private suspend fun probeProxyAssistedUdpStun(
+        proxyEndpoint: ProxyEndpoint,
+        target: CallTransportTargetCatalog.CallTransportTarget,
+        resolverConfig: DnsResolverConfig,
+    ): Result<StunBindingClient.BindingResult> = withContext(Dispatchers.IO) {
+        val resolvedIps = runCatching {
+            ResolverNetworkStack.lookup(target.host, resolverConfig)
+                .mapNotNull { it.hostAddress }
+                .distinct()
+        }.getOrDefault(emptyList())
+
+        runCatching {
+            Socks5UdpAssociateClient.open(
+                proxyHost = proxyEndpoint.host,
+                proxyPort = proxyEndpoint.port,
+            ).use { session ->
+                StunBindingClient.probeWithDatagramExchange(
+                    host = target.host,
+                    port = target.port,
+                    resolvedIps = resolvedIps,
+                    exchange = { payload ->
+                        session.exchange(
+                            targetHost = target.host,
+                            targetPort = target.port,
+                            payload = payload,
+                        )
+                    },
+                ).getOrThrow()
+            }
+        }
     }
 
     private fun labelForService(service: CallTransportService): String {

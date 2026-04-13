@@ -126,6 +126,7 @@ class MainActivity : AppCompatActivity() {
     private val bypassProgressOrder = listOf(
         BypassChecker.ProgressLine.BYPASS,
         BypassChecker.ProgressLine.XRAY_API,
+        BypassChecker.ProgressLine.CALL_TRANSPORT,
         BypassChecker.ProgressLine.UNDERLYING_NETWORK,
     )
     private val loadingStages = linkedSetOf<RunningStage>()
@@ -402,6 +403,7 @@ class MainActivity : AppCompatActivity() {
     private fun runCheck() {
         val splitTunnelEnabled = prefs.getBoolean(SettingsActivity.PREF_SPLIT_TUNNEL_ENABLED, true)
         val networkRequestsEnabled = prefs.getBoolean(SettingsActivity.PREF_NETWORK_REQUESTS_ENABLED, true)
+        val callTransportProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
         val privacyMode = prefs.getBoolean(SettingsActivity.PREF_PRIVACY_MODE, false)
         val portRange = prefs.getString(SettingsActivity.PREF_PORT_RANGE, "full") ?: "full"
         val portRangeStart = prefs.getInt(SettingsActivity.PREF_PORT_RANGE_START, 1024)
@@ -418,6 +420,7 @@ class MainActivity : AppCompatActivity() {
         val settings = CheckSettings(
             splitTunnelEnabled = splitTunnelEnabled,
             networkRequestsEnabled = networkRequestsEnabled,
+            callTransportProbeEnabled = callTransportProbeEnabled,
             resolverConfig = resolverConfig,
             portRange = portRange,
             portRangeStart = portRangeStart,
@@ -541,7 +544,7 @@ class MainActivity : AppCompatActivity() {
         stages += RunningStage.DIRECT
         stages += RunningStage.INDIRECT
         stages += RunningStage.LOCATION
-        if (settings.splitTunnelEnabled) {
+        if (settings.splitTunnelEnabled || (settings.networkRequestsEnabled && settings.callTransportProbeEnabled)) {
             stages += RunningStage.BYPASS
         }
         return stages
@@ -1136,8 +1139,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun maskIpsInText(text: String): String {
         val ipv4Regex = Regex("""\b(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}\b""")
-        return ipv4Regex.replace(text) { match ->
+        val maskedIpv4 = ipv4Regex.replace(text) { match ->
             "${match.groupValues[1]}.${match.groupValues[2]}.*.*"
+        }
+        val ipv6Regex = Regex("""(?<![A-Za-z0-9])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f]{0,4}(?![A-Za-z0-9])""")
+        return ipv6Regex.replace(maskedIpv4) { match ->
+            val parts = match.value.trim('[', ']').split(':').filter { it.isNotEmpty() }
+            if (parts.isEmpty()) {
+                "*:*:*:*"
+            } else {
+                parts.take(4).joinToString(":") + ":*:*:*:*"
+            }
         }
     }
 
