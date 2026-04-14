@@ -187,6 +187,45 @@ class VpnCheckRunnerTest {
         assertSame(sharedProbe, bypassProbeResult)
     }
 
+    @Test
+    fun `indirect check runs off the caller thread`() = runBlocking {
+        val callerThread = Thread.currentThread()
+        var indirectThread: Thread? = null
+
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ ->
+                indirectThread = Thread.currentThread()
+                category("indirect")
+            },
+            locationCheck = { _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                BypassResult(
+                    proxyEndpoint = null,
+                    directIp = null,
+                    proxyIp = null,
+                    xrayApiScanResult = null,
+                    findings = emptyList(),
+                    detected = false,
+                )
+            },
+        )
+
+        VpnCheckRunner.run(
+            context = context,
+            settings = CheckSettings(
+                splitTunnelEnabled = true,
+                networkRequestsEnabled = false,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(indirectThread != null)
+        assertTrue(indirectThread !== callerThread)
+    }
+
     private fun category(
         name: String,
         needsReview: Boolean = false,

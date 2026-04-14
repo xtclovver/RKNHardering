@@ -10,6 +10,7 @@ import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -119,7 +120,7 @@ object VpnCheckRunner {
                 tunActiveProbeDeferred?.await(),
             )
         }
-        val indirectDeferred = async {
+        val indirectDeferred = async(Dispatchers.IO) {
             dependencies.indirectCheck(
                 context,
                 settings.networkRequestsEnabled,
