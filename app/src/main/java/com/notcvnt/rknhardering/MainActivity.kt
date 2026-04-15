@@ -51,17 +51,62 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
 
 fun maskIp(ip: String): String {
-    val ipv4Parts = ip.split(".")
-    if (ipv4Parts.size == 4 && ipv4Parts.all { it.toIntOrNull() != null }) {
-        return "${ipv4Parts[0]}.${ipv4Parts[1]}.*.*"
+    val normalized = ip.trim()
+    val parsed = when {
+        normalized.contains('.') -> {
+            val parts = normalized.split('.')
+            if (parts.size != 4 || parts.any { (it.toIntOrNull() ?: -1) !in 0..255 }) {
+                return "*.*.*.*"
+            }
+            runCatching { InetAddress.getByName(normalized) }.getOrNull()
+        }
+        normalized.contains(':') -> runCatching { InetAddress.getByName(normalized) }.getOrNull()
+        else -> null
+    } ?: return "*.*.*.*"
+    return when (parsed) {
+        is Inet4Address -> {
+            if (parsed.isSiteLocalAddress || parsed.isLoopbackAddress || parsed.isLinkLocalAddress) {
+                normalized
+            } else {
+                val bytes = parsed.address.map { it.toInt() and 0xff }
+                "${bytes[0]}.${bytes[1]}.*.*"
+            }
+        }
+        is Inet6Address -> {
+            if (parsed.isLoopbackAddress || parsed.isLinkLocalAddress || isUniqueLocalIpv6(parsed)) {
+                normalized
+            } else {
+                val groups = parsed.hostAddress?.substringBefore('%')?.split(':').orEmpty()
+                if (groups.size < 4) {
+                    "*:*:*:*"
+                } else {
+                    groups.take(4).joinToString(":") + ":*:*:*:*"
+                }
+            }
+        }
+        else -> "*.*.*.*"
     }
-    val ipv6Parts = ip.split(":")
-    if (ipv6Parts.size == 8) {
-        return "${ipv6Parts[0]}:${ipv6Parts[1]}:${ipv6Parts[2]}:${ipv6Parts[3]}:*:*:*:*"
+}
+
+fun maskIpsInText(text: String): String {
+    val ipv4Regex = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+    val maskedIpv4 = ipv4Regex.replace(text) { match ->
+        maskIp(match.value)
     }
-    return "*.*.*.*"
+    val ipv6Regex = Regex("""(?<![A-Za-z0-9])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f]{0,4}(?![A-Za-z0-9])""")
+    return ipv6Regex.replace(maskedIpv4) { match ->
+        maskIp(match.value.trim('[', ']'))
+    }
+}
+
+private fun isUniqueLocalIpv6(address: Inet6Address): Boolean {
+    val firstByte = address.address.firstOrNull()?.toInt()?.and(0xff) ?: return false
+    return (firstByte and 0xfe) == 0xfc
 }
 
 class MainActivity : AppCompatActivity() {
@@ -1078,7 +1123,7 @@ class MainActivity : AppCompatActivity() {
     private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
         cardIpComparison.visibility = View.VISIBLE
         bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison)
-        textIpComparisonSummary.text = result.summary
+        textIpComparisonSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
 
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.VISIBLE
@@ -1141,22 +1186,6 @@ class MainActivity : AppCompatActivity() {
         row.addView(indicator)
         row.addView(description)
         return row
-    }
-
-    private fun maskIpsInText(text: String): String {
-        val ipv4Regex = Regex("""\b(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}\b""")
-        val maskedIpv4 = ipv4Regex.replace(text) { match ->
-            "${match.groupValues[1]}.${match.groupValues[2]}.*.*"
-        }
-        val ipv6Regex = Regex("""(?<![A-Za-z0-9])(?:[0-9A-Fa-f]{0,4}:){2,}[0-9A-Fa-f]{0,4}(?![A-Za-z0-9])""")
-        return ipv6Regex.replace(maskedIpv4) { match ->
-            val parts = match.value.trim('[', ']').split(':').filter { it.isNotEmpty() }
-            if (parts.isEmpty()) {
-                "*:*:*:*"
-            } else {
-                parts.take(4).joinToString(":") + ":*:*:*:*"
-            }
-        }
     }
 
     private fun createInfoView(label: String, value: String): View {
@@ -1292,7 +1321,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val summary = TextView(this).apply {
-            text = group.summary
+            text = if (privacyMode) maskIpsInText(group.summary) else group.summary
             textSize = 13f
             setPadding(0, 6.dp, 0, 0)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
@@ -1378,7 +1407,7 @@ class MainActivity : AppCompatActivity() {
                             append(getString(R.string.main_ipv6_error_ignored))
                         }
                         append(response.error)
-                    }
+                    }.let { if (privacyMode) maskIpsInText(it) else it }
                     textSize = 12f
                     setPadding(0, 2.dp, 0, 0)
                     setTextColor(
