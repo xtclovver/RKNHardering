@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategorySplitTunnel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_split_tunnel"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_split_tunnel_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategoryNetwork"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_network"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_network_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategoryDns"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_dns"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_dns_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategoryPrivacy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_privacy"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_privacy_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategoryAppearance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_appearance"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_appearance_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardCategoryAbout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_cat_about"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/settings_cat_about_desc"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -10,10 +10,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.materialswitch.MaterialSwitch
-import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -52,7 +52,12 @@ class SettingsActivityTest {
     @Test
     fun `cdn pulling warning cancel keeps switch and pref disabled`() {
         val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-        val switch = activity.findViewById<MaterialSwitch>(R.id.switchCdnPulling)
+        activity.supportFragmentManager.beginTransaction()
+            .replace(R.id.settingsFragmentContainer, SettingsNetworkFragment())
+            .commitNow()
+        val fragment = activity.supportFragmentManager
+            .findFragmentById(R.id.settingsFragmentContainer) as SettingsNetworkFragment
+        val switch = fragment.requireView().findViewById<MaterialSwitch>(R.id.switchCdnPulling)
 
         switch.performClick()
         val dialog = ShadowDialog.getLatestDialog() as AlertDialog
@@ -68,7 +73,12 @@ class SettingsActivityTest {
     @Test
     fun `cdn pulling warning confirm enables switch and saves pref`() {
         val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-        val switch = activity.findViewById<MaterialSwitch>(R.id.switchCdnPulling)
+        activity.supportFragmentManager.beginTransaction()
+            .replace(R.id.settingsFragmentContainer, SettingsNetworkFragment())
+            .commitNow()
+        val fragment = activity.supportFragmentManager
+            .findFragmentById(R.id.settingsFragmentContainer) as SettingsNetworkFragment
+        val switch = fragment.requireView().findViewById<MaterialSwitch>(R.id.switchCdnPulling)
 
         switch.performClick()
         val dialog = ShadowDialog.getLatestDialog() as AlertDialog

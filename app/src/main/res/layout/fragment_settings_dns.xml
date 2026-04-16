@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardResolver"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_dns_resolver"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/settings_dns_resolver_desc"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupResolverMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverSystem"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_mode_system" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverDirect"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_mode_direct" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverDoh"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_mode_doh" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupResolverPreset"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverPresetCustom"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_preset_custom" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverPresetCloudflare"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_preset_cloudflare" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverPresetGoogle"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_preset_google" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipResolverPresetYandex"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_dns_preset_yandex" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/inputResolverDirectServersLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/settings_dns_direct_servers"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editResolverDirectServers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/settings_dns_direct_servers_hint"
+                        android:inputType="textMultiLine"
+                        android:maxLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/inputResolverDohUrlLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/settings_dns_doh_url"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editResolverDohUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/settings_dns_doh_url_hint"
+                        android:inputType="textUri" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/inputResolverBootstrapLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/settings_dns_bootstrap"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editResolverBootstrap"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/settings_dns_bootstrap_hint"
+                        android:inputType="textMultiLine"
+                        android:maxLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

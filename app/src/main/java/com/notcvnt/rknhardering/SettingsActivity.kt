@@ -1,39 +1,17 @@
 package com.notcvnt.rknhardering
 
-import android.content.Intent
-import android.content.SharedPreferences
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
-import android.view.View
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
-import androidx.core.net.toUri
-import androidx.core.widget.doAfterTextChanged
+import androidx.fragment.app.Fragment
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.card.MaterialCardView
-import com.google.android.material.chip.ChipGroup
-import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
-import com.notcvnt.rknhardering.network.DnsResolverConfig
-import com.notcvnt.rknhardering.network.DnsResolverMode
-import com.notcvnt.rknhardering.network.DnsResolverPreset
-import com.notcvnt.rknhardering.network.DnsResolverPresets
-import com.notcvnt.rknhardering.probe.PortScanPlanner
-import com.notcvnt.rknhardering.probe.TunProbeModeOverride
-import java.text.NumberFormat
-import java.util.Locale
 
 internal fun buildCdnPullingWarningMessage(context: android.content.Context): CharSequence {
     val message = SpannableStringBuilder(
@@ -61,53 +39,7 @@ internal fun buildCdnPullingWarningMessage(context: android.content.Context): Ch
 
 class SettingsActivity : AppCompatActivity() {
 
-    private lateinit var prefs: SharedPreferences
-
-    private lateinit var scrollView: ScrollView
-    private lateinit var switchSplitTunnel: MaterialSwitch
-    private lateinit var switchTunProbeDebug: MaterialSwitch
-    private lateinit var cardTunProbeMode: MaterialCardView
-    private lateinit var cardProxyScan: MaterialCardView
-    private lateinit var switchProxyScan: MaterialSwitch
-    private lateinit var cardXrayApiScan: MaterialCardView
-    private lateinit var switchXrayApiScan: MaterialSwitch
-    private lateinit var cardPortRange: MaterialCardView
-    private lateinit var chipGroupPortRange: ChipGroup
-    private lateinit var customPortRangeContainer: LinearLayout
-    private lateinit var editPortStart: TextInputEditText
-    private lateinit var editPortEnd: TextInputEditText
-    private lateinit var textPortRangePreview: TextView
-    private lateinit var switchNetworkRequests: MaterialSwitch
-    private lateinit var cardCdnPulling: MaterialCardView
-    private lateinit var switchCdnPulling: MaterialSwitch
-    private lateinit var cardCdnPullingMeduza: MaterialCardView
-    private lateinit var switchCdnPullingMeduza: MaterialSwitch
-    private lateinit var cardCallTransportProbe: MaterialCardView
-    private lateinit var switchCallTransportProbe: MaterialSwitch
-    private lateinit var cardResolver: MaterialCardView
-    private lateinit var chipGroupTunProbeMode: ChipGroup
-    private lateinit var chipGroupResolverMode: ChipGroup
-    private lateinit var chipGroupResolverPreset: ChipGroup
-    private lateinit var inputResolverDirectServersLayout: TextInputLayout
-    private lateinit var inputResolverDohUrlLayout: TextInputLayout
-    private lateinit var inputResolverBootstrapLayout: TextInputLayout
-    private lateinit var editResolverDirectServers: TextInputEditText
-    private lateinit var editResolverDohUrl: TextInputEditText
-    private lateinit var editResolverBootstrap: TextInputEditText
-    private lateinit var switchPrivacyMode: MaterialSwitch
-    private lateinit var chipGroupTheme: ChipGroup
-    private lateinit var chipGroupLanguage: ChipGroup
-    private var suppressCdnPullingToggleCallback = false
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        outState.putInt(STATE_SCROLL_POSITION, scrollView.verticalScrollbarPosition)
-        super.onSaveInstanceState(outState)
-    }
-
-    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        super.onRestoreInstanceState(savedInstanceState)
-        scrollView.verticalScrollbarPosition = savedInstanceState.getInt(STATE_SCROLL_POSITION, 0)
-    }
+    private lateinit var toolbar: MaterialToolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -115,562 +47,61 @@ class SettingsActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_settings)
 
-        prefs = AppUiSettings.prefs(this)
+        toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
 
-        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
-        toolbar.setNavigationOnClickListener { finish() }
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.settingsFragmentContainer, SettingsCategoriesFragment())
+                .commit()
+        }
 
-        bindViews()
-        loadSettings()
-        setupListeners()
+        supportFragmentManager.addOnBackStackChangedListener {
+            updateToolbarTitle()
+        }
+        updateToolbarTitle()
     }
 
-    private fun bindViews() {
-        scrollView = findViewById(R.id.scrollView)
-        switchSplitTunnel = findViewById(R.id.switchSplitTunnel)
-        switchTunProbeDebug = findViewById(R.id.switchTunProbeDebug)
-        cardTunProbeMode = findViewById(R.id.cardTunProbeMode)
-        cardProxyScan = findViewById(R.id.cardProxyScan)
-        switchProxyScan = findViewById(R.id.switchProxyScan)
-        cardXrayApiScan = findViewById(R.id.cardXrayApiScan)
-        switchXrayApiScan = findViewById(R.id.switchXrayApiScan)
-        cardPortRange = findViewById(R.id.cardPortRange)
-        chipGroupPortRange = findViewById(R.id.chipGroupPortRange)
-        customPortRangeContainer = findViewById(R.id.customPortRangeContainer)
-        editPortStart = findViewById(R.id.editPortStart)
-        editPortEnd = findViewById(R.id.editPortEnd)
-        textPortRangePreview = findViewById(R.id.textPortRangePreview)
-        switchNetworkRequests = findViewById(R.id.switchNetworkRequests)
-        cardCdnPulling = findViewById(R.id.cardCdnPulling)
-        switchCdnPulling = findViewById(R.id.switchCdnPulling)
-        cardCdnPullingMeduza = findViewById(R.id.cardCdnPullingMeduza)
-        switchCdnPullingMeduza = findViewById(R.id.switchCdnPullingMeduza)
-        cardCallTransportProbe = findViewById(R.id.cardCallTransportProbe)
-        switchCallTransportProbe = findViewById(R.id.switchCallTransportProbe)
-        cardResolver = findViewById(R.id.cardResolver)
-        chipGroupTunProbeMode = findViewById(R.id.chipGroupTunProbeMode)
-        chipGroupResolverMode = findViewById(R.id.chipGroupResolverMode)
-        chipGroupResolverPreset = findViewById(R.id.chipGroupResolverPreset)
-        inputResolverDirectServersLayout = findViewById(R.id.inputResolverDirectServersLayout)
-        inputResolverDohUrlLayout = findViewById(R.id.inputResolverDohUrlLayout)
-        inputResolverBootstrapLayout = findViewById(R.id.inputResolverBootstrapLayout)
-        editResolverDirectServers = findViewById(R.id.editResolverDirectServers)
-        editResolverDohUrl = findViewById(R.id.editResolverDohUrl)
-        editResolverBootstrap = findViewById(R.id.editResolverBootstrap)
-        switchPrivacyMode = findViewById(R.id.switchPrivacyMode)
-        chipGroupTheme = findViewById(R.id.chipGroupTheme)
-        chipGroupLanguage = findViewById(R.id.chipGroupLanguage)
+    fun navigateTo(fragment: Fragment, titleRes: Int) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.settingsFragmentContainer, fragment)
+            .addToBackStack(null)
+            .commit()
+        supportActionBar?.title = getString(titleRes)
     }
 
-    private fun loadSettings() {
-        switchSplitTunnel.isChecked = prefs.getBoolean(PREF_SPLIT_TUNNEL_ENABLED, true)
-        switchTunProbeDebug.isChecked = prefs.getBoolean(PREF_TUN_PROBE_DEBUG_ENABLED, false)
-        switchProxyScan.isChecked = prefs.getBoolean(PREF_PROXY_SCAN_ENABLED, true)
-        switchXrayApiScan.isChecked = prefs.getBoolean(PREF_XRAY_API_SCAN_ENABLED, true)
-        switchNetworkRequests.isChecked = prefs.getBoolean(PREF_NETWORK_REQUESTS_ENABLED, true)
-        switchCdnPulling.isChecked = prefs.getBoolean(PREF_CDN_PULLING_ENABLED, false)
-        switchCdnPullingMeduza.isChecked = prefs.getBoolean(PREF_CDN_PULLING_MEDUZA_ENABLED, true)
-        switchCallTransportProbe.isChecked = prefs.getBoolean(PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
-        switchPrivacyMode.isChecked = prefs.getBoolean(PREF_PRIVACY_MODE, false)
-
-        updateLocalScanTogglesEnabled(switchSplitTunnel.isChecked)
-        updateTunProbeModeEnabled(switchSplitTunnel.isChecked)
-        updatePortRangeEnabled(switchSplitTunnel.isChecked && isAnyLocalScanEnabled())
-        updateCdnPullingEnabled(switchNetworkRequests.isChecked)
-        updateCdnPullingMeduzaVisible(switchCdnPulling.isChecked)
-        updateCallTransportEnabled(switchNetworkRequests.isChecked)
-        loadTunProbeSettings()
-
-        val portRange = prefs.getString(PREF_PORT_RANGE, "full") ?: "full"
-        val chipId = when (portRange) {
-            "popular" -> R.id.chipPortPopular
-            "extended" -> R.id.chipPortExtended
-            "full" -> R.id.chipPortFull
-            "custom" -> R.id.chipPortCustom
-            else -> R.id.chipPortFull
+    private fun updateToolbarTitle() {
+        val isRoot = supportFragmentManager.backStackEntryCount == 0
+        if (isRoot) {
+            supportActionBar?.title = getString(R.string.settings_title)
         }
-        chipGroupPortRange.check(chipId)
-        customPortRangeContainer.visibility = if (portRange == "custom") View.VISIBLE else View.GONE
-
-        editPortStart.setText(formatPortInputValue(prefs.getInt(PREF_PORT_RANGE_START, 1024)))
-        editPortEnd.setText(formatPortInputValue(prefs.getInt(PREF_PORT_RANGE_END, 65535)))
-        updatePortRangePreview()
-
-        loadResolverSettings()
-
-        val theme = prefs.getString(PREF_THEME, "system") ?: "system"
-        val themeChipId = when (theme) {
-            "light" -> R.id.chipThemeLight
-            "dark" -> R.id.chipThemeDark
-            else -> R.id.chipThemeSystem
-        }
-        chipGroupTheme.check(themeChipId)
-
-        val language = prefs.getString(PREF_LANGUAGE, "").orEmpty()
-        val languageChipId = when (language) {
-            "en" -> R.id.chipLangEn
-            "ru" -> R.id.chipLangRu
-            "fa" -> R.id.chipLangFa
-            "zh-CN" -> R.id.chipLangZh
-            else -> R.id.chipLangSystem
-        }
-        chipGroupLanguage.check(languageChipId)
-    }
-
-    private fun setupListeners() {
-        switchSplitTunnel.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_SPLIT_TUNNEL_ENABLED, isChecked) }
-            updateLocalScanTogglesEnabled(isChecked)
-            updateTunProbeModeEnabled(isChecked)
-            updatePortRangeEnabled(isChecked && isAnyLocalScanEnabled())
-        }
-
-        switchTunProbeDebug.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_TUN_PROBE_DEBUG_ENABLED, isChecked) }
-        }
-
-        switchProxyScan.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_PROXY_SCAN_ENABLED, isChecked) }
-            updatePortRangeEnabled(switchSplitTunnel.isChecked && (isChecked || switchXrayApiScan.isChecked))
-            updatePortRangePreview()
-        }
-
-        switchXrayApiScan.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_XRAY_API_SCAN_ENABLED, isChecked) }
-            updatePortRangeEnabled(switchSplitTunnel.isChecked && (isChecked || switchProxyScan.isChecked))
-            updatePortRangePreview()
-        }
-
-        switchNetworkRequests.setOnCheckedChangeListener { _, isChecked ->
-            updateCdnPullingEnabled(isChecked)
-            updateCallTransportEnabled(isChecked)
-            if (!isChecked) {
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.settings_network_disable_title)
-                    .setMessage(R.string.settings_network_disable_message)
-                    .setPositiveButton(R.string.settings_network_disable_confirm) { _, _ ->
-                        prefs.edit { putBoolean(PREF_NETWORK_REQUESTS_ENABLED, false) }
-                    }
-                    .setNegativeButton(android.R.string.cancel) { _, _ ->
-                        switchNetworkRequests.isChecked = true
-                    }
-                    .setOnCancelListener {
-                        switchNetworkRequests.isChecked = true
-                    }
-                    .show()
-            } else {
-                prefs.edit { putBoolean(PREF_NETWORK_REQUESTS_ENABLED, true) }
-            }
-        }
-
-        switchCdnPulling.setOnCheckedChangeListener { _, isChecked ->
-            if (suppressCdnPullingToggleCallback) return@setOnCheckedChangeListener
-            if (isChecked) {
-                showCdnPullingWarning()
-            } else {
-                prefs.edit { putBoolean(PREF_CDN_PULLING_ENABLED, false) }
-                updateCdnPullingMeduzaVisible(false)
-            }
-        }
-
-        switchCdnPullingMeduza.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_CDN_PULLING_MEDUZA_ENABLED, isChecked) }
-        }
-
-        switchCallTransportProbe.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_CALL_TRANSPORT_PROBE_ENABLED, isChecked) }
-        }
-
-        switchPrivacyMode.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(PREF_PRIVACY_MODE, isChecked) }
-        }
-
-        chipGroupPortRange.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            val value = when (checkedIds.first()) {
-                R.id.chipPortPopular -> "popular"
-                R.id.chipPortExtended -> "extended"
-                R.id.chipPortFull -> "full"
-                R.id.chipPortCustom -> "custom"
-                else -> "full"
-            }
-            prefs.edit { putString(PREF_PORT_RANGE, value) }
-            customPortRangeContainer.visibility = if (value == "custom") View.VISIBLE else View.GONE
-            updatePortRangePreview()
-        }
-
-        chipGroupTunProbeMode.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            prefs.edit {
-                putString(PREF_TUN_PROBE_MODE_OVERRIDE, selectedTunProbeModeOverride().prefValue)
-            }
-        }
-
-        chipGroupResolverMode.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            saveCustomResolverFields()
-            prefs.edit {
-                putString(PREF_DNS_RESOLVER_MODE, selectedResolverMode().prefValue)
-            }
-            refreshResolverUi(restoreCustomValues = true)
-        }
-
-        chipGroupResolverPreset.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            saveCustomResolverFields()
-            prefs.edit {
-                putString(PREF_DNS_RESOLVER_PRESET, selectedResolverPreset().prefValue)
-            }
-            refreshResolverUi(restoreCustomValues = true)
-        }
-
-        editPortStart.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) saveCustomPortRange()
-        }
-        editPortEnd.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) saveCustomPortRange()
-        }
-        editPortStart.doAfterTextChanged {
-            updatePortRangePreview()
-        }
-        editPortEnd.doAfterTextChanged {
-            updatePortRangePreview()
-        }
-        editResolverDirectServers.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) saveCustomResolverFields()
-        }
-        editResolverDohUrl.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) saveCustomResolverFields()
-        }
-        editResolverBootstrap.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) saveCustomResolverFields()
-        }
-
-        chipGroupTheme.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            val value = when (checkedIds.first()) {
-                R.id.chipThemeLight -> "light"
-                R.id.chipThemeDark -> "dark"
-                else -> "system"
-            }
-            prefs.edit { putString(PREF_THEME, value) }
-            applyTheme(value)
-        }
-
-        chipGroupLanguage.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-            val value = when (checkedIds.first()) {
-                R.id.chipLangEn -> "en"
-                R.id.chipLangRu -> "ru"
-                R.id.chipLangFa -> "fa"
-                R.id.chipLangZh -> "zh-CN"
-                else -> ""
-            }
-            prefs.edit { putString(PREF_LANGUAGE, value) }
-            AppUiSettings.applyLanguage(value)
-        }
-
-        findViewById<MaterialCardView>(R.id.cardPermissions).setOnClickListener {
-            reRequestPermissions()
-        }
-
-        findViewById<MaterialCardView>(R.id.cardGithub).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, getString(R.string.github_repo_url).toUri()))
-        }
-    }
-
-    private fun updateLocalScanTogglesEnabled(enabled: Boolean) {
-        cardProxyScan.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardProxyScan, enabled)
-        cardXrayApiScan.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardXrayApiScan, enabled)
-    }
-
-    private fun updatePortRangeEnabled(enabled: Boolean) {
-        cardPortRange.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardPortRange, enabled)
-    }
-
-    private fun updateCallTransportEnabled(enabled: Boolean) {
-        cardCallTransportProbe.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardCallTransportProbe, enabled)
-    }
-
-    private fun updateCdnPullingEnabled(enabled: Boolean) {
-        cardCdnPulling.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardCdnPulling, enabled)
-        if (!enabled) updateCdnPullingMeduzaVisible(false)
-    }
-
-    private fun updateCdnPullingMeduzaVisible(visible: Boolean) {
-        cardCdnPullingMeduza.visibility = if (visible) View.VISIBLE else View.GONE
-    }
-
-    private fun showCdnPullingWarning() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_cdn_pulling_warning_title)
-            .setMessage(buildCdnPullingWarningMessage(this))
-            .setPositiveButton(R.string.settings_cdn_pulling_warning_confirm) { _, _ ->
-                prefs.edit { putBoolean(PREF_CDN_PULLING_ENABLED, true) }
-                updateCdnPullingMeduzaVisible(true)
-            }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                setCdnPullingSwitch(false)
-            }
-            .setOnCancelListener {
-                setCdnPullingSwitch(false)
-            }
-            .show()
-    }
-
-    private fun setCdnPullingSwitch(checked: Boolean) {
-        suppressCdnPullingToggleCallback = true
-        switchCdnPulling.isChecked = checked
-        suppressCdnPullingToggleCallback = false
-    }
-
-    private fun setViewAndChildrenEnabled(view: View, enabled: Boolean) {
-        view.isEnabled = enabled
-        if (view is android.view.ViewGroup) {
-            for (i in 0 until view.childCount) {
-                setViewAndChildrenEnabled(view.getChildAt(i), enabled)
-            }
-        }
-    }
-
-    private fun saveCustomPortRange() {
-        val normalizedRange = PortScanPlanner.normalizeCustomRange(
-            start = editPortStart.text.toString().toIntOrNull() ?: PortScanPlanner.MIN_PORT,
-            end = editPortEnd.text.toString().toIntOrNull() ?: PortScanPlanner.MAX_PORT,
-        )
-        prefs.edit {
-            putInt(PREF_PORT_RANGE_START, normalizedRange.first)
-            putInt(PREF_PORT_RANGE_END, normalizedRange.last)
-        }
-        editPortStart.setText(formatPortInputValue(normalizedRange.first))
-        editPortEnd.setText(formatPortInputValue(normalizedRange.last))
-    }
-
-    private fun updatePortRangePreview() {
-        if (!isAnyLocalScanEnabled()) {
-            textPortRangePreview.text = getString(R.string.settings_port_range_preview_disabled)
-            return
-        }
-        val previewRanges = PortScanPlanner.buildPreviewRanges(
-            portRange = selectedPortRange(),
-            portRangeStart = currentCustomPortRange().first,
-            portRangeEnd = currentCustomPortRange().last,
-        )
-        val portsText = previewRanges.joinToString(", ") { range ->
-            if (range.first == range.last) {
-                range.first.toString()
-            } else {
-                "${range.first}-${range.last}"
-            }
-        }
-        val portsCount = previewRanges.sumOf { it.last - it.first + 1 }
-        val formattedCount = NumberFormat.getIntegerInstance().format(portsCount)
-        val portCountLabel = resources.getQuantityString(R.plurals.settings_port_word, portsCount, formattedCount)
-        val previewFormat = when {
-            switchProxyScan.isChecked && switchXrayApiScan.isChecked -> R.string.settings_port_range_preview_proxy_xray
-            switchProxyScan.isChecked -> R.string.settings_port_range_preview_proxy_only
-            else -> R.string.settings_port_range_preview_xray_only
-        }
-        textPortRangePreview.text = getString(previewFormat, portsText, portCountLabel)
-    }
-
-    private fun isAnyLocalScanEnabled(): Boolean {
-        return switchProxyScan.isChecked || switchXrayApiScan.isChecked
-    }
-
-    private fun selectedPortRange(): String {
-        return when (chipGroupPortRange.checkedChipId) {
-            R.id.chipPortPopular -> "popular"
-            R.id.chipPortExtended -> "extended"
-            R.id.chipPortCustom -> "custom"
-            else -> "full"
-        }
-    }
-
-    private fun currentCustomPortRange(): IntRange {
-        return PortScanPlanner.normalizeCustomRange(
-            start = editPortStart.text.toString().toIntOrNull() ?: PortScanPlanner.MIN_PORT,
-            end = editPortEnd.text.toString().toIntOrNull() ?: PortScanPlanner.MAX_PORT,
-        )
-    }
-
-    private fun loadResolverSettings() {
-        val mode = DnsResolverMode.fromPref(
-            prefs.getString(PREF_DNS_RESOLVER_MODE, DnsResolverMode.SYSTEM.prefValue),
-        )
-        chipGroupResolverMode.check(
-            when (mode) {
-                DnsResolverMode.SYSTEM -> R.id.chipResolverSystem
-                DnsResolverMode.DIRECT -> R.id.chipResolverDirect
-                DnsResolverMode.DOH -> R.id.chipResolverDoh
-            },
-        )
-
-        val preset = DnsResolverPreset.fromPref(
-            prefs.getString(PREF_DNS_RESOLVER_PRESET, DnsResolverPreset.CUSTOM.prefValue),
-        )
-        chipGroupResolverPreset.check(
-            when (preset) {
-                DnsResolverPreset.CUSTOM -> R.id.chipResolverPresetCustom
-                DnsResolverPreset.CLOUDFLARE -> R.id.chipResolverPresetCloudflare
-                DnsResolverPreset.GOOGLE -> R.id.chipResolverPresetGoogle
-                DnsResolverPreset.YANDEX -> R.id.chipResolverPresetYandex
-            },
-        )
-
-        loadCustomResolverFields()
-        refreshResolverUi(restoreCustomValues = false)
-    }
-
-    private fun loadTunProbeSettings() {
-        val mode = TunProbeModeOverride.fromPref(
-            prefs.getString(PREF_TUN_PROBE_MODE_OVERRIDE, TunProbeModeOverride.AUTO.prefValue),
-        )
-        chipGroupTunProbeMode.check(
-            when (mode) {
-                TunProbeModeOverride.AUTO -> R.id.chipTunProbeModeAuto
-                TunProbeModeOverride.STRICT_SAME_PATH -> R.id.chipTunProbeModeStrict
-                TunProbeModeOverride.CURL_COMPATIBLE -> R.id.chipTunProbeModeCurl
-            },
-        )
-    }
-
-    private fun loadCustomResolverFields() {
-        editResolverDirectServers.setText(prefs.getString(PREF_DNS_RESOLVER_DIRECT_SERVERS, "").orEmpty())
-        editResolverDohUrl.setText(prefs.getString(PREF_DNS_RESOLVER_DOH_URL, "").orEmpty())
-        editResolverBootstrap.setText(prefs.getString(PREF_DNS_RESOLVER_DOH_BOOTSTRAP, "").orEmpty())
-    }
-
-    private fun saveCustomResolverFields() {
-        // Presets reuse the same text fields for display, so only persist while custom is active.
-        if (persistedResolverPreset() != DnsResolverPreset.CUSTOM) return
-        prefs.edit {
-            putString(PREF_DNS_RESOLVER_DIRECT_SERVERS, editResolverDirectServers.text?.toString().orEmpty().trim())
-            putString(PREF_DNS_RESOLVER_DOH_URL, editResolverDohUrl.text?.toString().orEmpty().trim())
-            putString(PREF_DNS_RESOLVER_DOH_BOOTSTRAP, editResolverBootstrap.text?.toString().orEmpty().trim())
-        }
-    }
-
-    private fun formatPortInputValue(value: Int): String {
-        return String.format(Locale.US, "%d", value)
-    }
-
-    private fun persistedResolverPreset(): DnsResolverPreset {
-        return DnsResolverPreset.fromPref(
-            prefs.getString(PREF_DNS_RESOLVER_PRESET, DnsResolverPreset.CUSTOM.prefValue),
-        )
-    }
-
-    private fun refreshResolverUi(restoreCustomValues: Boolean) {
-        val mode = selectedResolverMode()
-        val preset = selectedResolverPreset()
-        val customPreset = preset == DnsResolverPreset.CUSTOM
-        val presetSpec = DnsResolverPresets.spec(preset)
-
-        chipGroupResolverPreset.visibility = if (mode == DnsResolverMode.SYSTEM) View.GONE else View.VISIBLE
-        inputResolverDirectServersLayout.visibility = if (mode == DnsResolverMode.DIRECT) View.VISIBLE else View.GONE
-        inputResolverDohUrlLayout.visibility = if (mode == DnsResolverMode.DOH) View.VISIBLE else View.GONE
-        inputResolverBootstrapLayout.visibility = if (mode == DnsResolverMode.DOH) View.VISIBLE else View.GONE
-
-        when {
-            mode == DnsResolverMode.DIRECT && !customPreset && presetSpec != null -> {
-                setTextIfDifferent(
-                    editResolverDirectServers,
-                    DnsResolverConfig.serializeAddressList(presetSpec.directServers),
-                )
-            }
-            mode == DnsResolverMode.DOH && !customPreset && presetSpec != null -> {
-                setTextIfDifferent(editResolverDohUrl, presetSpec.dohUrl)
-                setTextIfDifferent(
-                    editResolverBootstrap,
-                    DnsResolverConfig.serializeAddressList(presetSpec.dohBootstrapHosts),
-                )
-            }
-            customPreset && restoreCustomValues -> {
-                loadCustomResolverFields()
-            }
-        }
-
-        setViewAndChildrenEnabled(inputResolverDirectServersLayout, customPreset)
-        setViewAndChildrenEnabled(inputResolverDohUrlLayout, customPreset)
-        setViewAndChildrenEnabled(inputResolverBootstrapLayout, customPreset)
-        cardResolver.alpha = 1.0f
-    }
-
-    private fun updateTunProbeModeEnabled(enabled: Boolean) {
-        cardTunProbeMode.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardTunProbeMode, enabled)
-    }
-
-    private fun selectedResolverMode(): DnsResolverMode {
-        return when (chipGroupResolverMode.checkedChipId) {
-            R.id.chipResolverDirect -> DnsResolverMode.DIRECT
-            R.id.chipResolverDoh -> DnsResolverMode.DOH
-            else -> DnsResolverMode.SYSTEM
-        }
-    }
-
-    private fun selectedResolverPreset(): DnsResolverPreset {
-        return when (chipGroupResolverPreset.checkedChipId) {
-            R.id.chipResolverPresetCloudflare -> DnsResolverPreset.CLOUDFLARE
-            R.id.chipResolverPresetGoogle -> DnsResolverPreset.GOOGLE
-            R.id.chipResolverPresetYandex -> DnsResolverPreset.YANDEX
-            else -> DnsResolverPreset.CUSTOM
-        }
-    }
-
-    private fun selectedTunProbeModeOverride(): TunProbeModeOverride {
-        return when (chipGroupTunProbeMode.checkedChipId) {
-            R.id.chipTunProbeModeStrict -> TunProbeModeOverride.STRICT_SAME_PATH
-            R.id.chipTunProbeModeCurl -> TunProbeModeOverride.CURL_COMPATIBLE
-            else -> TunProbeModeOverride.AUTO
-        }
-    }
-
-    private fun setTextIfDifferent(view: TextInputEditText, value: String) {
-        if (view.text?.toString() != value) {
-            view.setText(value)
-        }
-    }
-
-    private fun reRequestPermissions() {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            putExtra(EXTRA_REQUEST_PERMISSIONS, true)
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        startActivity(intent)
-        finish()
+        // Стрелка назад всегда видна: на root — закрывает Activity, во фрагменте — возврат назад
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
     }
 
     companion object {
-        const val PREF_SPLIT_TUNNEL_ENABLED = "pref_split_tunnel_enabled"
-        const val PREF_PROXY_SCAN_ENABLED = "pref_proxy_scan_enabled"
-        const val PREF_XRAY_API_SCAN_ENABLED = "pref_xray_api_scan_enabled"
-        const val PREF_PORT_RANGE = "pref_port_range"
-        const val PREF_PORT_RANGE_START = "pref_port_range_start"
-        const val PREF_PORT_RANGE_END = "pref_port_range_end"
-        const val PREF_NETWORK_REQUESTS_ENABLED = "pref_network_requests_enabled"
-        const val PREF_CDN_PULLING_ENABLED = "pref_cdn_pulling_enabled"
-        const val PREF_CDN_PULLING_MEDUZA_ENABLED = "pref_cdn_pulling_meduza_enabled"
-        const val PREF_CALL_TRANSPORT_PROBE_ENABLED = "pref_call_transport_probe_enabled"
-        const val PREF_TUN_PROBE_DEBUG_ENABLED = "pref_tun_probe_debug_enabled"
-        const val PREF_TUN_PROBE_MODE_OVERRIDE = "pref_tun_probe_mode_override"
-        const val PREF_DNS_RESOLVER_MODE = "pref_dns_resolver_mode"
-        const val PREF_DNS_RESOLVER_PRESET = "pref_dns_resolver_preset"
-        const val PREF_DNS_RESOLVER_DIRECT_SERVERS = "pref_dns_resolver_direct_servers"
-        const val PREF_DNS_RESOLVER_DOH_URL = "pref_dns_resolver_doh_url"
-        const val PREF_DNS_RESOLVER_DOH_BOOTSTRAP = "pref_dns_resolver_doh_bootstrap"
-        const val PREF_PRIVACY_MODE = "pref_privacy_mode"
-        const val PREF_THEME = "pref_theme"
-        const val PREF_LANGUAGE = "pref_language"
+        const val PREF_SPLIT_TUNNEL_ENABLED = SettingsPrefs.PREF_SPLIT_TUNNEL_ENABLED
+        const val PREF_PROXY_SCAN_ENABLED = SettingsPrefs.PREF_PROXY_SCAN_ENABLED
+        const val PREF_XRAY_API_SCAN_ENABLED = SettingsPrefs.PREF_XRAY_API_SCAN_ENABLED
+        const val PREF_PORT_RANGE = SettingsPrefs.PREF_PORT_RANGE
+        const val PREF_PORT_RANGE_START = SettingsPrefs.PREF_PORT_RANGE_START
+        const val PREF_PORT_RANGE_END = SettingsPrefs.PREF_PORT_RANGE_END
+        const val PREF_NETWORK_REQUESTS_ENABLED = SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED
+        const val PREF_CDN_PULLING_ENABLED = SettingsPrefs.PREF_CDN_PULLING_ENABLED
+        const val PREF_CDN_PULLING_MEDUZA_ENABLED = SettingsPrefs.PREF_CDN_PULLING_MEDUZA_ENABLED
+        const val PREF_CALL_TRANSPORT_PROBE_ENABLED = SettingsPrefs.PREF_CALL_TRANSPORT_PROBE_ENABLED
+        const val PREF_TUN_PROBE_DEBUG_ENABLED = SettingsPrefs.PREF_TUN_PROBE_DEBUG_ENABLED
+        const val PREF_TUN_PROBE_MODE_OVERRIDE = SettingsPrefs.PREF_TUN_PROBE_MODE_OVERRIDE
+        const val PREF_DNS_RESOLVER_MODE = SettingsPrefs.PREF_DNS_RESOLVER_MODE
+        const val PREF_DNS_RESOLVER_PRESET = SettingsPrefs.PREF_DNS_RESOLVER_PRESET
+        const val PREF_DNS_RESOLVER_DIRECT_SERVERS = SettingsPrefs.PREF_DNS_RESOLVER_DIRECT_SERVERS
+        const val PREF_DNS_RESOLVER_DOH_URL = SettingsPrefs.PREF_DNS_RESOLVER_DOH_URL
+        const val PREF_DNS_RESOLVER_DOH_BOOTSTRAP = SettingsPrefs.PREF_DNS_RESOLVER_DOH_BOOTSTRAP
+        const val PREF_PRIVACY_MODE = SettingsPrefs.PREF_PRIVACY_MODE
+        const val PREF_THEME = SettingsPrefs.PREF_THEME
+        const val PREF_LANGUAGE = SettingsPrefs.PREF_LANGUAGE
         const val EXTRA_REQUEST_PERMISSIONS = "extra_request_permissions"
-
-        private const val STATE_SCROLL_POSITION = "state.SCROLL_POSITION"
 
         fun applyTheme(theme: String) {
             when (theme) {
