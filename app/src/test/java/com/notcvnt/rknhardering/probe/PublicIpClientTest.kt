@@ -1,10 +1,20 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Test
 
 class PublicIpClientTest {
+
+    @After
+    fun tearDown() {
+        PublicIpClient.resetForTests()
+        NativeCurlBridge.resetForTests()
+        ResolverNetworkStack.resetForTests()
+    }
 
     @Test
     fun `extractIp strips quotes from quoted plain response`() {
@@ -24,6 +34,34 @@ class PublicIpClientTest {
     @Test
     fun `extractIp parses json ip field with spaces`() {
         assertEquals("1.2.3.4", PublicIpClient.extractIp("{\"ip\": \"1.2.3.4\", \"city\": {}}"))
+    }
+
+    @Test
+    fun `yandex endpoint uses native curl only transport`() {
+        var okHttpCalls = 0
+        var nativeCalls = 0
+        ResolverNetworkStack.okHttpExecuteOverride = {
+            okHttpCalls += 1
+            error("OkHttp transport must not be used for Yandex IP checker")
+        }
+        NativeCurlBridge.executeOverride = { request ->
+            nativeCalls += 1
+            assertEquals("https://ipv4-internet.yandex.net/api/v0/ip", request.url)
+            NativeCurlResponse(
+                curlCode = 0,
+                httpCode = 200,
+                body = "\"1.2.3.4\"",
+            )
+        }
+
+        val result = PublicIpClient.fetchIp(
+            endpoint = "https://ipv4-internet.yandex.net/api/v0/ip",
+            resolverConfig = DnsResolverConfig.system(),
+        )
+
+        assertEquals("1.2.3.4", result.getOrNull())
+        assertEquals(0, okHttpCalls)
+        assertEquals(1, nativeCalls)
     }
 
     @Test

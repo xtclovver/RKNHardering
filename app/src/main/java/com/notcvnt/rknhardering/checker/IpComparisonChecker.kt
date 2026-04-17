@@ -39,6 +39,16 @@ object IpComparisonChecker {
             scope = IpCheckerScope.RU,
         ),
         EndpointSpec(
+            label = "Yandex IPv4",
+            url = "https://ipv4-internet.yandex.net/api/v0/ip",
+            scope = IpCheckerScope.RU,
+        ),
+        EndpointSpec(
+            label = "Yandex IPv6",
+            url = "https://ipv6-internet.yandex.net/api/v0/ip",
+            scope = IpCheckerScope.RU,
+        ),
+        EndpointSpec(
             label = "sypexgeo.net",
             url = "https://api.sypexgeo.net/json/",
             scope = IpCheckerScope.RU,
