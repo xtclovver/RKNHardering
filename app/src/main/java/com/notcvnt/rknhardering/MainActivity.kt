@@ -1851,6 +1851,17 @@ class MainActivity : AppCompatActivity() {
                     setTextColor(onSurfaceVariantColor())
                 },
             )
+            response.ipv4Error?.takeIf { it.isNotBlank() }?.let { reason ->
+                container.addView(
+                    TextView(themedContext()).apply {
+                        text = reason
+                        textSize = 11f
+                        typeface = Typeface.MONOSPACE
+                        setPadding(0, 0, 0, 0)
+                        setTextColor(onSurfaceVariantColor())
+                    },
+                )
+            }
         }
 
         container.addView(url)

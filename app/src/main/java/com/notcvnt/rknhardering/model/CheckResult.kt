@@ -234,6 +234,8 @@ data class CdnPullingResponse(
     val ipv4: String? = null,
     val ipv6: String? = null,
     val ipv4Unavailable: Boolean = false,
+    val ipv4Error: String? = null,
+    val ipv6Error: String? = null,
     val importantFields: Map<String, String> = emptyMap(),
     val rawBody: String? = null,
     val error: String? = null,

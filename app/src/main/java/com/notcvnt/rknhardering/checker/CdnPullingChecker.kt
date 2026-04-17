@@ -41,6 +41,16 @@ object CdnPullingChecker {
             kind = CdnPullingClient.TargetKind.GOOGLEVIDEO_REPORT_MAPPING,
         ),
         EndpointSpec(
+            label = "cloudflare.com",
+            url = "https://www.cloudflare.com/cdn-cgi/trace",
+            kind = CdnPullingClient.TargetKind.CLOUDFLARE_TRACE,
+        ),
+        EndpointSpec(
+            label = "one.one.one.one",
+            url = "https://one.one.one.one/cdn-cgi/trace",
+            kind = CdnPullingClient.TargetKind.CLOUDFLARE_TRACE,
+        ),
+        EndpointSpec(
             label = "rutracker.org",
             url = "https://rutracker.org/cdn-cgi/trace",
             kind = CdnPullingClient.TargetKind.CLOUDFLARE_TRACE,
@@ -107,6 +117,23 @@ object CdnPullingChecker {
                         else -> context.getString(R.string.checker_cdn_pulling_error_unrecognized)
                     }
 
+                    val ipv4ErrorMessage = when {
+                        ipv4Result.isFailure -> ipv4Result.exceptionOrNull()?.let { formatError(context, it) }
+                        ipv4 == null && ipv4Parsed?.ip != null ->
+                            "server returned non-IPv4 address: ${ipv4Parsed.ip}"
+                        ipv4 == null && ipv4Raw != null ->
+                            "response did not contain an IPv4 address"
+                        else -> null
+                    }
+                    val ipv6ErrorMessage = when {
+                        ipv6Result.isFailure -> ipv6Result.exceptionOrNull()?.let { formatError(context, it) }
+                        ipv6 == null && ipv6Parsed?.ip != null ->
+                            "server returned non-IPv6 address: ${ipv6Parsed.ip}"
+                        ipv6 == null && ipv6Raw != null ->
+                            "response did not contain an IPv6 address"
+                        else -> null
+                    }
+
                     CdnPullingResponse(
                         targetLabel = endpoint.label,
                         url = endpoint.url,
@@ -114,6 +141,8 @@ object CdnPullingChecker {
                         ipv4 = ipv4,
                         ipv6 = ipv6,
                         ipv4Unavailable = ipv4Unavailable,
+                        ipv4Error = ipv4ErrorMessage,
+                        ipv6Error = ipv6ErrorMessage,
                         importantFields = representativeParsed?.importantFields.orEmpty(),
                         rawBody = rawBody,
                         error = error,
