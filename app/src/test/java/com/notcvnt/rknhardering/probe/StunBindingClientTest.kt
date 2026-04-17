@@ -1,5 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.DirectDns
 import com.notcvnt.rknhardering.network.DnsResolverMode
@@ -18,6 +20,8 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -75,6 +79,47 @@ class StunBindingClientTest {
 
             assertTrue(result.isFailure)
             worker.join(2_000)
+        }
+    }
+
+    @Test
+    fun `cancelled udp probe returns cancellation failure`() {
+        DatagramSocket(0, InetAddress.getByName("127.0.0.1")).use { server ->
+            val received = CountDownLatch(1)
+            val executionContext = ScanExecutionContext(cancellationSignal = ScanCancellationSignal())
+
+            val worker = thread(start = true, isDaemon = true) {
+                val request = DatagramPacket(ByteArray(512), 512)
+                try {
+                    server.receive(request)
+                    received.countDown()
+                    while (!Thread.currentThread().isInterrupted) {
+                        Thread.sleep(50)
+                    }
+                } catch (_: SocketException) {
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
+            }
+
+            var failure: Throwable? = null
+            val probeWorker = thread(start = true) {
+                failure = StunBindingClient.probe(
+                    host = "127.0.0.1",
+                    port = server.localPort,
+                    resolverConfig = DnsResolverConfig.system(),
+                    timeoutMs = 5_000,
+                    executionContext = executionContext,
+                ).exceptionOrNull()
+            }
+
+            assertTrue(received.await(1, TimeUnit.SECONDS))
+            executionContext.cancellationSignal.cancel()
+            probeWorker.join(2_000)
+            server.close()
+            worker.join(2_000)
+
+            assertTrue(failure is kotlinx.coroutines.CancellationException)
         }
     }
 

@@ -1,5 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.registerSocket
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -20,8 +23,9 @@ object ProxyProber {
         port: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): ProxyType? {
-        return when (probePort(host, port, connectTimeoutMs, readTimeoutMs)) {
+        return when (probePort(host, port, connectTimeoutMs, readTimeoutMs, executionContext)) {
             PortProbeResult.SOCKS5_NO_AUTH -> ProxyType.SOCKS5
             PortProbeResult.HTTP_CONNECT_PROXY -> ProxyType.HTTP
             PortProbeResult.CLOSED,
@@ -35,13 +39,14 @@ object ProxyProber {
         port: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PortProbeResult {
-        val socksResult = probeSocks5NoAuth(host, port, connectTimeoutMs, readTimeoutMs)
+        val socksResult = probeSocks5NoAuth(host, port, connectTimeoutMs, readTimeoutMs, executionContext)
         return when (socksResult) {
             PortProbeResult.SOCKS5_NO_AUTH,
             PortProbeResult.CLOSED,
             -> socksResult
-            PortProbeResult.UNKNOWN_TCP_SERVICE -> probeHttpConnect(host, port, connectTimeoutMs, readTimeoutMs)
+            PortProbeResult.UNKNOWN_TCP_SERVICE -> probeHttpConnect(host, port, connectTimeoutMs, readTimeoutMs, executionContext)
             PortProbeResult.HTTP_CONNECT_PROXY -> PortProbeResult.HTTP_CONNECT_PROXY
         }
     }
@@ -51,12 +56,20 @@ object ProxyProber {
         port: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
+        executionContext: ScanExecutionContext,
     ): PortProbeResult {
         return Socket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerSocket(socket)
             try {
+                executionContext.throwIfCancelled()
                 socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 return PortProbeResult.CLOSED
+            } finally {
+                if (!socket.isConnected) {
+                    registration.dispose()
+                }
             }
 
             socket.soTimeout = readTimeoutMs
@@ -73,10 +86,14 @@ object ProxyProber {
                 } else {
                     PortProbeResult.UNKNOWN_TCP_SERVICE
                 }
-            } catch (_: SocketTimeoutException) {
+            } catch (error: SocketTimeoutException) {
+                rethrowIfCancellation(error, executionContext)
                 PortProbeResult.UNKNOWN_TCP_SERVICE
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 PortProbeResult.UNKNOWN_TCP_SERVICE
+            } finally {
+                registration.dispose()
             }
         }
     }
@@ -86,12 +103,20 @@ object ProxyProber {
         port: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
+        executionContext: ScanExecutionContext,
     ): PortProbeResult {
         return Socket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerSocket(socket)
             try {
+                executionContext.throwIfCancelled()
                 socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 return PortProbeResult.CLOSED
+            } finally {
+                if (!socket.isConnected) {
+                    registration.dispose()
+                }
             }
 
             socket.soTimeout = readTimeoutMs
@@ -112,10 +137,14 @@ object ProxyProber {
                 } else {
                     PortProbeResult.UNKNOWN_TCP_SERVICE
                 }
-            } catch (_: SocketTimeoutException) {
+            } catch (error: SocketTimeoutException) {
+                rethrowIfCancellation(error, executionContext)
                 PortProbeResult.UNKNOWN_TCP_SERVICE
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 PortProbeResult.UNKNOWN_TCP_SERVICE
+            } finally {
+                registration.dispose()
             }
         }
     }

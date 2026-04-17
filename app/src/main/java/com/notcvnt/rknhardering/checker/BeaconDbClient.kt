@@ -1,6 +1,8 @@
 package com.notcvnt.rknhardering.checker
 
 import com.notcvnt.rknhardering.BuildConfig
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +74,7 @@ internal class BeaconDbClient(
         val response = try {
             request(LOOKUP_URL, requestBody, userAgent)
         } catch (error: Exception) {
+            rethrowIfCancellation(error)
             return@withContext CellLookupResult(
                 countryCode = null,
                 latitude = null,
@@ -225,6 +228,7 @@ internal class BeaconDbClient(
             userAgent: String,
             resolverConfig: DnsResolverConfig,
         ): HttpResult {
+            val executionContext = ScanExecutionContext.currentOrDefault()
             val response = ResolverNetworkStack.execute(
                 url = url,
                 method = "POST",
@@ -237,6 +241,7 @@ internal class BeaconDbClient(
                 bodyContentType = "application/json; charset=utf-8",
                 timeoutMs = 8_000,
                 config = resolverConfig,
+                cancellationSignal = executionContext.cancellationSignal,
             )
             return HttpResult(code = response.code, body = response.body)
         }

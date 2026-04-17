@@ -13,6 +13,9 @@ object NativeCurlBridge {
     internal var executeOverride: ((NativeCurlRequest) -> NativeCurlResponse)? = null
 
     @Volatile
+    internal var cancelOverride: ((String) -> Boolean)? = null
+
+    @Volatile
     internal var isLibraryLoadedOverride: (() -> Boolean)? = null
 
     @Volatile
@@ -67,7 +70,10 @@ object NativeCurlBridge {
         return execute(request).toJson()
     }
 
-    internal fun execute(request: NativeCurlRequest): NativeCurlResponse {
+    internal fun execute(
+        request: NativeCurlRequest,
+        requestId: String = "",
+    ): NativeCurlResponse {
         executeOverride?.let { return it(request) }
         if (!isLibraryLoaded()) {
             return NativeCurlResponse(localError = lastLoadErrorMessage() ?: "Native curl bridge is not loaded")
@@ -91,8 +97,16 @@ object NativeCurlBridge {
             connectTimeoutMs = request.connectTimeoutMs,
             caBundlePath = activeCaBundle,
             debugVerbose = request.debugVerbose,
+            requestId = requestId,
         )
         return NativeCurlResponse.fromRaw(raw)
+    }
+
+    internal fun cancelRequest(requestId: String): Boolean {
+        if (requestId.isBlank()) return false
+        cancelOverride?.let { return it(requestId) }
+        if (!isLibraryLoaded()) return false
+        return nativeCancelRequest(requestId)
     }
 
     internal fun lastLoadErrorMessage(): String? {
@@ -114,6 +128,7 @@ object NativeCurlBridge {
     internal fun resetForTests() {
         initOverride = null
         executeOverride = null
+        cancelOverride = null
         isLibraryLoadedOverride = null
         initialized = false
         libraryLoaded = false
@@ -136,5 +151,8 @@ object NativeCurlBridge {
         connectTimeoutMs: Int,
         caBundlePath: String,
         debugVerbose: Boolean,
+        requestId: String,
     ): Array<String?>
+
+    private external fun nativeCancelRequest(requestId: String): Boolean
 }

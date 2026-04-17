@@ -1,5 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.registerDatagramSocket
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
@@ -34,9 +37,16 @@ object StunBindingClient {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         binding: ResolverBinding? = null,
         timeoutMs: Int = 3_000,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<BindingResult> {
         return runCatching {
-            val resolvedAddresses = ResolverNetworkStack.lookup(host, resolverConfig, binding)
+            executionContext.throwIfCancelled()
+            val resolvedAddresses = ResolverNetworkStack.lookup(
+                hostname = host,
+                config = resolverConfig,
+                binding = binding,
+                cancellationSignal = executionContext.cancellationSignal,
+            )
                 .distinctBy { it.hostAddress }
             if (resolvedAddresses.isEmpty()) {
                 throw IOException("No addresses resolved for $host")
@@ -52,8 +62,10 @@ object StunBindingClient {
                         resolvedAddresses = resolvedAddresses,
                         binding = binding,
                         timeoutMs = timeoutMs,
+                        executionContext = executionContext,
                     )
                 } catch (error: Exception) {
+                    rethrowIfCancellation(error, executionContext)
                     lastError = error
                 }
             }
@@ -66,8 +78,10 @@ object StunBindingClient {
         port: Int,
         resolvedIps: List<String> = emptyList(),
         exchange: (ByteArray) -> Socks5UdpAssociateClient.UdpDatagram,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<BindingResult> {
         return runCatching {
+            executionContext.throwIfCancelled()
             val transactionId = Random.nextBytes(12)
             val request = buildBindingRequest(transactionId)
             val response = exchange(request)
@@ -82,6 +96,10 @@ object StunBindingClient {
                     ?: throw IOException("Mapped IP is unavailable"),
                 mappedPort = mappedAddress.port,
             )
+        }.onFailure { error ->
+            if (error is Exception) {
+                rethrowIfCancellation(error, executionContext)
+            }
         }
     }
 
@@ -92,31 +110,41 @@ object StunBindingClient {
         resolvedAddresses: List<InetAddress>,
         binding: ResolverBinding?,
         timeoutMs: Int,
+        executionContext: ScanExecutionContext,
     ): BindingResult {
         val transactionId = Random.nextBytes(12)
         val request = buildBindingRequest(transactionId)
 
         DatagramSocket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerDatagramSocket(socket)
             socket.soTimeout = timeoutMs
             ResolverSocketBinder.bind(socket, binding)
-            val packet = DatagramPacket(request, request.size, address, port)
-            socket.send(packet)
+            try {
+                executionContext.throwIfCancelled()
+                val packet = DatagramPacket(request, request.size, address, port)
+                socket.send(packet)
 
-            val responseBuffer = ByteArray(1500)
-            val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
-            socket.receive(responsePacket)
+                val responseBuffer = ByteArray(1500)
+                val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
+                socket.receive(responsePacket)
 
-            val response = responsePacket.data.copyOf(responsePacket.length)
-            val mappedAddress = parseMappedAddress(response, transactionId)
-                ?: throw IOException("STUN response did not include a mapped address")
+                val response = responsePacket.data.copyOf(responsePacket.length)
+                val mappedAddress = parseMappedAddress(response, transactionId)
+                    ?: throw IOException("STUN response did not include a mapped address")
 
-            return BindingResult(
-                resolvedIps = resolvedAddresses.mapNotNull { it.hostAddress }.distinct(),
-                remoteIp = responsePacket.address.hostAddress ?: host,
-                remotePort = responsePacket.port,
-                mappedIp = mappedAddress.address.hostAddress ?: throw IOException("Mapped IP is unavailable"),
-                mappedPort = mappedAddress.port,
-            )
+                return BindingResult(
+                    resolvedIps = resolvedAddresses.mapNotNull { it.hostAddress }.distinct(),
+                    remoteIp = responsePacket.address.hostAddress ?: host,
+                    remotePort = responsePacket.port,
+                    mappedIp = mappedAddress.address.hostAddress ?: throw IOException("Mapped IP is unavailable"),
+                    mappedPort = mappedAddress.port,
+                )
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
+                throw error
+            } finally {
+                registration.dispose()
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
@@ -15,6 +16,7 @@ import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 
 data class CheckSettings(
     val splitTunnelEnabled: Boolean = true,
@@ -120,8 +122,11 @@ object VpnCheckRunner {
     suspend fun run(
         context: Context,
         settings: CheckSettings = CheckSettings(),
+        executionContext: ScanExecutionContext = ScanExecutionContext(),
         onUpdate: (suspend (CheckUpdate) -> Unit)? = null,
-    ): CheckResult = coroutineScope {
+    ): CheckResult = withContext(executionContext.asCoroutineContext()) {
+        executionContext.throwIfCancelled()
+        coroutineScope {
         val dependencies = dependenciesOverride ?: Dependencies()
         val geoIpDeferred = if (settings.networkRequestsEnabled) {
             async { dependencies.geoIpCheck(context, settings.resolverConfig) }
@@ -177,6 +182,7 @@ object VpnCheckRunner {
                     settings.portRangeEnd,
                     tunActiveProbeDeferred,
                     { progress ->
+                        executionContext.throwIfCancelled()
                         onUpdate?.invoke(CheckUpdate.BypassProgress(progress))
                     },
                 )
@@ -186,6 +192,7 @@ object VpnCheckRunner {
         val geoIpReadyDeferred = geoIpDeferred?.let { deferred ->
             async {
                 deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
                     onUpdate?.invoke(CheckUpdate.GeoIpReady(result))
                 }
             }
@@ -193,6 +200,7 @@ object VpnCheckRunner {
         val ipComparisonReadyDeferred = ipComparisonDeferred?.let { deferred ->
             async {
                 deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
                     onUpdate?.invoke(CheckUpdate.IpComparisonReady(result))
                 }
             }
@@ -200,28 +208,33 @@ object VpnCheckRunner {
         val cdnPullingReadyDeferred = cdnPullingDeferred?.let { deferred ->
             async {
                 deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
                     onUpdate?.invoke(CheckUpdate.CdnPullingReady(result))
                 }
             }
         }
         val directReadyDeferred = async {
             directDeferred.await().also { result ->
+                executionContext.throwIfCancelled()
                 onUpdate?.invoke(CheckUpdate.DirectSignsReady(result))
             }
         }
         val indirectReadyDeferred = async {
             indirectDeferred.await().also { result ->
+                executionContext.throwIfCancelled()
                 onUpdate?.invoke(CheckUpdate.IndirectSignsReady(result))
             }
         }
         val locationReadyDeferred = async {
             locationDeferred.await().also { result ->
+                executionContext.throwIfCancelled()
                 onUpdate?.invoke(CheckUpdate.LocationSignalsReady(result))
             }
         }
         val bypassReadyDeferred = bypassDeferred?.let { deferred ->
             async {
                 deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
                     onUpdate?.invoke(CheckUpdate.BypassReady(result))
                 }
             }
@@ -268,6 +281,7 @@ object VpnCheckRunner {
         val bypassResult = bypassReadyDeferred?.await() ?: emptyBypass
         val tunProbeResult = tunActiveProbeDeferred?.await()
 
+        executionContext.throwIfCancelled()
         val verdict = VerdictEngine.evaluate(
             geoIp = geoIp,
             directSigns = directSigns,
@@ -275,6 +289,7 @@ object VpnCheckRunner {
             locationSignals = locationSignals,
             bypassResult = bypassResult,
         )
+        executionContext.throwIfCancelled()
         onUpdate?.invoke(CheckUpdate.VerdictReady(verdict))
 
         CheckResult(
@@ -288,5 +303,6 @@ object VpnCheckRunner {
             verdict = verdict,
             tunProbeDiagnostics = tunProbeResult?.tunProbeDiagnostics,
         )
+    }
     }
 }

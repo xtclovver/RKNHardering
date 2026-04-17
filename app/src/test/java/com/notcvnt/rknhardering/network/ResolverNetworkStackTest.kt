@@ -1,15 +1,21 @@
 package com.notcvnt.rknhardering.network
 
+import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.probe.NativeCurlBridge
 import com.notcvnt.rknhardering.probe.NativeCurlRequest
 import com.notcvnt.rknhardering.probe.NativeCurlResponse
+import kotlinx.coroutines.CancellationException
 import okhttp3.Dns
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 import java.net.UnknownHostException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class ResolverNetworkStackTest {
 
@@ -121,5 +127,88 @@ class ResolverNetworkStackTest {
         assertTrue(error is IOException)
         assertTrue(error?.message?.contains("OkHttp failed after") == true)
         assertTrue(error?.message?.contains("native curl failed after") == true)
+    }
+
+    @Test
+    fun `execute stops before native curl fallback after cancellation`() {
+        val cancellationSignal = ScanCancellationSignal()
+        var okHttpCalls = 0
+        var nativeCalls = 0
+
+        ResolverNetworkStack.okHttpExecuteOverride = {
+            okHttpCalls += 1
+            cancellationSignal.cancel()
+            throw IOException("okhttp down")
+        }
+        NativeCurlBridge.executeOverride = { _: NativeCurlRequest ->
+            nativeCalls += 1
+            NativeCurlResponse(httpCode = 200, body = "fallback")
+        }
+
+        val error = runCatching {
+            ResolverNetworkStack.execute(
+                url = "https://example.com/ip",
+                method = "GET",
+                timeoutMs = 1_000,
+                config = DnsResolverConfig.system(),
+                cancellationSignal = cancellationSignal,
+            )
+        }.exceptionOrNull()
+
+        assertEquals(1, okHttpCalls)
+        assertEquals(0, nativeCalls)
+        assertTrue(error is CancellationException)
+    }
+
+    @Test
+    fun `native curl request is cancelled through registered callback`() {
+        val cancellationSignal = ScanCancellationSignal()
+        val executionContext = ScanExecutionContext(cancellationSignal = cancellationSignal)
+        val executeEntered = CountDownLatch(1)
+        val executeReleased = CountDownLatch(1)
+        val cancelledRequestIds = mutableListOf<String>()
+
+        NativeCurlBridge.executeOverride = { _: NativeCurlRequest ->
+            executeEntered.countDown()
+            assertTrue(executeReleased.await(2, TimeUnit.SECONDS))
+            NativeCurlResponse(httpCode = 200, body = "late response")
+        }
+        NativeCurlBridge.cancelOverride = { requestId ->
+            cancelledRequestIds += requestId
+            executeReleased.countDown()
+            true
+        }
+
+        var failure: Throwable? = null
+        val worker = Thread {
+            failure = runCatching {
+                NativeCurlHttpClient.execute(
+                    request = ResolverHttpRequest(
+                        url = "https://example.com/ip",
+                        method = "GET",
+                        headers = emptyMap(),
+                        body = null,
+                        bodyContentType = null,
+                        timeoutMs = 1_000,
+                        config = DnsResolverConfig.system(),
+                        proxy = null,
+                        binding = null,
+                        addressFamily = null,
+                        cancellationSignal = cancellationSignal,
+                    ),
+                    executionContext = executionContext,
+                )
+            }.exceptionOrNull()
+        }
+
+        worker.start()
+        assertTrue(executeEntered.await(1, TimeUnit.SECONDS))
+        cancellationSignal.cancel()
+        worker.join(2_000)
+
+        assertFalse(worker.isAlive)
+        assertTrue(failure is CancellationException)
+        assertEquals(1, cancelledRequestIds.size)
+        assertTrue(cancelledRequestIds.single().startsWith("native-http-"))
     }
 }

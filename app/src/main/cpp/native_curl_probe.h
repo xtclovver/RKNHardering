@@ -18,7 +18,13 @@ jobjectArray ExecuteNativeCurlRequest(
     jint timeout_ms,
     jint connect_timeout_ms,
     jstring ca_bundle_path,
-    jboolean debug_verbose
+    jboolean debug_verbose,
+    jstring request_id
+);
+
+jboolean CancelNativeCurlRequest(
+    JNIEnv* env,
+    jstring request_id
 );
 
 #endif

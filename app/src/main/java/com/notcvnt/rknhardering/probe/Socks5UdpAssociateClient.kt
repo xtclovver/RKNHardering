@@ -1,5 +1,10 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.registerDatagramSocket
+import com.notcvnt.rknhardering.registerSocket
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -44,6 +49,8 @@ object Socks5UdpAssociateClient {
     class Session internal constructor(
         private val controlSocket: Socket?,
         private val udpSocket: DatagramSocket,
+        private val controlRegistration: ScanCancellationSignal.Registration,
+        private val udpRegistration: ScanCancellationSignal.Registration,
         val relayHost: String,
         val relayPort: Int,
     ) : AutoCloseable {
@@ -54,24 +61,33 @@ object Socks5UdpAssociateClient {
             targetHost: String,
             targetPort: Int,
             payload: ByteArray,
+            executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
         ): UdpDatagram {
-            val request = buildUdpPacket(targetHost = targetHost, targetPort = targetPort, payload = payload)
-            val packet = DatagramPacket(
-                request,
-                request.size,
-                InetAddress.getByName(relayHost),
-                relayPort,
-            )
-            udpSocket.send(packet)
+            try {
+                executionContext.throwIfCancelled()
+                val request = buildUdpPacket(targetHost = targetHost, targetPort = targetPort, payload = payload)
+                val packet = DatagramPacket(
+                    request,
+                    request.size,
+                    InetAddress.getByName(relayHost),
+                    relayPort,
+                )
+                udpSocket.send(packet)
 
-            val responseBuffer = ByteArray(65_535)
-            val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
-            udpSocket.receive(responsePacket)
-            val response = responsePacket.data.copyOf(responsePacket.length)
-            return parseUdpPacket(response)
+                val responseBuffer = ByteArray(65_535)
+                val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
+                udpSocket.receive(responsePacket)
+                val response = responsePacket.data.copyOf(responsePacket.length)
+                return parseUdpPacket(response)
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
+                throw error
+            }
         }
 
         override fun close() {
+            udpRegistration.dispose()
+            controlRegistration.dispose()
             runCatching { udpSocket.close() }
             runCatching { controlSocket?.close() }
         }
@@ -81,18 +97,24 @@ object Socks5UdpAssociateClient {
         relayHost: String,
         relayPort: Int,
         readTimeoutMs: Int = 3_000,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Session {
         val udpSocket = DatagramSocket()
+        val udpRegistration = executionContext.cancellationSignal.registerDatagramSocket(udpSocket)
         try {
             udpSocket.soTimeout = readTimeoutMs
             return Session(
                 controlSocket = null,
                 udpSocket = udpSocket,
+                controlRegistration = ScanCancellationSignal.Registration.NO_OP,
+                udpRegistration = udpRegistration,
                 relayHost = relayHost,
                 relayPort = relayPort,
             )
         } catch (error: Exception) {
+            udpRegistration.dispose()
             runCatching { udpSocket.close() }
+            rethrowIfCancellation(error, executionContext)
             throw error
         }
     }
@@ -102,11 +124,15 @@ object Socks5UdpAssociateClient {
         proxyPort: Int,
         connectTimeoutMs: Int = 3_000,
         readTimeoutMs: Int = 3_000,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Session {
         val controlSocket = Socket()
         val udpSocket = DatagramSocket()
+        val controlRegistration = executionContext.cancellationSignal.registerSocket(controlSocket)
+        val udpRegistration = executionContext.cancellationSignal.registerDatagramSocket(udpSocket)
 
         try {
+            executionContext.throwIfCancelled()
             controlSocket.connect(InetSocketAddress(proxyHost, proxyPort), connectTimeoutMs)
             controlSocket.soTimeout = readTimeoutMs
             controlSocket.tcpNoDelay = true
@@ -138,16 +164,24 @@ object Socks5UdpAssociateClient {
             return Session(
                 controlSocket = controlSocket,
                 udpSocket = udpSocket,
+                controlRegistration = controlRegistration,
+                udpRegistration = udpRegistration,
                 relayHost = relayHost,
                 relayPort = associateResponse.boundPort,
             )
         } catch (error: SocketTimeoutException) {
+            controlRegistration.dispose()
+            udpRegistration.dispose()
             runCatching { udpSocket.close() }
             runCatching { controlSocket.close() }
+            rethrowIfCancellation(error, executionContext)
             throw IOException("Timed out during SOCKS5 UDP ASSOCIATE", error)
         } catch (error: Exception) {
+            controlRegistration.dispose()
+            udpRegistration.dispose()
             runCatching { udpSocket.close() }
             runCatching { controlSocket.close() }
+            rethrowIfCancellation(error, executionContext)
             throw error
         }
     }

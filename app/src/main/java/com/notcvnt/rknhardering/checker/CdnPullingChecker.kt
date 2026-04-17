@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
@@ -9,6 +10,8 @@ import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.CdnPullingClient
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.security.cert.CertPathBuilderException
 import java.security.cert.CertPathValidatorException
 import java.security.cert.CertificateException
@@ -59,23 +62,59 @@ object CdnPullingChecker {
             val activeEndpoints = if (meduzaEnabled) ENDPOINTS else ENDPOINTS.filter { it.label != "meduza.io" }
             val responses = activeEndpoints.map { endpoint ->
                 async {
-                    val bodyResult = fetchBodyWithRetries(
-                        endpoint = endpoint.url,
-                        timeoutMs = timeoutMs,
-                        resolverConfig = resolverConfig,
-                    )
-                    val rawBody = bodyResult.getOrNull()
-                    val parsedBody = rawBody?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
+                    val ipv4Deferred = async {
+                        fetchBodyWithRetries(
+                            endpoint = endpoint.url,
+                            timeoutMs = timeoutMs,
+                            resolverConfig = resolverConfig,
+                            addressFamily = Inet4Address::class.java,
+                        )
+                    }
+                    val ipv6Deferred = async {
+                        fetchBodyWithRetries(
+                            endpoint = endpoint.url,
+                            timeoutMs = timeoutMs,
+                            resolverConfig = resolverConfig,
+                            addressFamily = Inet6Address::class.java,
+                        )
+                    }
+
+                    val ipv4Result = ipv4Deferred.await()
+                    val ipv6Result = ipv6Deferred.await()
+
+                    val ipv4Raw = ipv4Result.getOrNull()
+                    val ipv6Raw = ipv6Result.getOrNull()
+                    val ipv4Parsed = ipv4Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
+                    val ipv6Parsed = ipv6Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
+
+                    val ipv4 = ipv4Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv4(it) }
+                    val ipv6 = ipv6Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv6(it) }
+
+                    val representativeParsed = ipv4Parsed?.takeIf { it.hasUsefulData }
+                        ?: ipv6Parsed?.takeIf { it.hasUsefulData }
+                    val representativeIp = ipv4 ?: ipv6 ?: representativeParsed?.ip
+                    val rawBody = ipv4Raw ?: ipv6Raw
+                    val ipv4Unavailable = ipv4 == null && ipv6 != null
+
+                    val hasAnyBody = rawBody != null
+                    val hasUsefulData = representativeParsed?.hasUsefulData == true
                     val error = when {
-                        bodyResult.isFailure -> formatError(context, bodyResult.exceptionOrNull())
-                        parsedBody?.hasUsefulData == true -> null
+                        !hasAnyBody -> formatError(
+                            context,
+                            ipv4Result.exceptionOrNull() ?: ipv6Result.exceptionOrNull(),
+                        )
+                        hasUsefulData -> null
                         else -> context.getString(R.string.checker_cdn_pulling_error_unrecognized)
                     }
+
                     CdnPullingResponse(
                         targetLabel = endpoint.label,
                         url = endpoint.url,
-                        ip = parsedBody?.ip,
-                        importantFields = parsedBody?.importantFields.orEmpty(),
+                        ip = representativeIp,
+                        ipv4 = ipv4,
+                        ipv6 = ipv6,
+                        ipv4Unavailable = ipv4Unavailable,
+                        importantFields = representativeParsed?.importantFields.orEmpty(),
                         rawBody = rawBody,
                         error = error,
                     )
@@ -89,15 +128,18 @@ object CdnPullingChecker {
         endpoint: String,
         timeoutMs: Int,
         resolverConfig: DnsResolverConfig,
+        addressFamily: Class<out java.net.InetAddress>? = null,
         maxAttempts: Int = MAX_FETCH_ATTEMPTS,
         retryDelayMs: Long = RETRY_DELAY_MS,
-        fetcher: (String, Int, DnsResolverConfig) -> Result<String> = { url, timeout, resolver ->
-            CdnPullingClient.fetchBody(url, timeoutMs = timeout, resolverConfig = resolver)
+        fetcher: (String, Int, DnsResolverConfig, Class<out java.net.InetAddress>?) -> Result<String> = { url, timeout, resolver, family ->
+            CdnPullingClient.fetchBody(url, timeoutMs = timeout, resolverConfig = resolver, addressFamily = family)
         },
     ): Result<String> {
+        val executionContext = ScanExecutionContext.currentOrDefault()
         var lastError: Throwable? = null
         repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
-            val result = fetcher(endpoint, timeoutMs, resolverConfig)
+            executionContext.throwIfCancelled()
+            val result = fetcher(endpoint, timeoutMs, resolverConfig, addressFamily)
             if (result.isSuccess) {
                 return result
             }
@@ -118,32 +160,58 @@ object CdnPullingChecker {
     ): CdnPullingResult {
         val successfulResponses = responses.filter { it.ip != null || it.importantFields.isNotEmpty() }
         val successfulCount = successfulResponses.size
+
+        val allIpv4s = successfulResponses.mapNotNull { it.ipv4 ?: it.ip?.takeIf { ip -> CdnPullingClient.looksLikeIpv4(ip) } }.distinct()
+        val allIpv6s = successfulResponses.mapNotNull { it.ipv6 ?: it.ip?.takeIf { ip -> CdnPullingClient.looksLikeIpv6(ip) } }.distinct()
         val allIps = successfulResponses.mapNotNull { it.ip }.distinct()
+
         val allSuccessfulResponsesExposeIp = successfulResponses.isNotEmpty() && successfulResponses.all { it.ip != null }
         val hasError = successfulCount == 0
         val detected = successfulCount > 0
+
+        val ipv4Conflict = allIpv4s.size > 1
+        val ipv6Conflict = allIpv6s.size > 1
         val needsReview = detected && (
             successfulCount < responses.size ||
-                allIps.size > 1 ||
+                ipv4Conflict ||
+                ipv6Conflict ||
                 !allSuccessfulResponsesExposeIp
         )
 
         val findings = buildFindings(successfulResponses, responses)
+
+        val representativeIps = buildList {
+            if (allIpv4s.size == 1) add(allIpv4s.single())
+            else addAll(allIpv4s)
+            if (allIpv6s.size == 1) add(allIpv6s.single())
+            else addAll(allIpv6s)
+        }.distinct()
+
+        val ipsFormatted = buildString {
+            if (allIpv4s.isNotEmpty()) append("IPv4: ${allIpv4s.joinToString(", ")}")
+            if (allIpv4s.isNotEmpty() && allIpv6s.isNotEmpty()) append("; ")
+            if (allIpv6s.isNotEmpty()) append("IPv6: ${allIpv6s.joinToString(", ")}")
+        }.ifEmpty { representativeIps.joinToString(", ") }
+
         val summary = when {
             hasError -> context.getString(R.string.checker_cdn_pulling_summary_error)
-            allIps.size > 1 -> context.getString(
+            ipv4Conflict || ipv6Conflict -> context.getString(
                 R.string.checker_cdn_pulling_summary_mixed_ips,
-                allIps.joinToString(", "),
+                ipsFormatted,
             )
-            successfulCount == responses.size && allSuccessfulResponsesExposeIp && allIps.size == 1 -> context.getString(
+            successfulCount == responses.size && allSuccessfulResponsesExposeIp && representativeIps.isNotEmpty() -> context.getString(
                 R.string.checker_cdn_pulling_summary_detected_full,
-                allIps.single(),
+                ipsFormatted,
             )
-            allSuccessfulResponsesExposeIp && allIps.size == 1 -> context.getString(
+            allSuccessfulResponsesExposeIp && representativeIps.size == 1 -> context.getString(
                 R.string.checker_cdn_pulling_summary_detected_partial,
-                allIps.single(),
+                representativeIps.single(),
                 successfulCount,
                 responses.size,
+            )
+            allSuccessfulResponsesExposeIp && representativeIps.isNotEmpty() -> context.getString(
+                R.string.checker_cdn_pulling_summary_detected_full,
+                ipsFormatted,
             )
             else -> context.getString(
                 R.string.checker_cdn_pulling_summary_detected_no_ip,

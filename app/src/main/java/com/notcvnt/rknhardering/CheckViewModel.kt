@@ -20,6 +20,9 @@ sealed interface ScanEvent {
 }
 
 class CheckViewModel(app: Application) : AndroidViewModel(app) {
+    internal companion object {
+        var runScanOverride: (suspend (Application, CheckSettings, ScanExecutionContext, (suspend (CheckUpdate) -> Unit)?) -> CheckResult)? = null
+    }
 
     private val _scanEvents = MutableStateFlow<List<ScanEvent>>(emptyList())
     val scanEvents: StateFlow<List<ScanEvent>> = _scanEvents
@@ -28,36 +31,84 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
     val isRunning: StateFlow<Boolean> = _isRunning
 
     private var scanJob: Job? = null
+    private var nextScanId = 1L
+    private var activeScanId: Long? = null
+    private var activeExecutionContext: ScanExecutionContext? = null
     private var completedDiagnosticsConsumed = false
 
     fun startScan(settings: CheckSettings, privacyMode: Boolean) {
-        if (scanJob?.isActive == true) return
+        if (scanJob?.isActive == true && activeExecutionContext?.cancellationSignal?.isCancelled() == false) return
 
         resetCompletedDiagnosticsRetention()
         _scanEvents.value = listOf(ScanEvent.Started(settings, privacyMode))
         _isRunning.value = true
+        val scanId = nextScanId++
+        val executionContext = ScanExecutionContext(scanId = scanId)
+        activeScanId = scanId
+        activeExecutionContext = executionContext
 
-        scanJob = viewModelScope.launch {
+        lateinit var launchedJob: Job
+        launchedJob = viewModelScope.launch {
             try {
-                val result = VpnCheckRunner.run(
-                    context = getApplication(),
-                    settings = settings,
-                ) { update ->
-                    _scanEvents.value = _scanEvents.value + ScanEvent.Update(update)
+                val runner = runScanOverride
+                val result = if (runner != null) {
+                    runner(
+                        getApplication(),
+                        settings,
+                        executionContext,
+                    ) { update ->
+                        if (isCurrentScan(scanId, executionContext)) {
+                            _scanEvents.value = _scanEvents.value + ScanEvent.Update(update)
+                        }
+                    }
+                } else {
+                    VpnCheckRunner.run(
+                        context = getApplication(),
+                        settings = settings,
+                        executionContext = executionContext,
+                    ) { update ->
+                        if (isCurrentScan(scanId, executionContext)) {
+                            _scanEvents.value = _scanEvents.value + ScanEvent.Update(update)
+                        }
+                    }
                 }
-                _scanEvents.value = _scanEvents.value + ScanEvent.Completed(result, privacyMode)
+                if (isCurrentScan(scanId, executionContext)) {
+                    _scanEvents.value = _scanEvents.value + ScanEvent.Completed(result, privacyMode)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                _scanEvents.value = _scanEvents.value + ScanEvent.Cancelled
+                if (isCurrentScan(scanId, executionContext)) {
+                    _scanEvents.value = _scanEvents.value + ScanEvent.Cancelled
+                }
                 throw e
             } finally {
-                _isRunning.value = false
-                scanJob = null
+                if (activeExecutionContext === executionContext) {
+                    activeExecutionContext = null
+                    activeScanId = null
+                    _isRunning.value = false
+                }
+                if (scanJob === launchedJob) {
+                    scanJob = null
+                }
             }
         }
+        scanJob = launchedJob
     }
 
     fun cancelScan() {
+        val executionContext = activeExecutionContext ?: return
+        val scanId = activeScanId
+        if (scanId != null) {
+            _scanEvents.value = _scanEvents.value + ScanEvent.Cancelled
+        }
+        activeExecutionContext = null
+        activeScanId = null
+        _isRunning.value = false
+        executionContext.cancellationSignal.cancel()
         scanJob?.cancel()
+    }
+
+    private fun isCurrentScan(scanId: Long, executionContext: ScanExecutionContext): Boolean {
+        return activeScanId == scanId && activeExecutionContext === executionContext
     }
 
     internal fun canRetainCompletedDiagnostics(): Boolean = !completedDiagnosticsConsumed

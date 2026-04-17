@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportProbeKind
@@ -20,7 +21,11 @@ import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -28,6 +33,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 class VpnCheckRunnerTest {
@@ -312,6 +319,71 @@ class VpnCheckRunnerTest {
         assertEquals(0, cdnCalls)
         assertEquals(CdnPullingResult.empty(), result.cdnPulling)
         assertTrue(updates.none { it is CheckUpdate.CdnPullingReady })
+    }
+
+    @Test
+    fun `cancelled execution does not emit late updates`() = runBlocking {
+        val started = CountDownLatch(5)
+        val release = CountDownLatch(1)
+        val updates = mutableListOf<CheckUpdate>()
+        val executionContext = ScanExecutionContext(scanId = 42L)
+
+        suspend fun awaitRelease() {
+            started.countDown()
+            withContext(Dispatchers.IO) {
+                assertTrue(release.await(2, TimeUnit.SECONDS))
+            }
+        }
+
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ ->
+                awaitRelease()
+                category("geo")
+            },
+            ipComparisonCheck = { _, _ ->
+                awaitRelease()
+                emptyIpComparison()
+            },
+            directCheck = { _, _ ->
+                awaitRelease()
+                category("direct")
+            },
+            indirectCheck = { _, _, _, _ ->
+                awaitRelease()
+                category("indirect")
+            },
+            locationCheck = { _, _, _ ->
+                awaitRelease()
+                category("location")
+            },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val worker = async {
+            runCatching {
+                VpnCheckRunner.run(
+                    context = context,
+                    settings = CheckSettings(
+                        splitTunnelEnabled = false,
+                        networkRequestsEnabled = true,
+                        resolverConfig = DnsResolverConfig.system(),
+                    ),
+                    executionContext = executionContext,
+                ) { update ->
+                    updates += update
+                }
+            }.exceptionOrNull()
+        }
+
+        assertTrue(withContext(Dispatchers.IO) { started.await(2, TimeUnit.SECONDS) })
+        executionContext.cancellationSignal.cancel()
+        release.countDown()
+
+        val error = worker.await()
+        assertTrue(error is CancellationException)
+        assertTrue(updates.isEmpty())
     }
 
     private fun category(

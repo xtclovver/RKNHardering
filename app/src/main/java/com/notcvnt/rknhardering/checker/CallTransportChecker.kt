@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import com.notcvnt.rknhardering.BuildConfig
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportProbeKind
@@ -89,7 +90,9 @@ object CallTransportChecker {
         },
         val proxyProbe: suspend (ProxyEndpoint) -> ProxyProbeOutcome = { proxyEndpoint ->
             val mtProto = MtProtoProber.probe(proxyEndpoint.host, proxyEndpoint.port)
-            val proxyIp = runCatching { IfconfigClient.fetchIpViaProxy(proxyEndpoint).getOrNull() }.getOrNull()
+            val proxyIp = cancellationAwareRunCatching {
+                IfconfigClient.fetchIpViaProxy(proxyEndpoint).getOrNull()
+            }.getOrNull()
             ProxyProbeOutcome(
                 reachable = mtProto.reachable,
                 targetHost = mtProto.targetAddress?.address?.hostAddress,
@@ -134,7 +137,7 @@ object CallTransportChecker {
             onProgress = onProgress,
         )
 
-        val proxyEndpoint = runCatching { dependencies.findLocalProxyEndpoint() }.getOrNull()
+        val proxyEndpoint = cancellationAwareRunCatchingSuspend { dependencies.findLocalProxyEndpoint() }.getOrNull()
         if (proxyEndpoint?.type == ProxyType.SOCKS5) {
             onProgress?.invoke(labelForService(CallTransportService.TELEGRAM), labelForPath(CallTransportNetworkPath.LOCAL_PROXY))
             results += probeProxyAssistedTelegram(
@@ -177,7 +180,7 @@ object CallTransportChecker {
             return value
         }
 
-        val catalog = runCatching {
+        val catalog = cancellationAwareRunCatching {
             dependencies.loadCatalog(context, experimentalCallTransportEnabled)
         }.getOrElse { error ->
             return@withContext listOf(
@@ -205,7 +208,7 @@ object CallTransportChecker {
                     ),
             )
         }
-        val paths = runCatching { dependencies.loadPaths(context) }
+        val paths = cancellationAwareRunCatching { dependencies.loadPaths(context) }
             .getOrElse { error ->
                 return@withContext listOf(
                     errorResult(
@@ -306,14 +309,14 @@ object CallTransportChecker {
         var cachedProxyPublicIp: String? = null
         suspend fun fetchProxyPublicIp(): String? {
             if (cachedProxyPublicIp != null) return cachedProxyPublicIp
-            cachedProxyPublicIp = runCatching {
+            cachedProxyPublicIp = cancellationAwareRunCatchingSuspend {
                 IfconfigClient.fetchIpViaProxy(proxyEndpoint, resolverConfig = resolverConfig).getOrNull()
             }.getOrNull()
             return cachedProxyPublicIp
         }
 
         val proxyLabel = formatHostPort(proxyEndpoint.host, proxyEndpoint.port)
-        val proxyOutcome = runCatching { dependencies.proxyProbe(proxyEndpoint) }.getOrNull()
+        val proxyOutcome = cancellationAwareRunCatchingSuspend { dependencies.proxyProbe(proxyEndpoint) }.getOrNull()
         if (proxyOutcome?.reachable == true) {
             cachedProxyPublicIp = proxyOutcome.observedPublicIp ?: cachedProxyPublicIp
             results += CallTransportLeakResult(
@@ -342,7 +345,7 @@ object CallTransportChecker {
             )
         }
 
-        val telegramTargets = runCatching {
+        val telegramTargets = cancellationAwareRunCatching {
             dependencies.loadCatalog(context, false).telegramTargets
         }.getOrElse { error ->
             return@withContext results + errorResult(
@@ -487,7 +490,7 @@ object CallTransportChecker {
     }
 
     private fun sameIpFamily(first: String, second: String): Boolean {
-        return runCatching {
+        return cancellationAwareRunCatching {
             InetAddress.getByName(first)::class.java == InetAddress.getByName(second)::class.java
         }.getOrDefault(false)
     }
@@ -547,13 +550,17 @@ object CallTransportChecker {
         target: CallTransportTargetCatalog.CallTransportTarget,
         resolverConfig: DnsResolverConfig,
     ): Result<StunBindingClient.BindingResult> = withContext(Dispatchers.IO) {
-        val resolvedIps = runCatching {
-            ResolverNetworkStack.lookup(target.host, resolverConfig)
+        val resolvedIps = cancellationAwareRunCatching {
+            ResolverNetworkStack.lookup(
+                hostname = target.host,
+                config = resolverConfig,
+                cancellationSignal = com.notcvnt.rknhardering.ScanExecutionContext.currentOrDefault().cancellationSignal,
+            )
                 .mapNotNull { it.hostAddress }
                 .distinct()
         }.getOrDefault(emptyList())
 
-        runCatching {
+        cancellationAwareRunCatching {
             try {
                 Socks5UdpAssociateClient.open(
                     proxyHost = proxyEndpoint.host,
@@ -568,7 +575,7 @@ object CallTransportChecker {
                 )
                 var lastError: Throwable = error
                 for (relay in findReusableProxyUdpRelays(proxyEndpoint, listeners)) {
-                    val candidateResult = runCatching {
+                    val candidateResult = cancellationAwareRunCatching {
                         Socks5UdpAssociateClient.openRelay(
                             relayHost = relay.relayHost,
                             relayPort = relay.relayPort,
@@ -577,7 +584,7 @@ object CallTransportChecker {
                         }
                     }
                     if (candidateResult.isSuccess) {
-                        return@runCatching candidateResult.getOrThrow()
+                        return@cancellationAwareRunCatching candidateResult.getOrThrow()
                     }
                     lastError = candidateResult.exceptionOrNull() ?: lastError
                 }
@@ -591,15 +598,18 @@ object CallTransportChecker {
         target: CallTransportTargetCatalog.CallTransportTarget,
         resolvedIps: List<String>,
     ): StunBindingClient.BindingResult {
+        val executionContext = com.notcvnt.rknhardering.ScanExecutionContext.currentOrDefault()
         return StunBindingClient.probeWithDatagramExchange(
             host = target.host,
             port = target.port,
             resolvedIps = resolvedIps,
+            executionContext = executionContext,
             exchange = { payload ->
                 session.exchange(
                     targetHost = target.host,
                     targetPort = target.port,
                     payload = payload,
+                    executionContext = executionContext,
                 )
             },
         ).getOrThrow()
@@ -637,9 +647,25 @@ object CallTransportChecker {
     }
 
     private fun isReusableProxyRelayHost(host: String): Boolean {
-        return isWildcardLocalRelayHost(host) || runCatching {
+        return isWildcardLocalRelayHost(host) || cancellationAwareRunCatching {
             java.net.InetAddress.getByName(normalizeLocalRelayHost(host)).isLoopbackAddress
         }.getOrDefault(false)
+    }
+
+    private inline fun <T> cancellationAwareRunCatching(block: () -> T): Result<T> {
+        return runCatching(block).onFailure { error ->
+            if (error is Exception) {
+                rethrowIfCancellation(error)
+            }
+        }
+    }
+
+    private suspend inline fun <T> cancellationAwareRunCatchingSuspend(crossinline block: suspend () -> T): Result<T> {
+        return runCatching { block() }.onFailure { error ->
+            if (error is Exception) {
+                rethrowIfCancellation(error)
+            }
+        }
     }
 
     private fun isWildcardLocalRelayHost(host: String): Boolean {

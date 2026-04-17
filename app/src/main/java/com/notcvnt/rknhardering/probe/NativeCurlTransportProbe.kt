@@ -1,5 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.DnsResolverMode
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
@@ -7,6 +10,7 @@ import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.URL
+import java.util.UUID
 
 internal object NativeCurlTransportProbe {
     private const val DEFAULT_PORT = 443
@@ -18,6 +22,7 @@ internal object NativeCurlTransportProbe {
         resolverConfig: DnsResolverConfig,
         binding: com.notcvnt.rknhardering.network.ResolverBinding.OsDeviceBinding,
         collectTrace: Boolean,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpModeProbeResult {
         val endpointAttempts = if (collectTrace) mutableListOf<TunEndpointAttempt>() else null
         var lastError: String? = null
@@ -29,9 +34,11 @@ internal object NativeCurlTransportProbe {
         )
 
         for (endpoint in endpoints) {
+            executionContext.throwIfCancelled()
             val resolveConfig = try {
-                resolveConfigFor(endpoint, resolverConfig, binding)
+                resolveConfigFor(endpoint, resolverConfig, binding, executionContext)
             } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 val diagnostics = diagnosticsFor(
                     resolveStrategy = resolveStrategyFor(resolverConfig),
                     response = NativeCurlResponse(localError = error.renderMessage()),
@@ -50,18 +57,26 @@ internal object NativeCurlTransportProbe {
                 continue
             }
 
-            val response = NativeCurlBridge.execute(
-                NativeCurlRequest(
-                    url = endpoint.url,
-                    interfaceName = binding.interfaceName,
-                    resolveRules = resolveConfig.resolveRules,
-                    ipResolveMode = ipResolveModeFor(endpoint.familyHint),
-                    timeoutMs = timeoutMs,
-                    connectTimeoutMs = timeoutMs,
-                    caBundlePath = NativeCurlBridge.caBundleInfo()?.absolutePath.orEmpty(),
-                    debugVerbose = collectTrace,
-                ),
-            )
+            val requestId = "native-probe-${UUID.randomUUID()}"
+            val cancellationRegistration = registerNativeCancellation(requestId, executionContext.cancellationSignal)
+            val response = try {
+                NativeCurlBridge.execute(
+                    NativeCurlRequest(
+                        url = endpoint.url,
+                        interfaceName = binding.interfaceName,
+                        resolveRules = resolveConfig.resolveRules,
+                        ipResolveMode = ipResolveModeFor(endpoint.familyHint),
+                        timeoutMs = timeoutMs,
+                        connectTimeoutMs = timeoutMs,
+                        caBundlePath = NativeCurlBridge.caBundleInfo()?.absolutePath.orEmpty(),
+                        debugVerbose = collectTrace,
+                    ),
+                    requestId = requestId,
+                )
+            } finally {
+                cancellationRegistration.dispose()
+            }
+            executionContext.throwIfCancelled()
             val diagnostics = diagnosticsFor(
                 resolveStrategy = resolveConfig.strategy,
                 response = response,
@@ -109,6 +124,7 @@ internal object NativeCurlTransportProbe {
         endpoint: IpEndpointSpec,
         resolverConfig: DnsResolverConfig,
         binding: com.notcvnt.rknhardering.network.ResolverBinding.OsDeviceBinding,
+        executionContext: ScanExecutionContext,
     ): ResolveConfig {
         if (resolverConfig.mode == DnsResolverMode.SYSTEM) {
             return ResolveConfig(
@@ -120,7 +136,12 @@ internal object NativeCurlTransportProbe {
 
         val host = URL(endpoint.url).host
         val port = URL(endpoint.url).port.takeIf { it > 0 } ?: DEFAULT_PORT
-        val resolvedAddresses = ResolverNetworkStack.lookup(host, resolverConfig, binding)
+        val resolvedAddresses = ResolverNetworkStack.lookup(
+            hostname = host,
+            config = resolverConfig,
+            binding = binding,
+            cancellationSignal = executionContext.cancellationSignal,
+        )
             .filter { address ->
                 when (endpoint.familyHint) {
                     IpEndpointFamilyHint.GENERIC -> true
@@ -190,5 +211,14 @@ internal object NativeCurlTransportProbe {
         return this?.message
             ?: this?.javaClass?.simpleName
             ?: "unknown error"
+    }
+
+    private fun registerNativeCancellation(
+        requestId: String,
+        cancellationSignal: ScanCancellationSignal,
+    ): ScanCancellationSignal.Registration {
+        return cancellationSignal.register {
+            NativeCurlBridge.cancelRequest(requestId)
+        }
     }
 }

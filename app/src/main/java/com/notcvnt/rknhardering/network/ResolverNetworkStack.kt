@@ -1,7 +1,11 @@
 package com.notcvnt.rknhardering.network
 
 import android.net.Network
+import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -38,6 +42,8 @@ internal data class ResolverHttpRequest(
     val config: DnsResolverConfig,
     val proxy: Proxy?,
     val binding: ResolverBinding?,
+    val addressFamily: Class<out InetAddress>? = null,
+    val cancellationSignal: ScanCancellationSignal? = null,
 )
 
 object ResolverNetworkStack {
@@ -60,9 +66,11 @@ object ResolverNetworkStack {
         hostname: String,
         config: DnsResolverConfig,
         binding: ResolverBinding? = null,
+        cancellationSignal: ScanCancellationSignal? = null,
     ): List<InetAddress> {
         literalToInetAddress(hostname)?.let { return listOf(it) }
-        return dns(config, binding).lookup(hostname)
+        cancellationSignal?.throwIfCancelled()
+        return dns(config, binding, cancellationSignal).lookup(hostname)
     }
 
     internal fun resetForTests() {
@@ -85,6 +93,8 @@ object ResolverNetworkStack {
         config: DnsResolverConfig,
         proxy: Proxy? = null,
         binding: ResolverBinding? = null,
+        addressFamily: Class<out InetAddress>? = null,
+        cancellationSignal: ScanCancellationSignal? = null,
     ): ResolverHttpResponse {
         val request = ResolverHttpRequest(
             url = url,
@@ -96,6 +106,8 @@ object ResolverNetworkStack {
             config = config,
             proxy = proxy,
             binding = binding,
+            addressFamily = addressFamily,
+            cancellationSignal = cancellationSignal,
         )
         return executeWithFallback(request)
     }
@@ -103,19 +115,24 @@ object ResolverNetworkStack {
     private fun executeWithFallback(request: ResolverHttpRequest): ResolverHttpResponse {
         var okHttpError: Throwable? = null
         repeat(OKHTTP_RETRY_COUNT + 1) {
+            request.cancellationSignal?.throwIfCancelled()
             try {
                 return executeWithOkHttp(request)
             } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext = currentExecutionContext(request))
                 okHttpError = error
             }
         }
 
+        request.cancellationSignal?.throwIfCancelled()
         if (NativeCurlHttpClient.canExecute(request)) {
             var nativeCurlError: Throwable? = null
             repeat(NATIVE_CURL_RETRY_COUNT + 1) {
+                request.cancellationSignal?.throwIfCancelled()
                 try {
-                    return NativeCurlHttpClient.execute(request)
+                    return NativeCurlHttpClient.execute(request, executionContext = currentExecutionContext(request))
                 } catch (error: Exception) {
+                    rethrowIfCancellation(error, executionContext = currentExecutionContext(request))
                     nativeCurlError = error
                 }
             }
@@ -132,6 +149,7 @@ object ResolverNetworkStack {
 
     private fun executeWithOkHttp(request: ResolverHttpRequest): ResolverHttpResponse {
         okHttpExecuteOverride?.let { return it(request) }
+        val executionContext = currentExecutionContext(request)
 
         val requestBuilder = Request.Builder().url(request.url)
         request.headers.forEach { (name, value) -> requestBuilder.header(name, value) }
@@ -141,7 +159,12 @@ object ResolverNetworkStack {
             "POST" -> requestBuilder.post(requestBody ?: ByteArray(0).toRequestBody(request.bodyContentType?.toMediaTypeOrNull()))
             else -> requestBuilder.method(request.method.uppercase(), requestBody)
         }
-        val client = baseClient(request.config, request.binding)
+        val client = baseClient(
+            config = request.config,
+            binding = request.binding,
+            addressFamily = request.addressFamily,
+            cancellationSignal = request.cancellationSignal,
+        )
             .newBuilder()
             .connectTimeout(request.timeoutMs.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(request.timeoutMs.toLong(), TimeUnit.MILLISECONDS)
@@ -152,25 +175,36 @@ object ResolverNetworkStack {
                 }
             }
             .build()
-        client.newCall(requestBuilder.build()).execute().use { response ->
-            return ResolverHttpResponse(
-                code = response.code,
-                body = response.body?.string().orEmpty(),
-            )
+        executionContext.throwIfCancelled()
+        val call = client.newCall(requestBuilder.build())
+        val registration = registerCallCancellation(call, request.cancellationSignal)
+        try {
+            call.execute().use { response ->
+                executionContext.throwIfCancelled()
+                return ResolverHttpResponse(
+                    code = response.code,
+                    body = response.body?.string().orEmpty(),
+                )
+            }
+        } catch (error: Exception) {
+            rethrowIfCancellation(error, executionContext)
+            throw error
+        } finally {
+            registration.dispose()
         }
     }
 
     private fun baseClient(
         config: DnsResolverConfig,
         binding: ResolverBinding? = null,
+        addressFamily: Class<out InetAddress>? = null,
+        cancellationSignal: ScanCancellationSignal? = null,
     ): OkHttpClient {
         val normalized = config.sanitized()
-        if (binding != null) {
-            return buildClient(
-                config = normalized,
-                dns = createDns(normalized, binding),
-                binding = binding,
-            )
+        if (binding != null || addressFamily != null || cancellationSignal != null) {
+            val baseDns = createDns(normalized, binding, cancellationSignal)
+            val dns = if (addressFamily != null) FilteringDns(baseDns, addressFamily) else baseDns
+            return buildClient(config = normalized, dns = dns, binding = binding)
         }
         val cached = cachedConfig
         if (cached == normalized) {
@@ -190,8 +224,15 @@ object ResolverNetworkStack {
         }
     }
 
-    private fun dns(config: DnsResolverConfig, binding: ResolverBinding? = null): Dns {
+    private fun dns(
+        config: DnsResolverConfig,
+        binding: ResolverBinding? = null,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Dns {
         val normalized = config.sanitized()
+        if (cancellationSignal != null) {
+            return createDns(normalized, binding, cancellationSignal)
+        }
         if (binding != null) {
             return createDns(normalized, binding)
         }
@@ -233,6 +274,14 @@ object ResolverNetworkStack {
     }
 
     internal fun createDns(config: DnsResolverConfig, binding: ResolverBinding? = null): Dns {
+        return createDns(config, binding, cancellationSignal = null)
+    }
+
+    internal fun createDns(
+        config: DnsResolverConfig,
+        binding: ResolverBinding? = null,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Dns {
         dnsFactoryOverride?.let { return it(config, binding) }
         if (binding is ResolverBinding.OsDeviceBinding && binding.dnsMode == ResolverBinding.DnsMode.SYSTEM) {
             return Dns.SYSTEM
@@ -244,7 +293,7 @@ object ResolverNetworkStack {
                 if (servers.isEmpty()) {
                     fallbackDns(binding)
                 } else {
-                    DirectDns(servers, binding = binding)
+                    DirectDns(servers, binding = binding, cancellationSignal = cancellationSignal)
                 }
             }
             DnsResolverMode.DOH -> {
@@ -272,7 +321,8 @@ object ResolverNetworkStack {
                 if (bootstrapHosts.isNotEmpty()) {
                     builder.bootstrapDnsHosts(bootstrapHosts)
                 }
-                builder.build()
+                val doh = builder.build()
+                if (cancellationSignal != null) CancellableDns(doh, bootstrapClient, cancellationSignal) else doh
             }
         }
     }
@@ -287,6 +337,21 @@ object ResolverNetworkStack {
             is ResolverBinding.AndroidNetworkBinding -> NetworkDns(binding.network)
             else -> Dns.SYSTEM
         }
+    }
+
+    private fun currentExecutionContext(request: ResolverHttpRequest): ScanExecutionContext {
+        return request.cancellationSignal?.let { signal ->
+            ScanExecutionContext.currentOrDefault().let { context ->
+                if (context.cancellationSignal === signal) context else ScanExecutionContext(cancellationSignal = signal)
+            }
+        } ?: ScanExecutionContext.currentOrDefault()
+    }
+
+    private fun registerCallCancellation(
+        call: Call,
+        cancellationSignal: ScanCancellationSignal?,
+    ): ScanCancellationSignal.Registration {
+        return cancellationSignal?.register { call.cancel() } ?: ScanCancellationSignal.Registration.NO_OP
     }
 }
 
@@ -324,6 +389,34 @@ internal class BindToDeviceSocketFactory(
         Socket(address, port, localAddress, localPort)
 }
 
+internal class CancellableDns(
+    private val delegate: Dns,
+    private val client: OkHttpClient,
+    private val cancellationSignal: ScanCancellationSignal,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        cancellationSignal.throwIfCancelled()
+        val registration = cancellationSignal.register { client.dispatcher.cancelAll() }
+        return try {
+            delegate.lookup(hostname)
+        } finally {
+            registration.dispose()
+        }
+    }
+}
+
+internal class FilteringDns(
+    private val delegate: Dns,
+    private val addressFamily: Class<out InetAddress>,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val all = delegate.lookup(hostname)
+        val filtered = all.filter { addressFamily.isInstance(it) }
+        if (filtered.isEmpty()) throw UnknownHostException("No ${addressFamily.simpleName} address for $hostname")
+        return filtered
+    }
+}
+
 private class NetworkDns(
     private val network: Network,
 ) : Dns {
@@ -344,6 +437,7 @@ internal class DirectDns(
     private val port: Int = 53,
     private val timeoutMs: Int = 3_000,
     private val binding: ResolverBinding? = null,
+    private val cancellationSignal: ScanCancellationSignal? = null,
 ) : Dns {
     private val serverAddresses = servers.mapNotNull { value ->
         value.trim()
@@ -352,6 +446,7 @@ internal class DirectDns(
     }
 
     override fun lookup(hostname: String): List<InetAddress> {
+        cancellationSignal?.throwIfCancelled()
         if (serverAddresses.isEmpty()) {
             throw UnknownHostException("No valid direct DNS servers configured")
         }
@@ -365,6 +460,7 @@ internal class DirectDns(
         for (type in listOf(1, 28)) {
             var typeResolved = false
             for (server in serverAddresses) {
+                cancellationSignal?.throwIfCancelled()
                 try {
                     val addresses = query(server, hostname, type)
                     if (addresses.isNotEmpty()) {
@@ -375,6 +471,7 @@ internal class DirectDns(
                         break
                     }
                 } catch (error: Exception) {
+                    rethrowIfCancellation(error, executionContext = ScanExecutionContext(cancellationSignal = cancellationSignal ?: ScanCancellationSignal()))
                     lastFailure = error
                 }
             }
@@ -391,19 +488,29 @@ internal class DirectDns(
         val requestId = Random.nextInt(0, 0xFFFF)
         val payload = buildQuery(hostname, type, requestId)
         DatagramSocket().use { socket ->
+            val registration = cancellationSignal?.register { socket.close() } ?: ScanCancellationSignal.Registration.NO_OP
             socket.soTimeout = timeoutMs
             ResolverSocketBinder.bind(socket, binding)
-            socket.send(DatagramPacket(payload, payload.size, server, port))
+            try {
+                cancellationSignal?.throwIfCancelled()
+                socket.send(DatagramPacket(payload, payload.size, server, port))
 
-            val responseBuffer = ByteArray(1500)
-            val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
-            socket.receive(responsePacket)
-            return parseResponse(
-                hostname = hostname,
-                type = type,
-                expectedId = requestId,
-                data = responsePacket.data.copyOf(responsePacket.length),
-            )
+                val responseBuffer = ByteArray(1500)
+                val responsePacket = DatagramPacket(responseBuffer, responseBuffer.size)
+                socket.receive(responsePacket)
+                cancellationSignal?.throwIfCancelled()
+                return parseResponse(
+                    hostname = hostname,
+                    type = type,
+                    expectedId = requestId,
+                    data = responsePacket.data.copyOf(responsePacket.length),
+                )
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext = ScanExecutionContext(cancellationSignal = cancellationSignal ?: ScanCancellationSignal()))
+                throw error
+            } finally {
+                registration.dispose()
+            }
         }
     }
 

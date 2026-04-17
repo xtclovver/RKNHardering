@@ -1,5 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.registerSocket
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
@@ -40,6 +43,7 @@ object MtProtoProber {
         proxyPort: Int,
         connectTimeoutMs: Int = 3000,
         readTimeoutMs: Int = 3000,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): ProbeResult = withContext(Dispatchers.IO) {
         for (target in TELEGRAM_DC_TARGETS) {
             val reachable = trySocks5Connect(
@@ -49,6 +53,7 @@ object MtProtoProber {
                 targetPort = target.port,
                 connectTimeoutMs = connectTimeoutMs,
                 readTimeoutMs = readTimeoutMs,
+                executionContext = executionContext,
             )
             if (reachable) {
                 return@withContext ProbeResult(reachable = true, targetAddress = target)
@@ -69,11 +74,15 @@ object MtProtoProber {
         targetPort: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Boolean {
         return Socket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerSocket(socket)
             try {
+                executionContext.throwIfCancelled()
                 socket.connect(InetSocketAddress(proxyHost, proxyPort), connectTimeoutMs)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 return false
             }
 
@@ -102,10 +111,14 @@ object MtProtoProber {
 
                 // replyCode 0x00 = succeeded
                 replyCode == 0x00
-            } catch (_: SocketTimeoutException) {
+            } catch (error: SocketTimeoutException) {
+                rethrowIfCancellation(error, executionContext)
                 false
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
                 false
+            } finally {
+                registration.dispose()
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
@@ -12,7 +14,7 @@ object CdnPullingClient {
     private const val USER_AGENT = "curl/8.0"
 
     @Volatile
-    internal var fetchBodyOverride: ((String, Int, DnsResolverConfig, ResolverBinding?) -> Result<String>)? = null
+    internal var fetchBodyOverride: ((String, Int, DnsResolverConfig, ResolverBinding?, Class<out java.net.InetAddress>?) -> Result<String>)? = null
 
     enum class TargetKind {
         GOOGLEVIDEO_REPORT_MAPPING,
@@ -32,9 +34,12 @@ object CdnPullingClient {
         timeoutMs: Int = 7000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         binding: ResolverBinding? = null,
+        addressFamily: Class<out java.net.InetAddress>? = null,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> {
-        fetchBodyOverride?.let { return it(endpoint, timeoutMs, resolverConfig, binding) }
+        fetchBodyOverride?.let { return it(endpoint, timeoutMs, resolverConfig, binding, addressFamily) }
         return try {
+            executionContext.throwIfCancelled()
             val response = ResolverNetworkStack.execute(
                 url = endpoint,
                 method = "GET",
@@ -45,7 +50,10 @@ object CdnPullingClient {
                 timeoutMs = timeoutMs,
                 config = resolverConfig,
                 binding = binding,
+                addressFamily = addressFamily,
+                cancellationSignal = executionContext.cancellationSignal,
             )
+            executionContext.throwIfCancelled()
             if (response.code !in 200..299) {
                 return Result.failure(IOException(PublicIpClient.formatHttpError(response.code, response.body)))
             }
@@ -55,6 +63,7 @@ object CdnPullingClient {
             }
             Result.success(body)
         } catch (e: Exception) {
+            rethrowIfCancellation(e, executionContext)
             Result.failure(e)
         }
     }
@@ -111,6 +120,17 @@ object CdnPullingClient {
             '.' in normalized -> looksLikeIpv4Literal(normalized)
             else -> false
         }
+    }
+
+    internal fun looksLikeIpv4(value: String): Boolean {
+        if (value.isBlank() || value.length > 64) return false
+        return looksLikeIpv4Literal(value.trim())
+    }
+
+    internal fun looksLikeIpv6(value: String): Boolean {
+        if (value.isBlank() || value.length > 64) return false
+        val normalized = value.trim()
+        return ':' in normalized && looksLikeIpv6Literal(normalized)
     }
 
     private fun looksLikeIpv4Literal(value: String): Boolean {

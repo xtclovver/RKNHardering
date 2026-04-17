@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
@@ -14,6 +15,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.URL
 
 object IpComparisonChecker {
@@ -30,6 +34,7 @@ object IpComparisonChecker {
         val label: String,
         val url: String,
         val scope: IpCheckerScope,
+        val addressFamily: Class<out InetAddress>? = null,
     )
 
     private val ENDPOINTS = listOf(
@@ -62,11 +67,13 @@ object IpComparisonChecker {
             label = "ifconfig.me IPv4",
             url = "https://ipv4.ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
+            addressFamily = Inet4Address::class.java,
         ),
         EndpointSpec(
             label = "ifconfig.me IPv6",
             url = "https://ipv6.ifconfig.me/ip",
             scope = IpCheckerScope.NON_RU,
+            addressFamily = Inet6Address::class.java,
         ),
         EndpointSpec(
             label = "checkip.amazonaws.com",
@@ -96,13 +103,19 @@ object IpComparisonChecker {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     ): IpComparisonResult = withContext(Dispatchers.IO) {
         coroutineScope {
+            val executionContext = ScanExecutionContext.currentOrDefault()
             val responses = ENDPOINTS.map { endpoint ->
                 async {
-                    val dnsRecords = PublicIpClient.resolveDnsRecords(endpoint.url, resolverConfig)
+                    val dnsRecords = PublicIpClient.resolveDnsRecords(
+                        endpoint = endpoint.url,
+                        resolverConfig = resolverConfig,
+                        executionContext = executionContext,
+                    )
                     val result = fetchIpWithRetries(
                         endpoint = endpoint.url,
                         timeoutMs = timeoutMs,
                         resolverConfig = resolverConfig,
+                        addressFamily = endpoint.addressFamily,
                     )
                     val error = result.exceptionOrNull()?.let(::formatError)
                     IpCheckerResponse(
@@ -129,15 +142,24 @@ object IpComparisonChecker {
         endpoint: String,
         timeoutMs: Int,
         resolverConfig: DnsResolverConfig,
+        addressFamily: Class<out InetAddress>? = null,
         maxAttempts: Int = MAX_FETCH_ATTEMPTS,
         retryDelayMs: Long = RETRY_DELAY_MS,
-        fetcher: (String, Int, DnsResolverConfig) -> Result<String> = { url, timeout, resolver ->
-            PublicIpClient.fetchIp(url, timeout, resolverConfig = resolver)
+        fetcher: (String, Int, DnsResolverConfig, Class<out InetAddress>?) -> Result<String> = { url, timeout, resolver, family ->
+            PublicIpClient.fetchIp(
+                endpoint = url,
+                timeoutMs = timeout,
+                resolverConfig = resolver,
+                addressFamily = family,
+                executionContext = ScanExecutionContext.currentOrDefault(),
+            )
         },
     ): Result<String> {
+        val executionContext = ScanExecutionContext.currentOrDefault()
         var lastError: Throwable? = null
         repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
-            val result = fetcher(endpoint, timeoutMs, resolverConfig)
+            executionContext.throwIfCancelled()
+            val result = fetcher(endpoint, timeoutMs, resolverConfig, addressFamily)
             if (result.isSuccess) {
                 return result
             }

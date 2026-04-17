@@ -1,5 +1,8 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.registerSocket
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
@@ -169,20 +172,29 @@ class XrayApiScanner(
             val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
             return override(host, port, retryDeadline)
         }
+        val executionContext = ScanExecutionContext.currentOrDefault()
         val client = clients.getValue(host)
-        client.listOutbounds(port, deadlineMs = grpcDeadlineMs).getOrNull()?.let { return it }
+        client.listOutbounds(port, deadlineMs = grpcDeadlineMs, executionContext = executionContext).getOrNull()?.let { return it }
         val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
-        return client.listOutbounds(port, deadlineMs = retryDeadline).getOrNull()
+        executionContext.throwIfCancelled()
+        return client.listOutbounds(port, deadlineMs = retryDeadline, executionContext = executionContext).getOrNull()
     }
 
     private fun isTcpPortOpen(host: String, port: Int): Boolean {
         isTcpPortOpenOverride?.let { return it(host, port) }
+        val executionContext = ScanExecutionContext.currentOrDefault()
         return try {
             Socket().use { socket ->
-                socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+                val registration = executionContext.cancellationSignal.registerSocket(socket)
+                try {
+                    socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+                } finally {
+                    registration.dispose()
+                }
             }
             true
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            rethrowIfCancellation(error, executionContext)
             false
         }
     }

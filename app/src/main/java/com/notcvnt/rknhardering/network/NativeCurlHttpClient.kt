@@ -1,13 +1,19 @@
 package com.notcvnt.rknhardering.network
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.ScanCancellationSignal
 import com.notcvnt.rknhardering.probe.NativeCurlBridge
+import com.notcvnt.rknhardering.probe.NativeCurlIpResolveMode
 import com.notcvnt.rknhardering.probe.NativeCurlProxyType
 import com.notcvnt.rknhardering.probe.NativeCurlRequest
 import com.notcvnt.rknhardering.probe.NativeCurlResolveRule
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
+import java.util.UUID
 
 internal object NativeCurlHttpClient {
 
@@ -18,8 +24,20 @@ internal object NativeCurlHttpClient {
         return NativeCurlBridge.canExecute()
     }
 
-    fun execute(request: ResolverHttpRequest): ResolverHttpResponse {
-        val nativeResponse = NativeCurlBridge.execute(buildRequest(request))
+    fun execute(
+        request: ResolverHttpRequest,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): ResolverHttpResponse {
+        executionContext.throwIfCancelled()
+        val requestId = "native-http-${UUID.randomUUID()}"
+        val cancellationRegistration = registerNativeCancellation(requestId, executionContext.cancellationSignal)
+        executionContext.throwIfCancelled()
+        val nativeResponse = try {
+            NativeCurlBridge.execute(buildRequest(request), requestId = requestId)
+        } finally {
+            cancellationRegistration.dispose()
+        }
+        executionContext.throwIfCancelled()
         nativeResponse.localError?.takeIf { it.isNotBlank() }?.let { throw IOException(it) }
         nativeResponse.errorBuffer?.takeIf { it.isNotBlank() }?.let { throw IOException(it) }
 
@@ -44,10 +62,17 @@ internal object NativeCurlHttpClient {
             }
         }
 
+        val ipResolveMode = when (request.addressFamily) {
+            Inet4Address::class.java -> NativeCurlIpResolveMode.V4
+            Inet6Address::class.java -> NativeCurlIpResolveMode.V6
+            else -> NativeCurlIpResolveMode.WHATEVER
+        }
+
         return NativeCurlRequest(
             url = request.url,
             interfaceName = (request.binding as? ResolverBinding.OsDeviceBinding)?.interfaceName.orEmpty(),
             resolveRules = buildResolveRules(request, url.host, defaultPort),
+            ipResolveMode = ipResolveMode,
             timeoutMs = request.timeoutMs,
             connectTimeoutMs = request.timeoutMs,
             caBundlePath = NativeCurlBridge.caBundleInfo()?.absolutePath.orEmpty(),
@@ -70,7 +95,13 @@ internal object NativeCurlHttpClient {
         if (request.binding is ResolverBinding.AndroidNetworkBinding) return emptyList()
         if (request.config.mode == DnsResolverMode.SYSTEM) return emptyList()
 
-        val addresses = ResolverNetworkStack.lookup(host, request.config, request.binding)
+        val addresses = ResolverNetworkStack.lookup(
+            hostname = host,
+            config = request.config,
+            binding = request.binding,
+            cancellationSignal = request.cancellationSignal,
+        )
+            .filter { request.addressFamily == null || request.addressFamily.isInstance(it) }
             .mapNotNull { it.hostAddress }
             .distinct()
 
@@ -97,6 +128,15 @@ internal object NativeCurlHttpClient {
             Proxy.Type.HTTP -> NativeCurlProxyType.HTTP
             Proxy.Type.SOCKS -> NativeCurlProxyType.SOCKS5
             else -> NativeCurlProxyType.DIRECT
+        }
+    }
+
+    private fun registerNativeCancellation(
+        requestId: String,
+        cancellationSignal: ScanCancellationSignal,
+    ): ScanCancellationSignal.Registration {
+        return cancellationSignal.register {
+            NativeCurlBridge.cancelRequest(requestId)
         }
     }
 }

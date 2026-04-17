@@ -1,5 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.NativeCurlHttpClient
 import com.notcvnt.rknhardering.network.ResolverBinding
@@ -40,9 +42,12 @@ object PublicIpClient {
         proxy: Proxy? = null,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         binding: ResolverBinding? = null,
+        addressFamily: Class<out InetAddress>? = null,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> {
         fetchIpOverride?.let { return it(endpoint, timeoutMs, proxy, resolverConfig, binding) }
         return try {
+            executionContext.throwIfCancelled()
             val request = ResolverHttpRequest(
                 url = endpoint,
                 method = "GET",
@@ -56,8 +61,11 @@ object PublicIpClient {
                 config = resolverConfig,
                 proxy = proxy,
                 binding = binding,
+                addressFamily = addressFamily,
+                cancellationSignal = executionContext.cancellationSignal,
             )
             val response = executeRequest(request)
+            executionContext.throwIfCancelled()
             val code = response.code
             if (code !in 200..299) {
                 return Result.failure(
@@ -76,6 +84,7 @@ object PublicIpClient {
             }
             Result.success(ip)
         } catch (e: Exception) {
+            rethrowIfCancellation(e, executionContext)
             Result.failure(e)
         }
     }
@@ -119,10 +128,17 @@ object PublicIpClient {
         endpoint: String,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         binding: ResolverBinding? = null,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): DnsRecords {
         return try {
             val host = java.net.URL(endpoint).host
-            val allAddresses = ResolverNetworkStack.lookup(host, resolverConfig, binding)
+            executionContext.throwIfCancelled()
+            val allAddresses = ResolverNetworkStack.lookup(
+                hostname = host,
+                config = resolverConfig,
+                binding = binding,
+                cancellationSignal = executionContext.cancellationSignal,
+            )
             DnsRecords(
                 ipv4Records = allAddresses
                     .filterIsInstance<Inet4Address>()
@@ -133,7 +149,8 @@ object PublicIpClient {
                     .mapNotNull { it.hostAddress }
                     .distinct(),
             )
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            rethrowIfCancellation(error, executionContext)
             DnsRecords()
         }
     }

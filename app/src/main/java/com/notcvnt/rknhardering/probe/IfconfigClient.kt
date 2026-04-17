@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
 import kotlinx.coroutines.Dispatchers
@@ -14,25 +15,28 @@ object IfconfigClient {
     private const val DISABLED_BY_OVERRIDE_MESSAGE = "Disabled by override"
 
     private val ENDPOINTS = listOf(
-        IpEndpointSpec("https://ifconfig.me/ip"),
-        IpEndpointSpec("https://checkip.amazonaws.com"),
-        IpEndpointSpec("https://ip.mail.ru"),
-        IpEndpointSpec("https://api4.ipify.org"),
+        IpEndpointSpec("https://ifconfig.me/ip", IpEndpointFamilyHint.IPV4),
+        IpEndpointSpec("https://checkip.amazonaws.com", IpEndpointFamilyHint.IPV4),
+        IpEndpointSpec("https://ip.mail.ru", IpEndpointFamilyHint.IPV4),
+        IpEndpointSpec("https://api4.ipify.org", IpEndpointFamilyHint.IPV4),
         IpEndpointSpec("https://api6.ipify.org", IpEndpointFamilyHint.IPV6),
     )
 
     suspend fun fetchDirectIp(
         timeoutMs: Int = 7000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> = fetchIpWithFallback(
         timeoutMs = timeoutMs,
         resolverConfig = resolverConfig,
+        executionContext = executionContext,
     )
 
     suspend fun fetchIpViaProxy(
         endpoint: ProxyEndpoint,
         timeoutMs: Int = 7000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> = fetchIpWithFallback(
         timeoutMs = timeoutMs,
         resolverConfig = resolverConfig,
@@ -43,6 +47,7 @@ object IfconfigClient {
             },
             InetSocketAddress(endpoint.host, endpoint.port),
         ),
+        executionContext = executionContext,
     )
 
     suspend fun fetchIpViaNetwork(
@@ -51,12 +56,14 @@ object IfconfigClient {
         timeoutMs: Int = 7000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> = fetchIpViaNetworkComparison(
         primaryBinding = primaryBinding,
         fallbackBinding = fallbackBinding,
         timeoutMs = timeoutMs,
         resolverConfig = resolverConfig,
         modeOverride = modeOverride,
+        executionContext = executionContext,
     ).asResult()
 
     suspend fun fetchIpViaNetworkComparison(
@@ -66,6 +73,7 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
         collectTrace: Boolean = false,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpNetworkComparison = withContext(Dispatchers.IO) {
         val strict = if (modeOverride == TunProbeModeOverride.CURL_COMPATIBLE) {
             PublicIpModeProbeResult(
@@ -80,6 +88,7 @@ object IfconfigClient {
                 resolverConfig = resolverConfig,
                 binding = primaryBinding,
                 collectTrace = collectTrace,
+                executionContext = executionContext,
             )
         }
         val curlCompatible = when {
@@ -94,6 +103,7 @@ object IfconfigClient {
                 resolverConfig = resolverConfig,
                 binding = fallbackBinding,
                 collectTrace = collectTrace,
+                executionContext = executionContext,
             )
             else -> PublicIpModeProbeResult(
                 mode = PublicIpProbeMode.CURL_COMPATIBLE,
@@ -151,12 +161,15 @@ object IfconfigClient {
         proxy: Proxy? = null,
         binding: ResolverBinding? = null,
         fallbackBinding: ResolverBinding.OsDeviceBinding? = null,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> = withContext(Dispatchers.IO) {
+        executionContext.throwIfCancelled()
         val primaryResult = fetchIpForBinding(
             timeoutMs = timeoutMs,
             resolverConfig = resolverConfig,
             proxy = proxy,
             binding = binding,
+            executionContext = executionContext,
         )
 
         if (primaryResult.isSuccess || fallbackBinding == null) {
@@ -168,6 +181,7 @@ object IfconfigClient {
             resolverConfig = resolverConfig,
             proxy = proxy,
             binding = fallbackBinding,
+            executionContext = executionContext,
         )
 
         if (fallbackResult.isSuccess) {
@@ -202,16 +216,28 @@ object IfconfigClient {
         proxy: Proxy? = null,
         binding: ResolverBinding? = null,
         onEndpointResult: ((IpEndpointSpec, Result<String>) -> Unit)? = null,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<String> = fetchFirstSuccessfulIp(ENDPOINTS) { endpoint ->
+        executionContext.throwIfCancelled()
         val result = PublicIpClient.fetchIp(
             endpoint = endpoint.url,
             timeoutMs = timeoutMs,
             proxy = proxy,
             resolverConfig = resolverConfig,
             binding = binding,
+            addressFamily = addressFamilyFor(endpoint.familyHint),
+            executionContext = executionContext,
         )
         onEndpointResult?.invoke(endpoint, result)
         result
+    }
+
+    private fun addressFamilyFor(hint: IpEndpointFamilyHint): Class<out java.net.InetAddress>? {
+        return when (hint) {
+            IpEndpointFamilyHint.IPV4 -> java.net.Inet4Address::class.java
+            IpEndpointFamilyHint.IPV6 -> java.net.Inet6Address::class.java
+            IpEndpointFamilyHint.GENERIC -> null
+        }
     }
 
     private suspend fun fetchModeProbeResult(
@@ -220,6 +246,7 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig,
         binding: ResolverBinding,
         collectTrace: Boolean = false,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpModeProbeResult {
         if (mode == PublicIpProbeMode.CURL_COMPATIBLE && binding is ResolverBinding.OsDeviceBinding) {
             return NativeCurlTransportProbe.fetchModeProbeResult(
@@ -229,6 +256,7 @@ object IfconfigClient {
                 resolverConfig = resolverConfig,
                 binding = binding,
                 collectTrace = collectTrace,
+                executionContext = executionContext,
             )
         }
         val endpointAttempts = if (collectTrace) mutableListOf<TunEndpointAttempt>() else null
@@ -236,6 +264,7 @@ object IfconfigClient {
             timeoutMs = timeoutMs,
             resolverConfig = resolverConfig,
             binding = binding,
+            executionContext = executionContext,
             onEndpointResult = endpointAttempts?.let { attempts ->
                 { endpoint, endpointResult ->
                     attempts += TunEndpointAttempt(

@@ -3,12 +3,18 @@
 #include <curl/curl.h>
 #include <jni.h>
 
+#include <atomic>
 #include <cctype>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace {
 
@@ -24,6 +30,15 @@ struct CurlExecutionResult {
 };
 
 std::once_flag g_curl_init_once;
+std::mutex g_request_states_mutex;
+
+struct NativeCurlCancellationState {
+  std::atomic_bool cancelled{false};
+  std::mutex sockets_mutex;
+  std::unordered_set<curl_socket_t> sockets;
+};
+
+std::unordered_map<std::string, std::shared_ptr<NativeCurlCancellationState>> g_request_states;
 
 void EnsureCurlGlobalInit() {
   std::call_once(g_curl_init_once, []() { curl_global_init(CURL_GLOBAL_DEFAULT); });
@@ -49,6 +64,72 @@ void SetArrayValue(JNIEnv* env, jobjectArray array, jsize index, const std::stri
   jstring string_value = env->NewStringUTF(value.c_str());
   env->SetObjectArrayElement(array, index, string_value);
   env->DeleteLocalRef(string_value);
+}
+
+std::shared_ptr<NativeCurlCancellationState> RegisterCancellationState(const std::string& request_id) {
+  if (request_id.empty()) {
+    return nullptr;
+  }
+  auto state = std::make_shared<NativeCurlCancellationState>();
+  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  g_request_states[request_id] = state;
+  return state;
+}
+
+void UnregisterCancellationState(
+    const std::string& request_id,
+    const std::shared_ptr<NativeCurlCancellationState>& state) {
+  if (request_id.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  auto it = g_request_states.find(request_id);
+  if (it != g_request_states.end() && it->second == state) {
+    g_request_states.erase(it);
+  }
+}
+
+std::shared_ptr<NativeCurlCancellationState> FindCancellationState(const std::string& request_id) {
+  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  auto it = g_request_states.find(request_id);
+  return it != g_request_states.end() ? it->second : nullptr;
+}
+
+void TrackSocket(NativeCurlCancellationState* state, curl_socket_t socket_fd) {
+  if (state == nullptr || socket_fd == CURL_SOCKET_BAD) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(state->sockets_mutex);
+  state->sockets.insert(socket_fd);
+}
+
+bool UntrackSocket(NativeCurlCancellationState* state, curl_socket_t socket_fd) {
+  if (state == nullptr || socket_fd == CURL_SOCKET_BAD) {
+    return false;
+  }
+  std::lock_guard<std::mutex> lock(state->sockets_mutex);
+  return state->sockets.erase(socket_fd) > 0;
+}
+
+void CancelTrackedSockets(const std::shared_ptr<NativeCurlCancellationState>& state) {
+  if (state == nullptr) {
+    return;
+  }
+
+  std::vector<curl_socket_t> sockets_to_close;
+  {
+    std::lock_guard<std::mutex> lock(state->sockets_mutex);
+    sockets_to_close.reserve(state->sockets.size());
+    for (curl_socket_t socket_fd : state->sockets) {
+      sockets_to_close.push_back(socket_fd);
+    }
+    state->sockets.clear();
+  }
+
+  for (curl_socket_t socket_fd : sockets_to_close) {
+    shutdown(socket_fd, SHUT_RDWR);
+    close(socket_fd);
+  }
 }
 
 size_t WriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
@@ -77,6 +158,47 @@ long CurlProxyType(jint mode) {
     default:
       return CURLPROXY_HTTP;
   }
+}
+
+int ProgressCallback(
+    void* clientp,
+    curl_off_t /* dltotal */,
+    curl_off_t /* dlnow */,
+    curl_off_t /* ultotal */,
+    curl_off_t /* ulnow */) {
+  auto* state = static_cast<NativeCurlCancellationState*>(clientp);
+  return state != nullptr && state->cancelled.load() ? 1 : 0;
+}
+
+curl_socket_t OpenSocketCallback(void* clientp, curlsocktype /* purpose */, struct curl_sockaddr* address) {
+  auto* state = static_cast<NativeCurlCancellationState*>(clientp);
+  if (state != nullptr && state->cancelled.load()) {
+    return CURL_SOCKET_BAD;
+  }
+
+  curl_socket_t socket_fd = socket(address->family, address->socktype, address->protocol);
+  if (socket_fd == CURL_SOCKET_BAD) {
+    return CURL_SOCKET_BAD;
+  }
+
+  TrackSocket(state, socket_fd);
+  if (state != nullptr && state->cancelled.load()) {
+    if (UntrackSocket(state, socket_fd)) {
+      shutdown(socket_fd, SHUT_RDWR);
+      close(socket_fd);
+    }
+    return CURL_SOCKET_BAD;
+  }
+
+  return socket_fd;
+}
+
+int CloseSocketCallback(void* clientp, curl_socket_t item) {
+  auto* state = static_cast<NativeCurlCancellationState*>(clientp);
+  if (UntrackSocket(state, item)) {
+    close(item);
+  }
+  return 0;
 }
 
 std::string NormalizeMethod(const std::string& method) {
@@ -116,7 +238,8 @@ CurlExecutionResult ExecuteRequest(
     jint timeout_ms,
     jint connect_timeout_ms,
     const std::string& ca_bundle_path,
-    bool debug_verbose) {
+    bool debug_verbose,
+    const std::string& request_id) {
   CurlExecutionResult result;
 
   if (url.empty()) {
@@ -129,9 +252,11 @@ CurlExecutionResult ExecuteRequest(
   }
 
   EnsureCurlGlobalInit();
+  const auto cancellation_state = RegisterCancellationState(request_id);
 
   CURL* handle = curl_easy_init();
   if (handle == nullptr) {
+    UnregisterCancellationState(request_id, cancellation_state);
     result.local_error = "curl_easy_init failed";
     return result;
   }
@@ -166,6 +291,13 @@ CurlExecutionResult ExecuteRequest(
   curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 2L);
   curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CurlIpResolveMode(ip_resolve_mode));
   curl_easy_setopt(handle, CURLOPT_VERBOSE, debug_verbose ? 1L : 0L);
+  curl_easy_setopt(handle, CURLOPT_NOPROGRESS, 0L);
+  curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, ProgressCallback);
+  curl_easy_setopt(handle, CURLOPT_XFERINFODATA, cancellation_state.get());
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETFUNCTION, OpenSocketCallback);
+  curl_easy_setopt(handle, CURLOPT_OPENSOCKETDATA, cancellation_state.get());
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETFUNCTION, CloseSocketCallback);
+  curl_easy_setopt(handle, CURLOPT_CLOSESOCKETDATA, cancellation_state.get());
   if (!interface_option.empty()) {
     curl_easy_setopt(handle, CURLOPT_INTERFACE, interface_option.c_str());
   }
@@ -213,11 +345,26 @@ CurlExecutionResult ExecuteRequest(
   if (result.error_buffer.empty() && result.curl_code != CURLE_OK) {
     result.error_buffer = curl_easy_strerror(result.curl_code);
   }
+  if (result.curl_code == CURLE_ABORTED_BY_CALLBACK &&
+      cancellation_state != nullptr && cancellation_state->cancelled.load()) {
+    result.local_error = "Request cancelled";
+  }
 
   curl_slist_free_all(header_list);
   curl_slist_free_all(resolve_list);
   curl_easy_cleanup(handle);
+  UnregisterCancellationState(request_id, cancellation_state);
   return result;
+}
+
+jboolean CancelRequestById(const std::string& request_id) {
+  auto state = FindCancellationState(request_id);
+  if (state == nullptr) {
+    return JNI_FALSE;
+  }
+  state->cancelled.store(true);
+  CancelTrackedSockets(state);
+  return JNI_TRUE;
 }
 
 }  // namespace
@@ -237,7 +384,8 @@ jobjectArray ExecuteNativeCurlRequest(
     jint timeout_ms,
     jint connect_timeout_ms,
     jstring ca_bundle_path,
-    jboolean debug_verbose) {
+    jboolean debug_verbose,
+    jstring request_id) {
   std::vector<std::string> parsed_rules;
   std::vector<std::string> parsed_headers;
   if (headers != nullptr) {
@@ -273,7 +421,8 @@ jobjectArray ExecuteNativeCurlRequest(
       timeout_ms,
       connect_timeout_ms,
       JStringToStdString(env, ca_bundle_path),
-      debug_verbose == JNI_TRUE);
+      debug_verbose == JNI_TRUE,
+      JStringToStdString(env, request_id));
 
   jclass string_class = env->FindClass("java/lang/String");
   jobjectArray output = env->NewObjectArray(kResultSize, string_class, nullptr);
@@ -303,7 +452,8 @@ Java_com_notcvnt_rknhardering_probe_NativeCurlBridge_nativeExecuteRaw(
     jint timeout_ms,
     jint connect_timeout_ms,
     jstring ca_bundle_path,
-    jboolean debug_verbose) {
+    jboolean debug_verbose,
+    jstring request_id) {
   return ExecuteNativeCurlRequest(
       env,
       url,
@@ -319,5 +469,14 @@ Java_com_notcvnt_rknhardering_probe_NativeCurlBridge_nativeExecuteRaw(
       timeout_ms,
       connect_timeout_ms,
       ca_bundle_path,
-      debug_verbose);
+      debug_verbose,
+      request_id);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_notcvnt_rknhardering_probe_NativeCurlBridge_nativeCancelRequest(
+    JNIEnv* env,
+    jobject /* this */,
+    jstring request_id) {
+  return CancelRequestById(JStringToStdString(env, request_id));
 }
