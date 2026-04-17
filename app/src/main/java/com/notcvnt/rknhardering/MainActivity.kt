@@ -11,13 +11,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.AttrRes
+import androidx.annotation.ColorRes
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -37,6 +38,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.notcvnt.rknhardering.checker.BypassChecker
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.CheckSettings
@@ -59,6 +61,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -196,6 +199,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRunCheck: MaterialButton
     private lateinit var btnStopCheck: MaterialButton
     private lateinit var btnCopyDiagnostics: MaterialButton
+    private lateinit var btnExport: MaterialButton
+    private lateinit var resultActionsContainer: LinearLayout
     private lateinit var cardRunCheckNotice: MaterialCardView
     private lateinit var resultsScrollView: TouchAwareScrollView
     private lateinit var textCheckStatus: TextView
@@ -266,6 +271,7 @@ class MainActivity : AppCompatActivity() {
     private var activeCheckPrivacyMode = false
     private var activeCheckSettings: CheckSettings? = null
     private var retainedDiagnosticsSnapshot: RetainedDiagnosticsSnapshot? = null
+    private var completedExportSnapshot: CompletedExportSnapshot? = null
     private var isVerdictDetailsExpanded = false
 
     private val prefs by lazy { AppUiSettings.prefs(this) }
@@ -275,6 +281,18 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         markPermissionsRequested(result.keys)
         prefs.edit { putBoolean(PREF_RATIONALE_SHOWN, true) }
+    }
+
+    private val exportMarkdownLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument(ExportFormat.MARKDOWN.mimeType),
+    ) { uri ->
+        writeExportDocument(uri, ExportFormat.MARKDOWN)
+    }
+
+    private val exportJsonLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
+    ) { uri ->
+        writeExportDocument(uri, ExportFormat.JSON)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -302,6 +320,7 @@ class MainActivity : AppCompatActivity() {
         btnRunCheck.setOnClickListener { onRunCheckClicked() }
         btnStopCheck.setOnClickListener { viewModel.cancelScan() }
         btnCopyDiagnostics.setOnClickListener { copyTunProbeDiagnostics() }
+        btnExport.setOnClickListener { showExportFormatDialog() }
         observeScanEvents()
 
         if (intent.getBooleanExtra(SettingsActivity.EXTRA_REQUEST_PERMISSIONS, false)) {
@@ -321,7 +340,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateCopyDiagnosticsVisibility()
+        updateResultActionButtonsVisibility()
     }
 
     private fun bindViews() {
@@ -329,6 +348,8 @@ class MainActivity : AppCompatActivity() {
         btnRunCheck = findViewById(R.id.btnRunCheck)
         btnStopCheck = findViewById(R.id.btnStopCheck)
         btnCopyDiagnostics = findViewById(R.id.btnCopyDiagnostics)
+        btnExport = findViewById(R.id.btnExport)
+        resultActionsContainer = findViewById(R.id.resultActionsContainer)
         cardRunCheckNotice = findViewById(R.id.cardRunCheckNotice)
         textCheckStatus = findViewById(R.id.textCheckStatus)
         cardGeoIp = findViewById(R.id.cardGeoIp)
@@ -382,7 +403,7 @@ class MainActivity : AppCompatActivity() {
         btnVerdictDetails.setOnClickListener { toggleVerdictDetails() }
         setupResultsScrollTracking()
         updateCheckControls(isRunning = false)
-        updateCopyDiagnosticsVisibility()
+        updateResultActionButtonsVisibility()
     }
 
     private fun setupResultsScrollTracking() {
@@ -511,6 +532,103 @@ class MainActivity : AppCompatActivity() {
         runCheck()
     }
 
+    private fun showExportFormatDialog() {
+        if (completedExportSnapshot == null) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.main_export_title)
+            .setPositiveButton(R.string.main_export_markdown) { _, _ ->
+                onExportFormatSelected(ExportFormat.MARKDOWN)
+            }
+            .setNegativeButton(R.string.main_export_json) { _, _ ->
+                onExportFormatSelected(ExportFormat.JSON)
+            }
+            .setNeutralButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun onExportFormatSelected(format: ExportFormat) {
+        if (isDebugClipboardExportEnabled()) {
+            showExportActionDialog(format)
+        } else {
+            launchExport(format)
+        }
+    }
+
+    private fun showExportActionDialog(format: ExportFormat) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(
+                when (format) {
+                    ExportFormat.MARKDOWN -> R.string.main_export_markdown
+                    ExportFormat.JSON -> R.string.main_export_json
+                },
+            )
+            .setPositiveButton(R.string.main_export_save_file) { _, _ ->
+                launchExport(format)
+            }
+            .setNegativeButton(R.string.main_export_copy_to_clipboard) { _, _ ->
+                copyExportToClipboard(format)
+            }
+            .setNeutralButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun launchExport(format: ExportFormat) {
+        val snapshot = completedExportSnapshot ?: return
+        val defaultFileName = buildDefaultExportFileName(format, snapshot.finishedAtMillis)
+        when (format) {
+            ExportFormat.MARKDOWN -> exportMarkdownLauncher.launch(defaultFileName)
+            ExportFormat.JSON -> exportJsonLauncher.launch(defaultFileName)
+        }
+    }
+
+    private fun copyExportToClipboard(format: ExportFormat) {
+        val snapshot = completedExportSnapshot ?: return
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val labelResId = when (format) {
+            ExportFormat.MARKDOWN -> R.string.main_export_markdown
+            ExportFormat.JSON -> R.string.main_export_json
+        }
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText(
+                getString(labelResId),
+                buildExportContent(snapshot, format),
+            ),
+        )
+        Toast.makeText(this, R.string.main_export_copied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun writeExportDocument(uri: Uri?, format: ExportFormat) {
+        val targetUri = uri ?: return
+        val snapshot = completedExportSnapshot ?: return
+        val content = buildExportContent(snapshot, format)
+        val exportResult = runCatching {
+            contentResolver.openOutputStream(targetUri)?.use { outputStream ->
+                outputStream.writer(Charsets.UTF_8).use { writer ->
+                    writer.write(content)
+                }
+            } ?: throw IOException("Unable to open export destination")
+        }
+        if (exportResult.isSuccess) {
+            Toast.makeText(this, R.string.main_export_saved, Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, R.string.main_export_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun buildExportContent(
+        snapshot: CompletedExportSnapshot,
+        format: ExportFormat,
+    ): String {
+        return when (format) {
+            ExportFormat.MARKDOWN -> CheckResultMarkdownExportFormatter.format(this, snapshot)
+            ExportFormat.JSON -> CheckResultJsonExportFormatter.format(this, snapshot)
+        }
+    }
+
+    private fun isDebugClipboardExportEnabled(): Boolean {
+        return prefs.getBoolean(SettingsActivity.PREF_TUN_PROBE_DEBUG_ENABLED, false)
+    }
+
     private fun updateRunCheckNoticeVisibility() {
         cardRunCheckNotice.visibility = if (hasDismissedRunCheckNotice) View.GONE else View.VISIBLE
     }
@@ -547,6 +665,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkStatusStopped(): String = getString(R.string.main_check_stopped)
 
+    private fun themedContext(): android.content.Context = resultsScrollView.context
+
+    private fun themeColor(@AttrRes attrRes: Int, @ColorRes fallbackColorRes: Int): Int {
+        return MaterialColors.getColor(
+            resultsScrollView,
+            attrRes,
+            ContextCompat.getColor(themedContext(), fallbackColorRes),
+        )
+    }
+
+    private fun surfaceColor(): Int =
+        themeColor(com.google.android.material.R.attr.colorSurface, R.color.md_surface)
+
+    private fun onSurfaceColor(): Int =
+        themeColor(com.google.android.material.R.attr.colorOnSurface, R.color.md_on_surface)
+
+    private fun onSurfaceVariantColor(): Int =
+        themeColor(
+            com.google.android.material.R.attr.colorOnSurfaceVariant,
+            R.color.md_on_surface_variant,
+        )
+
+    private fun outlineVariantColor(): Int =
+        themeColor(com.google.android.material.R.attr.colorOutlineVariant, R.color.md_outline_variant)
+
     private fun updateCheckStatus(message: String?) {
         textCheckStatus.text = message.orEmpty()
         textCheckStatus.visibility = if (message.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -557,6 +700,22 @@ class MainActivity : AppCompatActivity() {
         val canShow = retainedDiagnosticsSnapshot != null &&
             debugEnabled
         btnCopyDiagnostics.visibility = if (canShow) View.VISIBLE else View.GONE
+    }
+
+    private fun updateExportVisibility() {
+        btnExport.visibility = if (completedExportSnapshot != null) View.VISIBLE else View.GONE
+    }
+
+    private fun updateResultActionButtonsVisibility() {
+        updateCopyDiagnosticsVisibility()
+        updateExportVisibility()
+        resultActionsContainer.visibility = if (
+            btnCopyDiagnostics.visibility == View.VISIBLE || btnExport.visibility == View.VISIBLE
+        ) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
     }
 
     private fun copyTunProbeDiagnostics() {
@@ -575,7 +734,7 @@ class MainActivity : AppCompatActivity() {
         )
         viewModel.markCompletedDiagnosticsConsumed()
         retainedDiagnosticsSnapshot = null
-        updateCopyDiagnosticsVisibility()
+        updateResultActionButtonsVisibility()
         Toast.makeText(this, R.string.main_diagnostics_copied, Toast.LENGTH_SHORT).show()
     }
 
@@ -667,6 +826,7 @@ class MainActivity : AppCompatActivity() {
         activeCheckPrivacyMode = privacyMode
         activeCheckSettings = settings
         retainedDiagnosticsSnapshot = null
+        completedExportSnapshot = null
         hasUserScrolledManually = false
         userTouchScrollInProgress = false
         isAutoScrollInProgress = false
@@ -677,7 +837,7 @@ class MainActivity : AppCompatActivity() {
         resetBypassProgress()
         clearStageContent()
         showAllLoadingCardsNow(settings)
-        updateCopyDiagnosticsVisibility()
+        updateResultActionButtonsVisibility()
     }
 
     private fun showAllLoadingCardsNow(settings: CheckSettings) {
@@ -699,12 +859,16 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     null
                 }
+                completedExportSnapshot = createCompletedExportSnapshot(
+                    result = event.result,
+                    privacyMode = event.privacyMode,
+                )
                 activeCheckSettings = null
                 ensureCardVisible(cardVerdict, shouldAutoScroll = animate)
                 displayVerdict(event.result, event.privacyMode)
                 if (animate) animateContentReveal(iconVerdict, textVerdict, textVerdictExplanation, btnVerdictDetails)
                 stopLoadingStatusAnimation()
-                updateCopyDiagnosticsVisibility()
+                updateResultActionButtonsVisibility()
             }
             is ScanEvent.Cancelled -> {
                 activeCheckSettings = null
@@ -714,7 +878,7 @@ class MainActivity : AppCompatActivity() {
                 stopLoadingStatusAnimation()
                 updateCheckStatus(getString(R.string.main_check_stopped))
                 markLoadingStagesCancelled()
-                updateCopyDiagnosticsVisibility()
+                updateResultActionButtonsVisibility()
             }
         }
     }
@@ -1070,7 +1234,7 @@ class MainActivity : AppCompatActivity() {
     private fun bindCardLoadingState(stage: RunningStage, icon: ImageView, status: TextView) {
         icon.setImageResource(R.drawable.ic_help)
         status.text = stageLoadingStatusBase(stage)
-        status.setTextColor(ContextCompat.getColor(this, R.color.md_on_surface_variant))
+        status.setTextColor(onSurfaceVariantColor())
     }
 
     private fun syncLoadingStatusAnimation() {
@@ -1227,12 +1391,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createLoadingHintView(message: String): View {
-        return TextView(this).apply {
+        return TextView(themedContext()).apply {
             text = message
             textSize = 13f
             setLineSpacing(2.dp.toFloat(), 1f)
             setPadding(0, 8.dp, 0, 2.dp)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
     }
 
@@ -1358,13 +1522,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
-        val row = LinearLayout(this).apply {
+        val row = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 4.dp, 0, 4.dp)
         }
 
-        val indicator = TextView(this).apply {
+        val indicator = TextView(themedContext()).apply {
             text = when {
                 finding.detected -> "\u26A0"
                 finding.needsReview -> "?"
@@ -1372,7 +1536,7 @@ class MainActivity : AppCompatActivity() {
             }
             setTextColor(
                 ContextCompat.getColor(
-                    this@MainActivity,
+                    themedContext(),
                     when {
                         finding.detected -> R.color.finding_detected
                         finding.needsReview -> R.color.verdict_yellow
@@ -1386,12 +1550,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
-        val description = TextView(this).apply {
+        val description = TextView(themedContext()).apply {
             text = wrapForDisplay(descriptionText)
             textSize = 13f
-            val tv = TypedValue()
-            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
-            setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             textDirection = View.TEXT_DIRECTION_LOCALE
             textAlignment = View.TEXT_ALIGNMENT_VIEW_START
@@ -1404,19 +1566,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun createInfoView(label: String, value: String): View {
         val rtl = isRtlLayout()
-        val row = LinearLayout(this).apply {
+        val row = LinearLayout(themedContext()).apply {
             orientation = if (rtl) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
             gravity = if (rtl) Gravity.END else Gravity.CENTER_VERTICAL
             setPadding(0, 4.dp, 0, if (rtl) 6.dp else 4.dp)
         }
 
-        val labelView = TextView(this).apply {
+        val labelView = TextView(themedContext()).apply {
             text = wrapForDisplay(label)
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             isAllCaps = !rtl
             letterSpacing = 0.05f
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
             layoutParams = if (rtl) {
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1429,16 +1591,10 @@ class MainActivity : AppCompatActivity() {
             textAlignment = if (rtl) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
         }
 
-        val valueView = TextView(this).apply {
+        val valueView = TextView(themedContext()).apply {
             text = wrapForDisplay(value)
             textSize = 13f
-            val tv = TypedValue()
-            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
-            if (tv.resourceId != 0) {
-                setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
-            } else if (tv.type >= TypedValue.TYPE_FIRST_COLOR_INT && tv.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                setTextColor(tv.data)
-            }
+            setTextColor(onSurfaceColor())
             layoutParams = if (rtl) {
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1489,7 +1645,7 @@ class MainActivity : AppCompatActivity() {
         expanded: Boolean,
         privacyMode: Boolean = false,
     ): View {
-        val card = MaterialCardView(this).apply {
+        val card = MaterialCardView(themedContext()).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -1498,50 +1654,50 @@ class MainActivity : AppCompatActivity() {
             }
             radius = 14.dp.toFloat()
             strokeWidth = 1.dp
-            strokeColor = ContextCompat.getColor(this@MainActivity, R.color.md_outline_variant)
-            setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_surface))
+            strokeColor = outlineVariantColor()
+            setCardBackgroundColor(surfaceColor())
         }
 
-        val container = LinearLayout(this).apply {
+        val container = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(12.dp, 12.dp, 12.dp, 12.dp)
         }
 
-        val header = LinearLayout(this).apply {
+        val header = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val title = TextView(this).apply {
+        val title = TextView(themedContext()).apply {
             text = group.title
             textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        val status = TextView(this).apply {
+        val status = TextView(themedContext()).apply {
             text = group.statusLabel
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(this@MainActivity, statusColorRes(group.detected, group.needsReview)))
+            setTextColor(ContextCompat.getColor(themedContext(), statusColorRes(group.detected, group.needsReview)))
         }
 
-        val toggle = TextView(this).apply {
+        val toggle = TextView(themedContext()).apply {
             text = if (expanded) "▼" else "▶"
             textSize = 12f
             setPadding(8.dp, 0, 0, 0)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
 
-        val summary = TextView(this).apply {
+        val summary = TextView(themedContext()).apply {
             text = if (privacyMode) maskIpsInText(group.summary) else group.summary
             textSize = 13f
             setPadding(0, 6.dp, 0, 0)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
 
-        val details = LinearLayout(this).apply {
+        val details = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.VERTICAL
             visibility = if (expanded) View.VISIBLE else View.GONE
             setPadding(0, 8.dp, 0, 0)
@@ -1570,42 +1726,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(this).apply {
+        val container = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 8.dp, 0, 8.dp)
         }
 
-        val topRow = LinearLayout(this).apply {
+        val topRow = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val label = TextView(this).apply {
+        val label = TextView(themedContext()).apply {
             text = response.label
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val displayIp = if (privacyMode && response.ip != null) maskIp(response.ip) else response.ip
-        val value = TextView(this).apply {
+        val value = TextView(themedContext()).apply {
             text = displayIp ?: getString(R.string.main_card_status_error)
             textSize = 13f
             typeface = Typeface.MONOSPACE
             setTextColor(
                 ContextCompat.getColor(
-                    this@MainActivity,
+                    themedContext(),
                     if (response.ip != null) R.color.status_green else R.color.status_amber,
                 ),
             )
         }
 
-        val url = TextView(this).apply {
+        val url = TextView(themedContext()).apply {
             text = response.url
             textSize = 12f
             setPadding(0, 4.dp, 0, 0)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
 
         topRow.addView(label)
@@ -1615,7 +1771,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!response.error.isNullOrBlank()) {
             container.addView(
-                TextView(this).apply {
+                TextView(themedContext()).apply {
                     text = buildString {
                         if (response.ignoredIpv6Error) {
                             append(getString(R.string.main_ipv6_error_ignored))
@@ -1625,10 +1781,11 @@ class MainActivity : AppCompatActivity() {
                     textSize = 12f
                     setPadding(0, 2.dp, 0, 0)
                     setTextColor(
-                        ContextCompat.getColor(
-                            this@MainActivity,
-                            if (response.ignoredIpv6Error) R.color.md_on_surface_variant else R.color.status_amber,
-                        ),
+                        if (response.ignoredIpv6Error) {
+                            onSurfaceVariantColor()
+                        } else {
+                            ContextCompat.getColor(themedContext(), R.color.status_amber)
+                        },
                     )
                 },
             )
@@ -1638,21 +1795,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(this).apply {
+        val container = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 8.dp, 0, 8.dp)
         }
 
-        val topRow = LinearLayout(this).apply {
+        val topRow = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        val label = TextView(this).apply {
+        val label = TextView(themedContext()).apply {
             text = response.targetLabel
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
@@ -1662,13 +1819,13 @@ class MainActivity : AppCompatActivity() {
             response.error != null -> getString(R.string.main_card_status_error)
             else -> getString(R.string.main_card_status_clean)
         }
-        val value = TextView(this).apply {
+        val value = TextView(themedContext()).apply {
             text = valueText
             textSize = 13f
             typeface = Typeface.MONOSPACE
             setTextColor(
                 ContextCompat.getColor(
-                    this@MainActivity,
+                    themedContext(),
                     when {
                         response.ip != null -> R.color.status_red
                         response.error != null -> R.color.status_amber
@@ -1678,11 +1835,11 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        val url = TextView(this).apply {
+        val url = TextView(themedContext()).apply {
             text = response.url
             textSize = 12f
             setPadding(0, 4.dp, 0, 0)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
 
         topRow.addView(label)
@@ -1702,11 +1859,11 @@ class MainActivity : AppCompatActivity() {
 
         if (!response.error.isNullOrBlank()) {
             container.addView(
-                TextView(this).apply {
+                TextView(themedContext()).apply {
                     text = maskInfoValue(response.error, privacyMode)
                     textSize = 12f
                     setPadding(0, 2.dp, 0, 0)
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_amber))
+                    setTextColor(ContextCompat.getColor(themedContext(), R.color.status_amber))
                 },
             )
         }
@@ -1752,7 +1909,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createCallTransportLeakView(leak: CallTransportLeakResult, privacyMode: Boolean): View {
-        val container = LinearLayout(this).apply {
+        val container = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 4.dp, 0, 4.dp)
         }
@@ -1774,18 +1931,18 @@ class MainActivity : AppCompatActivity() {
             CallTransportService.WHATSAPP -> "WhatsApp"
         }
         val statusColor = when (leak.status) {
-            CallTransportStatus.BASELINE -> R.color.status_green
-            CallTransportStatus.NEEDS_REVIEW -> R.color.status_amber
-            CallTransportStatus.ERROR -> R.color.status_amber
-            CallTransportStatus.NO_SIGNAL -> R.color.md_on_surface_variant
-            CallTransportStatus.UNSUPPORTED -> R.color.md_on_surface_variant
+            CallTransportStatus.BASELINE -> ContextCompat.getColor(themedContext(), R.color.status_green)
+            CallTransportStatus.NEEDS_REVIEW -> ContextCompat.getColor(themedContext(), R.color.status_amber)
+            CallTransportStatus.ERROR -> ContextCompat.getColor(themedContext(), R.color.status_amber)
+            CallTransportStatus.NO_SIGNAL -> onSurfaceVariantColor()
+            CallTransportStatus.UNSUPPORTED -> onSurfaceVariantColor()
         }
 
-        val headerRow = LinearLayout(this).apply {
+        val headerRow = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val indicator = TextView(this).apply {
+        val indicator = TextView(themedContext()).apply {
             text = when (leak.status) {
                 CallTransportStatus.BASELINE -> "\u2713"
                 CallTransportStatus.NEEDS_REVIEW -> "?"
@@ -1793,17 +1950,15 @@ class MainActivity : AppCompatActivity() {
                 CallTransportStatus.NO_SIGNAL -> "\u2014"
                 CallTransportStatus.UNSUPPORTED -> "\u2014"
             }
-            setTextColor(ContextCompat.getColor(this@MainActivity, statusColor))
+            setTextColor(statusColor)
             textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setPadding(0, 0, 8.dp, 0)
         }
-        val headerText = TextView(this).apply {
+        val headerText = TextView(themedContext()).apply {
             text = "$serviceLabel \u00B7 $pathLabel \u00B7 $statusLabel"
             textSize = 13f
-            val tv = android.util.TypedValue()
-            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
-            setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         headerRow.addView(indicator)
@@ -1811,15 +1966,16 @@ class MainActivity : AppCompatActivity() {
         container.addView(headerRow)
 
         formatCallTransportReason(this, leak, privacyMode)?.let { reason ->
-            val reasonColor = when (leak.status) {
-                CallTransportStatus.ERROR -> R.color.status_amber
-                else -> R.color.md_on_surface_variant
+            val reasonColor = if (leak.status == CallTransportStatus.ERROR) {
+                ContextCompat.getColor(themedContext(), R.color.status_amber)
+            } else {
+                onSurfaceVariantColor()
             }
-            container.addView(TextView(this).apply {
+            container.addView(TextView(themedContext()).apply {
                 text = reason
                 textSize = 12f
                 setPadding(22.dp, 2.dp, 0, 0)
-                setTextColor(ContextCompat.getColor(this@MainActivity, reasonColor))
+                setTextColor(reasonColor)
             })
         }
 
@@ -1972,7 +2128,7 @@ class MainActivity : AppCompatActivity() {
 
         if (verdictDetailsContent.isNotEmpty()) {
             verdictDetailsContent.addView(
-                View(this).apply {
+                View(themedContext()).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         1.dp,
@@ -1980,7 +2136,7 @@ class MainActivity : AppCompatActivity() {
                         topMargin = 12.dp
                         bottomMargin = 12.dp
                     }
-                    setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_outline_variant))
+                    setBackgroundColor(outlineVariantColor())
                     alpha = 0.7f
                 },
             )
@@ -1991,42 +2147,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createVerdictSectionTitleView(title: String): View {
-        return TextView(this).apply {
+        return TextView(themedContext()).apply {
             text = title
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             isAllCaps = true
             letterSpacing = 0.05f
             setPadding(0, 0, 0, 6.dp)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
     }
 
     private fun createVerdictBulletView(text: String): View {
-        val row = LinearLayout(this).apply {
+        val row = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 4.dp, 0, 4.dp)
         }
 
-        val bullet = TextView(this).apply {
+        val bullet = TextView(themedContext()).apply {
             this.text = "•"
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 0, 8.dp, 0)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_variant))
+            setTextColor(onSurfaceVariantColor())
         }
 
-        val body = TextView(this).apply {
+        val body = TextView(themedContext()).apply {
             this.text = text
             textSize = 13f
             setLineSpacing(2.dp.toFloat(), 1f)
-            val tv = TypedValue()
-            this@MainActivity.theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
-            if (tv.resourceId != 0) {
-                setTextColor(ContextCompat.getColor(this@MainActivity, tv.resourceId))
-            } else if (tv.type >= TypedValue.TYPE_FIRST_COLOR_INT && tv.type <= TypedValue.TYPE_LAST_COLOR_INT) {
-                setTextColor(tv.data)
-            }
+            setTextColor(onSurfaceColor())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
