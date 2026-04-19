@@ -323,7 +323,7 @@ class VpnCheckRunnerTest {
 
     @Test
     fun `cancelled execution does not emit late updates`() = runBlocking {
-        val started = CountDownLatch(5)
+        val started = CountDownLatch(6)
         val release = CountDownLatch(1)
         val updates = mutableListOf<CheckUpdate>()
         val executionContext = ScanExecutionContext(scanId = 42L)
@@ -355,6 +355,10 @@ class VpnCheckRunnerTest {
             locationCheck = { _, _, _ ->
                 awaitRelease()
                 category("location")
+            },
+            nativeCheck = { _ ->
+                awaitRelease()
+                category("native")
             },
             bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")

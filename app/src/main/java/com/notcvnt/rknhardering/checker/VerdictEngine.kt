@@ -21,6 +21,14 @@ object VerdictEngine {
         EvidenceSource.ROUTING,
         EvidenceSource.DNS,
         EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+        EvidenceSource.NATIVE_INTERFACE,
+        EvidenceSource.NATIVE_ROUTE,
+        EvidenceSource.NATIVE_JVM_MISMATCH,
+    )
+
+    private val NATIVE_REVIEW_SOURCES = setOf(
+        EvidenceSource.NATIVE_HOOK_MARKERS,
+        EvidenceSource.NATIVE_LIBRARY_INTEGRITY,
     )
 
     fun evaluate(
@@ -29,10 +37,16 @@ object VerdictEngine {
         indirectSigns: CategoryResult,
         locationSignals: CategoryResult,
         bypassResult: BypassResult,
+        nativeSigns: CategoryResult = CategoryResult(
+            name = "",
+            detected = false,
+            findings = emptyList(),
+        ),
     ): Verdict {
         val directEvidence = directSigns.evidence.filter { it.detected }
         val indirectEvidence = indirectSigns.evidence.filter { it.detected }
         val bypassEvidence = bypassResult.evidence.filter { it.detected }
+        val nativeEvidence = nativeSigns.evidence.filter { it.detected }
 
         if (bypassEvidence.any { it.source == EvidenceSource.SPLIT_TUNNEL_BYPASS }) {
             return Verdict.DETECTED
@@ -61,7 +75,10 @@ object VerdictEngine {
 
         val geoMatrixHit = foreignGeoSignal
         val directMatrixHit = directEvidence.any { it.source in MATRIX_DIRECT_SOURCES }
-        val indirectMatrixHit = indirectEvidence.any { it.source in MATRIX_INDIRECT_SOURCES }
+        val indirectMatrixHit =
+            indirectEvidence.any { it.source in MATRIX_INDIRECT_SOURCES } ||
+                nativeEvidence.any { it.source in MATRIX_INDIRECT_SOURCES }
+        val nativeReviewHit = nativeEvidence.any { it.source in NATIVE_REVIEW_SOURCES }
 
         val matrixVerdict = when {
             !geoMatrixHit && !directMatrixHit && !indirectMatrixHit -> Verdict.NOT_DETECTED
@@ -80,6 +97,9 @@ object VerdictEngine {
             return Verdict.NEEDS_REVIEW
         }
         if (hasActionableCallTransportLeak && matrixVerdict == Verdict.NOT_DETECTED) {
+            return Verdict.NEEDS_REVIEW
+        }
+        if (nativeReviewHit && matrixVerdict == Verdict.NOT_DETECTED) {
             return Verdict.NEEDS_REVIEW
         }
 

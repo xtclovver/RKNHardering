@@ -41,6 +41,7 @@ sealed interface CheckUpdate {
     data class DirectSignsReady(val result: CategoryResult) : CheckUpdate
     data class IndirectSignsReady(val result: CategoryResult) : CheckUpdate
     data class LocationSignalsReady(val result: CategoryResult) : CheckUpdate
+    data class NativeSignsReady(val result: CategoryResult) : CheckUpdate
     data class BypassProgress(val progress: BypassChecker.Progress) : CheckUpdate
     data class BypassReady(val result: BypassResult) : CheckUpdate
     data class VerdictReady(val verdict: Verdict) : CheckUpdate
@@ -88,6 +89,8 @@ object VpnCheckRunner {
                     resolverConfig = resolverConfig,
                 )
             },
+        val nativeCheck: suspend (Context) -> CategoryResult =
+            { ctx -> NativeSignsChecker.check(ctx) },
         val bypassCheck: suspend (
             Context,
             DnsResolverConfig,
@@ -168,6 +171,9 @@ object VpnCheckRunner {
         val locationDeferred = async {
             dependencies.locationCheck(context, settings.networkRequestsEnabled, settings.resolverConfig)
         }
+        val nativeDeferred = async(Dispatchers.IO) {
+            dependencies.nativeCheck(context)
+        }
         val bypassEnabled = settings.splitTunnelEnabled
         val bypassDeferred = if (bypassEnabled) {
             async {
@@ -231,6 +237,12 @@ object VpnCheckRunner {
                 onUpdate?.invoke(CheckUpdate.LocationSignalsReady(result))
             }
         }
+        val nativeReadyDeferred = async {
+            nativeDeferred.await().also { result ->
+                executionContext.throwIfCancelled()
+                onUpdate?.invoke(CheckUpdate.NativeSignsReady(result))
+            }
+        }
         val bypassReadyDeferred = bypassDeferred?.let { deferred ->
             async {
                 deferred.await().also { result ->
@@ -278,6 +290,7 @@ object VpnCheckRunner {
         val directSigns = directReadyDeferred.await()
         val indirectSigns = indirectReadyDeferred.await()
         val locationSignals = locationReadyDeferred.await()
+        val nativeSigns = nativeReadyDeferred.await()
         val bypassResult = bypassReadyDeferred?.await() ?: emptyBypass
         val tunProbeResult = tunActiveProbeDeferred?.await()
 
@@ -288,6 +301,7 @@ object VpnCheckRunner {
             indirectSigns = indirectSigns,
             locationSignals = locationSignals,
             bypassResult = bypassResult,
+            nativeSigns = nativeSigns,
         )
         executionContext.throwIfCancelled()
         onUpdate?.invoke(CheckUpdate.VerdictReady(verdict))
@@ -302,6 +316,7 @@ object VpnCheckRunner {
             bypassResult = bypassResult,
             verdict = verdict,
             tunProbeDiagnostics = tunProbeResult?.tunProbeDiagnostics,
+            nativeSigns = nativeSigns,
         )
     }
     }

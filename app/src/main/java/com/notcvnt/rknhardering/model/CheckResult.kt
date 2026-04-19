@@ -33,6 +33,12 @@ enum class EvidenceSource {
     TELEGRAM_CALL_TRANSPORT,
     WHATSAPP_CALL_TRANSPORT,
     STUN_PROBE,
+    NATIVE_INTERFACE,
+    NATIVE_ROUTE,
+    NATIVE_SOCKET,
+    NATIVE_HOOK_MARKERS,
+    NATIVE_JVM_MISMATCH,
+    NATIVE_LIBRARY_INTEGRITY,
 }
 
 enum class StunScope {
@@ -304,4 +310,9 @@ data class CheckResult(
     val bypassResult: BypassResult,
     val verdict: Verdict,
     val tunProbeDiagnostics: TunProbeDiagnostics? = null,
+    val nativeSigns: CategoryResult = CategoryResult(
+        name = "",
+        detected = false,
+        findings = emptyList(),
+    ),
 )

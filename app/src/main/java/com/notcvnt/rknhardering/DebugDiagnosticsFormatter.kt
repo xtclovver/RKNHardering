@@ -16,8 +16,11 @@ import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.LocalProxyCheckResult
 import com.notcvnt.rknhardering.model.MatchedVpnApp
+import com.notcvnt.rknhardering.probe.NativeInterfaceProbe
+import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayOutboundSummary
+import java.net.NetworkInterface
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,6 +57,8 @@ object DebugDiagnosticsFormatter {
         appendCategory(builder, "indirectSigns", result.indirectSigns)
         appendCategory(builder, "locationSignals", result.locationSignals)
         appendBypass(builder, result.bypassResult)
+        appendCategory(builder, "nativeSigns", result.nativeSigns)
+        appendNativeSignsRaw(builder, privacyMode)
 
         builder.appendLine()
         builder.appendLine("[tunProbe]")
@@ -66,6 +71,259 @@ object DebugDiagnosticsFormatter {
             builder.appendLine()
         }
         return builder.toString().trimEnd()
+    }
+
+    private fun appendNativeSignsRaw(builder: StringBuilder, privacyMode: Boolean) {
+        builder.appendLine()
+        builder.appendLine("[nativeSigns.raw]")
+        val loaded = runCatching { NativeSignsBridge.isLibraryLoaded() }.getOrDefault(false)
+        builder.appendLine("libraryLoaded: $loaded")
+        if (!loaded) {
+            return
+        }
+
+        builder.appendLine("-- ifconfig-like dump (getifaddrs + /sys/class/net) --")
+        val dump = runCatching { NativeSignsBridge.interfaceDump() }.getOrDefault(emptyArray())
+        if (dump.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            dump.forEach { block ->
+                builder.appendLine(maskInterfaceDumpBlock(block.trimEnd()))
+                builder.appendLine()
+            }
+        }
+
+        builder.appendLine("-- getifaddrs() rows (pipe-delimited) --")
+        val rows = runCatching { NativeSignsBridge.getIfAddrs() }.getOrDefault(emptyArray())
+        if (rows.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            rows.forEach { row -> builder.appendLine(maskIfAddrsRow(row)) }
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- Routes via AF_NETLINK NETLINK_ROUTE RTM_GETROUTE (IPv4+IPv6) --")
+        val nlRoutes = runCatching { NativeSignsBridge.netlinkRouteDump(0) }.getOrDefault(emptyArray())
+        if (nlRoutes.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            nlRoutes.forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- TCP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv4) --")
+        val nlTcp4 = runCatching { NativeSignsBridge.netlinkSockDiag(2, 6) }.getOrDefault(emptyArray())
+        if (nlTcp4.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            nlTcp4.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
+            if (nlTcp4.size > 60) builder.appendLine("... (${nlTcp4.size - 60} more truncated)")
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- TCP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv6) --")
+        val nlTcp6 = runCatching { NativeSignsBridge.netlinkSockDiag(10, 6) }.getOrDefault(emptyArray())
+        if (nlTcp6.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            nlTcp6.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
+            if (nlTcp6.size > 60) builder.appendLine("... (${nlTcp6.size - 60} more truncated)")
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- UDP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv4) --")
+        val nlUdp4 = runCatching { NativeSignsBridge.netlinkSockDiag(2, 17) }.getOrDefault(emptyArray())
+        if (nlUdp4.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            nlUdp4.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
+            if (nlUdp4.size > 60) builder.appendLine("... (${nlUdp4.size - 60} more truncated)")
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- /proc/net/route (native fopen, fallback) --")
+        val routeContent = runCatching { NativeSignsBridge.readProcFile("/proc/net/route") }.getOrNull()
+            ?: runCatching { NativeSignsBridge.readProcFile("/proc/self/net/route") }.getOrNull()
+        builder.appendLine(renderProcContent(routeContent))
+
+        builder.appendLine()
+        builder.appendLine("-- /proc/net/ipv6_route (native fopen, fallback) --")
+        val v6Route = runCatching { NativeSignsBridge.readProcFile("/proc/net/ipv6_route") }.getOrNull()
+            ?: runCatching { NativeSignsBridge.readProcFile("/proc/self/net/ipv6_route") }.getOrNull()
+        builder.appendLine(renderProcContent(v6Route))
+
+        builder.appendLine()
+        builder.appendLine("-- /proc/net/dev (native fopen, fallback) --")
+        val devContent = runCatching { NativeSignsBridge.readProcFile("/proc/net/dev") }.getOrNull()
+        builder.appendLine(renderProcContent(devContent))
+
+        builder.appendLine()
+        builder.appendLine("-- /proc/self/maps markers (native classification) --")
+        val mapsFindings = runCatching { NativeInterfaceProbe.collectMapsFindings() }.getOrDefault(emptyList())
+        if (mapsFindings.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            mapsFindings.forEach { f ->
+                builder.appendLine("kind=${f.kind} marker=${f.marker ?: "<none>"} detail=${f.detail ?: "<none>"}")
+            }
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- libraryIntegrity (dlsym+dladdr) --")
+        val integrity = runCatching { NativeInterfaceProbe.collectLibraryIntegrity() }.getOrDefault(emptyList())
+        if (integrity.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            integrity.forEach { sym ->
+                builder.appendLine(
+                    "symbol=${sym.symbol} missing=${sym.missing} addr=${sym.address ?: "<none>"} lib=${sym.library ?: "<none>"}",
+                )
+            }
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- probeFeatureFlags --")
+        val flags = runCatching { NativeSignsBridge.probeFeatureFlags() }.getOrDefault(emptyArray())
+        if (flags.isEmpty()) {
+            builder.appendLine("<empty>")
+        } else {
+            flags.forEach { builder.appendLine(it) }
+        }
+
+        builder.appendLine()
+        builder.appendLine("-- JVM NetworkInterface.getNetworkInterfaces() --")
+        val jvmDump = runCatching { renderJvmInterfaces(privacyMode) }.getOrDefault("<error>")
+        builder.appendLine(jvmDump)
+    }
+
+    private fun maskInterfaceDumpBlock(block: String): String {
+        return block.lines().joinToString("\n") { line ->
+            val trimmed = line.trimStart()
+            val leading = line.substring(0, line.length - trimmed.length)
+            when {
+                trimmed.startsWith("inet ") -> {
+                    val rest = trimmed.removePrefix("inet ")
+                    val addr = rest.substringBefore(' ')
+                    val tail = rest.substringAfter(' ', missingDelimiterValue = "")
+                    val maskedAddr = maskIp(addr)
+                    val maskedTail = maskBroadcastOrDestinationToken(tail)
+                    if (tail.isBlank()) "${leading}inet $maskedAddr" else "${leading}inet $maskedAddr $maskedTail"
+                }
+                trimmed.startsWith("inet6 ") -> {
+                    val rest = trimmed.removePrefix("inet6 ")
+                    val addr = rest.substringBefore(' ')
+                    val tail = rest.substringAfter(' ', missingDelimiterValue = "")
+                    val maskedAddr = maskIp(addr)
+                    val maskedTail = maskBroadcastOrDestinationToken(tail)
+                    if (tail.isBlank()) "${leading}inet6 $maskedAddr" else "${leading}inet6 $maskedAddr $maskedTail"
+                }
+                else -> line
+            }
+        }
+    }
+
+    private fun maskBroadcastOrDestinationToken(tail: String): String {
+        if (tail.isBlank()) return tail
+        val tokens = tail.split(' ').toMutableList()
+        var i = 0
+        while (i < tokens.size - 1) {
+            val key = tokens[i]
+            if (key == "broadcast" || key == "destination") {
+                tokens[i + 1] = maskIp(tokens[i + 1])
+                i += 2
+            } else {
+                i += 1
+            }
+        }
+        return tokens.joinToString(" ")
+    }
+
+    private fun maskNetlinkPipeRow(row: String): String {
+        if (!row.contains('|')) return row
+        val ipKeys = setOf("dst", "via", "src", "prefsrc")
+        val endpointKeys = setOf("src", "dst")
+        val parts = row.split('|').toMutableList()
+        for (i in parts.indices) {
+            val token = parts[i]
+            val eq = token.indexOf('=')
+            if (eq <= 0) continue
+            val key = token.substring(0, eq)
+            val value = token.substring(eq + 1)
+            if (key !in ipKeys && key !in endpointKeys) continue
+
+            if (key in endpointKeys && value.count { it == ':' } >= 1) {
+                val lastColon = value.lastIndexOf(':')
+                if (lastColon > 0) {
+                    val port = value.substring(lastColon + 1)
+                    if (port.all(Char::isDigit)) {
+                        val addr = value.substring(0, lastColon)
+                        parts[i] = "$key=${maskIp(addr)}:$port"
+                        continue
+                    }
+                }
+            }
+            val slash = value.indexOf('/')
+            if (slash > 0) {
+                val addr = value.substring(0, slash)
+                val suffix = value.substring(slash)
+                parts[i] = "$key=${maskIp(addr)}$suffix"
+            } else if (value.equals("default", ignoreCase = true)) {
+                parts[i] = token
+            } else {
+                parts[i] = "$key=${maskIp(value)}"
+            }
+        }
+        return parts.joinToString("|")
+    }
+
+    private fun maskIfAddrsRow(row: String): String {
+        val parts = row.split('|').toMutableList()
+        if (parts.size < 7) return row
+        val addr = parts[4]
+        if (addr.isNotBlank()) parts[4] = maskIp(addr)
+        return parts.joinToString("|")
+    }
+
+    private fun renderProcContent(content: String?, maxLines: Int = 0): String {
+        if (content == null) return "<unavailable (null)>"
+        if (content.isEmpty()) return "<empty>"
+        val masked = maskIpsInText(content).trimEnd()
+        if (maxLines <= 0) return masked
+        val lines = masked.lines()
+        if (lines.size <= maxLines) return masked
+        return (lines.take(maxLines).joinToString("\n")) + "\n... (${lines.size - maxLines} more lines truncated)"
+    }
+
+    private fun renderJvmInterfaces(privacyMode: Boolean): String {
+        val ifaces = NetworkInterface.getNetworkInterfaces() ?: return "<none>"
+        val sb = StringBuilder()
+        while (ifaces.hasMoreElements()) {
+            val iface = ifaces.nextElement() ?: continue
+            val name = iface.name ?: "?"
+            val index = runCatching { iface.index }.getOrDefault(0)
+            val mtu = runCatching { iface.mtu }.getOrDefault(-1)
+            val up = runCatching { iface.isUp }.getOrDefault(false)
+            val loop = runCatching { iface.isLoopback }.getOrDefault(false)
+            val p2p = runCatching { iface.isPointToPoint }.getOrDefault(false)
+            val virt = runCatching { iface.isVirtual }.getOrDefault(false)
+            sb.append(name)
+            sb.append(": index=").append(index)
+            sb.append(" mtu=").append(mtu)
+            sb.append(" up=").append(up)
+            sb.append(" loopback=").append(loop)
+            sb.append(" p2p=").append(p2p)
+            sb.append(" virtual=").append(virt)
+            sb.append('\n')
+            val addrs = iface.inetAddresses
+            while (addrs.hasMoreElements()) {
+                val addr = addrs.nextElement() ?: continue
+                val host = addr.hostAddress?.substringBefore('%') ?: continue
+                val rendered = if (privacyMode) maskIp(host) else host
+                sb.append("  addr ").append(rendered).append('\n')
+            }
+        }
+        if (sb.isEmpty()) return "<none>"
+        return sb.toString().trimEnd()
     }
 
     private fun appendCategory(

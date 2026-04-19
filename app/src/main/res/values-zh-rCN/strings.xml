@@ -460,4 +460,28 @@
     <string name="tile_hint_detected_count">%1$d / %2$d 已检测</string>
     <string name="tile_hint_review">需要核查</string>
     <string name="tile_hint_error">错误</string>
+
+    <!-- NativeSignsChecker -->
+    <string name="checker_native_category_name">原生检查</string>
+    <string name="checker_native_card_title">原生底层检查</string>
+    <string name="checker_native_unavailable">原生库未加载；无法执行原生检查。</string>
+    <string name="checker_native_unavailable_with_reason">原生库未加载：%1$s</string>
+    <string name="checker_native_no_anomalies">原生信号：未检测到异常</string>
+    <string name="checker_native_interfaces_empty">getifaddrs() 未返回任何接口</string>
+    <string name="checker_native_interfaces_summary">getifaddrs()：%1$d 个接口（%2$d 活动）</string>
+    <string name="checker_native_vpn_interface">原生 VPN 接口：%1$s（索引 %2$d，MTU %3$d）</string>
+    <string name="checker_native_ipsec_interface">原生 IPsec 接口：%1$s（索引 %2$d）</string>
+    <string name="checker_native_mismatch_missing_in_jvm">接口 %1$s：原生可见但 JVM 不可见</string>
+    <string name="checker_native_mismatch_missing_in_native">接口 %1$s：JVM 可见但原生不可见</string>
+    <string name="checker_native_mismatch_index">接口 %1$s 索引不一致：native=%2$d jvm=%3$d</string>
+    <string name="checker_native_mismatch_addresses">接口 %1$s 地址不一致：native-only=%2$s，jvm-only=%3$s</string>
+    <string name="checker_native_routes_empty">/proc/net/route：不可用</string>
+    <string name="checker_native_routes_no_default">/proc/net/route：没有默认路由</string>
+    <string name="checker_native_route_default">默认路由经 %1$s</string>
+    <string name="checker_native_hooks_clean">/proc/self/maps：未发现已知 hook 标记</string>
+    <string name="checker_native_hook_marker">/proc/self/maps 中的 hook 标记：%1$s</string>
+    <string name="checker_native_rwx_regions">/proc/self/maps：大型 RWX 区域 %1$s 个</string>
+    <string name="checker_native_symbols_clean">libc 符号解析正常</string>
+    <string name="checker_native_symbol_missing">dlsym %1$s：未找到</string>
+    <string name="checker_native_symbol_foreign_library">dlsym %1$s 指向外部库：%2$s</string>
 </resources>

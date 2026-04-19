@@ -217,6 +217,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textCallTransportSummary: TextView
     private lateinit var stunGroupsContainer: LinearLayout
     private lateinit var findingsCallTransport: LinearLayout
+    private lateinit var cardNativeSigns: MaterialCardView
+    private lateinit var iconNativeSigns: ImageView
+    private lateinit var statusNativeSigns: TextView
+    private lateinit var textNativeSignsSummary: TextView
+    private lateinit var findingsNativeSigns: LinearLayout
     private lateinit var cardVerdict: MaterialCardView
     private lateinit var iconGeoIp: ImageView
     private lateinit var iconIpComparison: ImageView
@@ -390,6 +395,11 @@ class MainActivity : AppCompatActivity() {
         textCallTransportSummary = findViewById(R.id.textCallTransportSummary)
         stunGroupsContainer = findViewById(R.id.stunGroupsContainer)
         findingsCallTransport = findViewById(R.id.findingsCallTransport)
+        cardNativeSigns = findViewById(R.id.cardNativeSigns)
+        iconNativeSigns = findViewById(R.id.iconNativeSigns)
+        statusNativeSigns = findViewById(R.id.statusNativeSigns)
+        textNativeSignsSummary = findViewById(R.id.textNativeSignsSummary)
+        findingsNativeSigns = findViewById(R.id.findingsNativeSigns)
         cardVerdict = findViewById(R.id.cardVerdict)
         iconGeoIp = findViewById(R.id.iconGeoIp)
         iconIpComparison = findViewById(R.id.iconIpComparison)
@@ -471,6 +481,7 @@ class MainActivity : AppCompatActivity() {
             Spec(CATEGORY_STN, getString(R.string.main_card_call_transport), R.drawable.ic_phone),
             Spec(CATEGORY_LOC, getString(R.string.main_card_location_signals), R.drawable.ic_pin),
             Spec(CATEGORY_BYP, getString(R.string.settings_split_tunnel), R.drawable.ic_split),
+            Spec(CATEGORY_NAT, getString(R.string.checker_native_card_title), R.drawable.ic_shield),
         )
         specs.forEachIndexed { index, spec ->
             val tile = inflater.inflate(R.layout.view_category_tile, categoryGrid, false) as MaterialCardView
@@ -936,6 +947,9 @@ class MainActivity : AppCompatActivity() {
         resetBypassProgress()
         clearStageContent()
         resetAllTiles()
+        if (settings.callTransportProbeEnabled) {
+            setTileStatus(CATEGORY_STN, TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
+        }
         bindVerdictHeroRunning()
         showAllLoadingCardsNow(settings)
         updateResultActionButtonsVisibility()
@@ -986,6 +1000,9 @@ class MainActivity : AppCompatActivity() {
                         TILE_STATUS_REVIEW,
                         getString(R.string.tile_hint_stopped),
                     )
+                }
+                if (isCallTransportTileLoading()) {
+                    setTileStatus(CATEGORY_STN, TILE_STATUS_REVIEW, getString(R.string.tile_hint_stopped))
                 }
                 bindVerdictHeroIdle()
                 verdictSubtitle.text = getString(R.string.main_check_stopped)
@@ -1123,6 +1140,11 @@ class MainActivity : AppCompatActivity() {
                 )
                 updateTileFromCategory(CATEGORY_LOC, update.result)
                 if (animate) animateContentReveal(findingsLocation, locationInfoSection, locationDivider)
+            }
+            is CheckUpdate.NativeSignsReady -> {
+                displayNativeSigns(update.result, activeCheckPrivacyMode)
+                updateTileFromCategory(CATEGORY_NAT, update.result)
+                if (animate) animateContentReveal(findingsNativeSigns, textNativeSignsSummary)
             }
             is CheckUpdate.BypassProgress -> {
                 showLoadingCardForStage(RunningStage.BYPASS)
@@ -1522,6 +1544,7 @@ class MainActivity : AppCompatActivity() {
             cardDirect,
             cardIndirect,
             cardCallTransport,
+            cardNativeSigns,
             cardLocation,
             cardBypass,
             cardVerdict,
@@ -2062,6 +2085,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun displayNativeSigns(result: CategoryResult, privacyMode: Boolean) {
+        if (result.findings.isEmpty() && result.evidence.isEmpty()) {
+            cardNativeSigns.visibility = View.GONE
+            return
+        }
+        cardNativeSigns.visibility = View.VISIBLE
+
+        bindCardStatus(
+            detected = result.detected,
+            needsReview = result.needsReview,
+            icon = iconNativeSigns,
+            status = statusNativeSigns,
+            hasError = result.hasError,
+        )
+
+        val summaryFinding = result.findings.firstOrNull { finding ->
+            finding.description.startsWith("getifaddrs():") ||
+                finding.description.startsWith("Native library not loaded")
+        }
+        if (summaryFinding != null) {
+            textNativeSignsSummary.text = summaryFinding.description
+            textNativeSignsSummary.visibility = View.VISIBLE
+        } else {
+            textNativeSignsSummary.visibility = View.GONE
+        }
+
+        findingsNativeSigns.removeAllViews()
+        val rest = result.findings.filter { it !== summaryFinding }
+        if (rest.isNotEmpty()) {
+            findingsNativeSigns.visibility = View.VISIBLE
+            for (finding in rest) {
+                findingsNativeSigns.addView(createFindingView(finding, privacyMode))
+            }
+        } else {
+            findingsNativeSigns.visibility = View.GONE
+        }
+    }
+
     private fun createStunGroupView(group: StunProbeGroupResult, privacyMode: Boolean): View {
         val groupTitle = when (group.scope) {
             StunScope.GLOBAL -> getString(R.string.main_card_call_transport_stun_group_global)
@@ -2554,6 +2615,7 @@ class MainActivity : AppCompatActivity() {
         private const val CATEGORY_STN = "stn"
         private const val CATEGORY_LOC = "loc"
         private const val CATEGORY_BYP = "byp"
+        private const val CATEGORY_NAT = "nat"
 
         private const val TILE_STATUS_NEUTRAL = 0
         private const val TILE_STATUS_CLEAN = 1
@@ -2653,6 +2715,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_STN -> cardCallTransport
         CATEGORY_LOC -> cardLocation
         CATEGORY_BYP -> cardBypass
+        CATEGORY_NAT -> cardNativeSigns
         else -> null
     }
 
@@ -2666,6 +2729,7 @@ class MainActivity : AppCompatActivity() {
             CATEGORY_STN -> R.id.cardCallTransportContent
             CATEGORY_LOC -> R.id.cardLocationContent
             CATEGORY_BYP -> R.id.cardBypassContent
+            CATEGORY_NAT -> R.id.cardNativeSignsContent
             else -> return null
         }
         // Content может быть либо ещё в своей карточке, либо уже в detailContentSlot
@@ -2681,6 +2745,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_STN -> R.drawable.ic_phone
         CATEGORY_LOC -> R.drawable.ic_pin
         CATEGORY_BYP -> R.drawable.ic_split
+        CATEGORY_NAT -> R.drawable.ic_shield
         else -> R.drawable.ic_help
     }
 
@@ -2786,6 +2851,12 @@ class MainActivity : AppCompatActivity() {
         else
             getString(R.string.tile_hint_clean_count, leaks.size)
         setTileStatus(CATEGORY_STN, status, hint)
+    }
+
+    private fun isCallTransportTileLoading(): Boolean {
+        val holder = tiles[CATEGORY_STN] ?: return false
+        return holder.statusDot.tag == TILE_STATUS_NEUTRAL &&
+            holder.hint.text?.toString() == getString(R.string.tile_hint_loading)
     }
 
     private fun buildTileHintForCategory(category: CategoryResult): String {

@@ -480,4 +480,28 @@
     <string name="tile_hint_detected_count">%1$d of %2$d detected</string>
     <string name="tile_hint_review">Needs review</string>
     <string name="tile_hint_error">Error</string>
+
+    <!-- NativeSignsChecker -->
+    <string name="checker_native_category_name">Native signs</string>
+    <string name="checker_native_card_title">Native low-level checks</string>
+    <string name="checker_native_unavailable">Native library not loaded; native checks are unavailable.</string>
+    <string name="checker_native_unavailable_with_reason">Native library not loaded: %1$s</string>
+    <string name="checker_native_no_anomalies">Native signals: no anomalies detected</string>
+    <string name="checker_native_interfaces_empty">getifaddrs() returned no interfaces</string>
+    <string name="checker_native_interfaces_summary">getifaddrs(): %1$d interfaces (%2$d up)</string>
+    <string name="checker_native_vpn_interface">Native VPN-like interface: %1$s (index %2$d, MTU %3$d)</string>
+    <string name="checker_native_ipsec_interface">Native IPsec-like interface: %1$s (index %2$d)</string>
+    <string name="checker_native_mismatch_missing_in_jvm">Interface %1$s: visible in native but missing in JVM</string>
+    <string name="checker_native_mismatch_missing_in_native">Interface %1$s: visible in JVM but missing in native</string>
+    <string name="checker_native_mismatch_index">Interface %1$s index mismatch: native=%2$d jvm=%3$d</string>
+    <string name="checker_native_mismatch_addresses">Interface %1$s address mismatch: native-only=%2$s, jvm-only=%3$s</string>
+    <string name="checker_native_routes_empty">/proc/net/route: unavailable</string>
+    <string name="checker_native_routes_no_default">/proc/net/route: no default route</string>
+    <string name="checker_native_route_default">Default route via %1$s</string>
+    <string name="checker_native_hooks_clean">/proc/self/maps: no known hook markers</string>
+    <string name="checker_native_hook_marker">Hook marker in /proc/self/maps: %1$s</string>
+    <string name="checker_native_rwx_regions">/proc/self/maps: %1$s large RWX regions</string>
+    <string name="checker_native_symbols_clean">Library symbols: all resolve to libc</string>
+    <string name="checker_native_symbol_missing">dlsym %1$s: missing</string>
+    <string name="checker_native_symbol_foreign_library">dlsym %1$s resolves to foreign library: %2$s</string>
 </resources>

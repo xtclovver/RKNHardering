@@ -480,4 +480,28 @@
     <string name="tile_hint_detected_count">%1$d из %2$d выявлено</string>
     <string name="tile_hint_review">Требует проверки</string>
     <string name="tile_hint_error">Ошибка</string>
+
+    <!-- NativeSignsChecker -->
+    <string name="checker_native_category_name">Нативные признаки</string>
+    <string name="checker_native_card_title">Нативные низкоуровневые проверки</string>
+    <string name="checker_native_unavailable">Нативная библиотека не загружена; проверки недоступны.</string>
+    <string name="checker_native_unavailable_with_reason">Нативная библиотека не загружена: %1$s</string>
+    <string name="checker_native_no_anomalies">Нативные сигналы: аномалий не обнаружено</string>
+    <string name="checker_native_interfaces_empty">getifaddrs() не вернул интерфейсов</string>
+    <string name="checker_native_interfaces_summary">getifaddrs(): %1$d интерфейсов (%2$d активны)</string>
+    <string name="checker_native_vpn_interface">Нативный VPN-интерфейс: %1$s (индекс %2$d, MTU %3$d)</string>
+    <string name="checker_native_ipsec_interface">Нативный IPsec-интерфейс: %1$s (индекс %2$d)</string>
+    <string name="checker_native_mismatch_missing_in_jvm">Интерфейс %1$s: виден нативно, но отсутствует в JVM</string>
+    <string name="checker_native_mismatch_missing_in_native">Интерфейс %1$s: виден в JVM, но отсутствует нативно</string>
+    <string name="checker_native_mismatch_index">Интерфейс %1$s: расхождение индекса native=%2$d jvm=%3$d</string>
+    <string name="checker_native_mismatch_addresses">Интерфейс %1$s: расхождение адресов native-only=%2$s, jvm-only=%3$s</string>
+    <string name="checker_native_routes_empty">/proc/net/route: недоступен</string>
+    <string name="checker_native_routes_no_default">/proc/net/route: default-маршрута нет</string>
+    <string name="checker_native_route_default">Default-маршрут через %1$s</string>
+    <string name="checker_native_hooks_clean">/proc/self/maps: известных hook-маркеров нет</string>
+    <string name="checker_native_hook_marker">Hook-маркер в /proc/self/maps: %1$s</string>
+    <string name="checker_native_rwx_regions">/proc/self/maps: крупных RWX-регионов: %1$s</string>
+    <string name="checker_native_symbols_clean">Символы libc разрешаются корректно</string>
+    <string name="checker_native_symbol_missing">dlsym %1$s: не найден</string>
+    <string name="checker_native_symbol_foreign_library">dlsym %1$s указывает на чужую библиотеку: %2$s</string>
 </resources>

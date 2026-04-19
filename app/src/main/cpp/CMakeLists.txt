@@ -77,3 +77,34 @@ target_link_libraries(
     mbedx509
     log
 )
+
+add_library(
+    native_signs_probe
+    SHARED
+    native_signs_probe.cpp
+)
+
+target_compile_options(
+    native_signs_probe
+    PRIVATE
+    -fvisibility=hidden
+    -fno-exceptions
+    -fno-rtti
+    -ffunction-sections
+    -fdata-sections
+    -Wall
+    -Wextra
+)
+
+target_link_options(
+    native_signs_probe
+    PRIVATE
+    -Wl,--gc-sections
+)
+
+target_link_libraries(
+    native_signs_probe
+    PRIVATE
+    log
+    dl
+)

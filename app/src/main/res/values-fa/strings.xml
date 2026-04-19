@@ -462,4 +462,28 @@
     <string name="tile_hint_detected_count">%1$d از %2$d شناسایی شد</string>
     <string name="tile_hint_review">نیاز به بررسی</string>
     <string name="tile_hint_error">خطا</string>
+
+    <!-- NativeSignsChecker -->
+    <string name="checker_native_category_name">نشانه‌های بومی</string>
+    <string name="checker_native_card_title">بررسی‌های بومی سطح پایین</string>
+    <string name="checker_native_unavailable">کتابخانه بومی بارگذاری نشد؛ بررسی‌ها در دسترس نیستند.</string>
+    <string name="checker_native_unavailable_with_reason">کتابخانه بومی بارگذاری نشد: %1$s</string>
+    <string name="checker_native_no_anomalies">سیگنال‌های بومی: هیچ ناهنجاری شناسایی نشد</string>
+    <string name="checker_native_interfaces_empty">getifaddrs() هیچ واسطی برنگرداند</string>
+    <string name="checker_native_interfaces_summary">getifaddrs(): %1$d واسط (%2$d فعال)</string>
+    <string name="checker_native_vpn_interface">واسط VPN بومی: %1$s (ایندکس %2$d، MTU %3$d)</string>
+    <string name="checker_native_ipsec_interface">واسط IPsec بومی: %1$s (ایندکس %2$d)</string>
+    <string name="checker_native_mismatch_missing_in_jvm">واسط %1$s: در بومی هست اما در JVM نیست</string>
+    <string name="checker_native_mismatch_missing_in_native">واسط %1$s: در JVM هست اما در بومی نیست</string>
+    <string name="checker_native_mismatch_index">عدم تطابق ایندکس %1$s: native=%2$d jvm=%3$d</string>
+    <string name="checker_native_mismatch_addresses">عدم تطابق آدرس %1$s: native-only=%2$s, jvm-only=%3$s</string>
+    <string name="checker_native_routes_empty">/proc/net/route: در دسترس نیست</string>
+    <string name="checker_native_routes_no_default">/proc/net/route: مسیر پیش‌فرض وجود ندارد</string>
+    <string name="checker_native_route_default">مسیر پیش‌فرض از طریق %1$s</string>
+    <string name="checker_native_hooks_clean">/proc/self/maps: نشانگر hook شناخته شده‌ای یافت نشد</string>
+    <string name="checker_native_hook_marker">نشانگر hook در /proc/self/maps: %1$s</string>
+    <string name="checker_native_rwx_regions">/proc/self/maps: %1$s ناحیه بزرگ RWX</string>
+    <string name="checker_native_symbols_clean">سمبل‌های libc به‌درستی resolve می‌شوند</string>
+    <string name="checker_native_symbol_missing">dlsym %1$s: یافت نشد</string>
+    <string name="checker_native_symbol_foreign_library">dlsym %1$s به کتابخانه دیگری اشاره می‌کند: %2$s</string>
 </resources>
