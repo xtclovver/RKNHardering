@@ -4,6 +4,16 @@ import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 
+data class GeoIpFacts(
+    val ip: String? = null,
+    val countryCode: String? = null,
+    val asn: String? = null,
+    val outsideRu: Boolean = false,
+    val hosting: Boolean = false,
+    val proxyDb: Boolean = false,
+    val fetchError: Boolean = false,
+)
+
 enum class EvidenceConfidence {
     LOW,
     MEDIUM,
@@ -206,6 +216,7 @@ data class CategoryResult(
     val activeApps: List<ActiveVpnApp> = emptyList(),
     val callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
     val stunProbeGroups: List<StunProbeGroupResult> = emptyList(),
+    val geoFacts: GeoIpFacts? = null,
 ) {
     val hasError: Boolean
         get() = findings.any { it.isError }
@@ -316,4 +327,5 @@ data class CheckResult(
         detected = false,
         findings = emptyList(),
     ),
+    val ipConsensus: IpConsensusResult = IpConsensusResult.empty(),
 )
