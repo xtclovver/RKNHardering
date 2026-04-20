@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.model.EvidenceSource
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -313,5 +315,46 @@ class GeoIpCheckerTest {
 
         assertEquals("ok", result)
         assertEquals(3, attempts)
+    }
+
+    @Test
+    fun `evaluate populates geoFacts with outsideRu and hosting`() {
+        val snapshot = GeoIpChecker.GeoIpSnapshot(
+            ip = "5.6.7.8",
+            country = "Germany",
+            countryCode = "DE",
+            isp = "Example",
+            org = "Example",
+            asn = "AS12345 Example",
+            isProxy = false,
+            isHosting = true,
+            hostingVotes = 2,
+            hostingChecks = 2,
+            hostingSources = listOf("ipapi.is", "iplocate.io"),
+        )
+        val context: android.content.Context =
+            androidx.test.core.app.ApplicationProvider.getApplicationContext()
+
+        val result = GeoIpChecker.evaluate(context, snapshot)
+
+        val facts = result.geoFacts
+        assertNotNull(facts)
+        assertEquals("5.6.7.8", facts!!.ip)
+        assertEquals("DE", facts.countryCode)
+        assertTrue(facts.outsideRu)
+        assertTrue(facts.hosting)
+        assertFalse(facts.proxyDb)
+        assertFalse(facts.fetchError)
+    }
+
+    @Test
+    fun `noProviderResult yields geoFacts with fetchError`() {
+        val result = GeoIpChecker.noProviderResult("both providers failed")
+
+        val facts = result.geoFacts
+        assertNotNull(facts)
+        assertTrue(facts!!.fetchError)
+        assertNull(facts.ip)
+        assertNull(facts.countryCode)
     }
 }

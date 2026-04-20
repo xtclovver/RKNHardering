@@ -9,6 +9,7 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
@@ -313,12 +314,24 @@ object GeoIpChecker {
             detected = snapshot.isProxy,
         )
 
+        val countryCode = snapshot.countryCode.uppercase().ifBlank { null }
+        val outsideRu = countryCode != null && countryCode != "RU"
+        val geoFacts = GeoIpFacts(
+            ip = snapshot.ip.takeUnless { it.isBlank() || it == "N/A" },
+            countryCode = countryCode,
+            asn = snapshot.asn.takeUnless { it.isBlank() || it == "N/A" },
+            outsideRu = outsideRu,
+            hosting = snapshot.isHosting,
+            proxyDb = snapshot.isProxy,
+            fetchError = false,
+        )
         return CategoryResult(
             name = "GeoIP",
             detected = snapshot.isHosting || snapshot.isProxy,
             findings = findings,
             needsReview = needsReview,
             evidence = evidence,
+            geoFacts = geoFacts,
         )
     }
 
@@ -327,6 +340,7 @@ object GeoIpChecker {
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message, isError = true)),
+            geoFacts = GeoIpFacts(fetchError = true),
         )
     }
 
@@ -335,6 +349,7 @@ object GeoIpChecker {
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message)),
+            geoFacts = GeoIpFacts(fetchError = true),
         )
     }
 
