@@ -12,6 +12,7 @@
     <!-- M3 Surface tokens -->
     <color name="md_surface">#FFFAFAFA</color>
     <color name="md_surface_container">#FFF0EFF4</color>
+    <color name="md_surface_container_high">#FFE7E5ED</color>
     <color name="md_on_surface">#FF1C1B1F</color>
     <color name="md_on_surface_variant">#FF47464F</color>
     <color name="md_outline_variant">#FFC8C5D0</color>

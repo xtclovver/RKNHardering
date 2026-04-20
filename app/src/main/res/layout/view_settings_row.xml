@@ -8,12 +8,12 @@
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
-    android:minHeight="56dp"
+    android:minHeight="60dp"
     android:orientation="horizontal"
     android:paddingStart="16dp"
-    android:paddingTop="10dp"
+    android:paddingTop="14dp"
     android:paddingEnd="16dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="14dp">
 
     <FrameLayout
         android:layout_width="32dp"
@@ -32,24 +32,25 @@
 
     <TextView
         android:id="@+id/rowTitle"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="14dp"
+        android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="?android:attr/textColorPrimary"
-        android:textSize="15sp" />
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
     <TextView
         android:id="@+id/rowValue"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:layout_marginEnd="2dp"
-        android:layout_weight="1"
         android:ellipsize="end"
-        android:gravity="end"
         android:maxLines="1"
+        android:maxWidth="132dp"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="13sp" />
 

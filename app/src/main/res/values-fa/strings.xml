@@ -109,6 +109,7 @@
 
     <string name="main_subtitle">خودآزمایی VPN/Proxy</string>
     <string name="main_run_check">اجرای بررسی</string>
+    <string name="main_run_check_again">اجرای دوباره بررسی</string>
     <string name="main_stop_check">توقف</string>
     <string name="main_card_geo_ip" translatable="false">GeoIP</string>
     <string name="main_card_ip_comparison">مقایسه IP</string>
@@ -151,6 +152,7 @@
     <string name="main_card_call_transport_stun_no_response">بدون پاسخ</string>
     <string name="main_card_call_transport_stun_error">خطا</string>
     <string name="main_card_location_signals">نشانه‌های مکان</string>
+    <string name="main_card_native_signs">نشانه‌های بومی</string>
     <string name="main_verdict_details">جزئیات</string>
 
     <string name="main_perm_title">مجوز اضافی</string>
@@ -480,6 +482,12 @@
     <string name="tile_hint_detected_count">%1$d از %2$d شناسایی شد</string>
     <string name="tile_hint_review">نیاز به بررسی</string>
     <string name="tile_hint_error">خطا</string>
+    <string name="settings_value_on">روشن</string>
+    <string name="settings_value_off">خاموش</string>
+    <string name="settings_value_network_all">همه درخواست‌ها</string>
+    <string name="settings_value_network_disabled">غیرفعال</string>
+    <string name="settings_value_privacy_masking">پنهان‌سازی IP</string>
+    <string name="settings_value_appearance_format">%1$s \u00b7 %2$s</string>
 
     <!-- NativeSignsChecker -->
     <string name="checker_native_category_name">نشانه‌های بومی β</string>

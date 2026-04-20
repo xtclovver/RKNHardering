@@ -109,13 +109,14 @@
 
     <string name="main_subtitle">Самопроверка на обнаружение VPN/Proxy</string>
     <string name="main_run_check">Запустить проверку</string>
+    <string name="main_run_check_again">Запустить проверку снова</string>
     <string name="main_stop_check">Остановить</string>
     <string name="main_card_geo_ip" translatable="false">GeoIP</string>
     <string name="main_card_ip_comparison">Сравнение IP</string>
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">Прямые признаки</string>
     <string name="main_card_indirect_signs">Косвенные признаки</string>
-    <string name="main_card_call_transport">STUN mapped IP</string>
+    <string name="main_card_call_transport">STUN-серверы</string>
     <string name="main_card_call_transport_status_baseline">Ответ есть</string>
     <string name="main_card_call_transport_status_no_signal">Нет ответа</string>
     <string name="main_card_call_transport_status_needs_review">Требует проверки</string>
@@ -151,6 +152,7 @@
     <string name="main_card_call_transport_stun_no_response">Нет ответа</string>
     <string name="main_card_call_transport_stun_error">Ошибка</string>
     <string name="main_card_location_signals">Сигналы местоположения</string>
+    <string name="main_card_native_signs">Нативные признаки</string>
     <string name="main_verdict_details">Подробнее</string>
 
     <string name="main_perm_title">Дополнительное разрешение</string>
@@ -486,7 +488,7 @@
     <string name="verdict_title_idle">Проверка не запущена</string>
     <string name="verdict_subtitle_idle">Запустите проверку, чтобы увидеть вердикт</string>
     <string name="verdict_subtitle_running">Проверка выполняется\u2026</string>
-    <string name="verdict_subtitle_done">Проверка завершена \u00b7 %1$d категорий</string>
+    <string name="verdict_subtitle_done">Завершено \u00b7 %1$d категорий</string>
     <string name="section_check_details">Детали проверки</string>
     <string name="privacy_footer_text">Проверка выполняется локально \u00b7 16 доменов</string>
     <string name="privacy_footer_action">Что это?</string>
@@ -498,6 +500,12 @@
     <string name="tile_hint_detected_count">%1$d из %2$d выявлено</string>
     <string name="tile_hint_review">Требует проверки</string>
     <string name="tile_hint_error">Ошибка</string>
+    <string name="settings_value_on">Вкл</string>
+    <string name="settings_value_off">Выкл</string>
+    <string name="settings_value_network_all">Все запросы</string>
+    <string name="settings_value_network_disabled">Отключено</string>
+    <string name="settings_value_privacy_masking">Маскировка IP</string>
+    <string name="settings_value_appearance_format">%1$s \u00b7 %2$s</string>
 
     <!-- NativeSignsChecker -->
     <string name="checker_native_category_name">Нативные признаки β</string>

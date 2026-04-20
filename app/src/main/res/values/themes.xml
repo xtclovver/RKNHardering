@@ -9,6 +9,7 @@
         <item name="colorSurface">@color/md_surface</item>
         <item name="colorOnSurface">@color/md_on_surface</item>
         <item name="colorSurfaceContainer">@color/md_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/md_surface_container_high</item>
         <item name="colorOnSurfaceVariant">@color/md_on_surface_variant</item>
         <item name="colorOutlineVariant">@color/md_outline_variant</item>
         <item name="android:colorBackground">@color/md_surface</item>
@@ -19,9 +20,9 @@
     <style name="SettingsGroupLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:paddingStart">4dp</item>
-        <item name="android:paddingTop">16dp</item>
-        <item name="android:paddingEnd">4dp</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingEnd">20dp</item>
         <item name="android:paddingBottom">6dp</item>
         <item name="android:textAllCaps">true</item>
         <item name="android:textColor">?android:attr/textColorSecondary</item>
@@ -42,7 +43,6 @@
     <style name="SettingsRowDivider">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1dp</item>
-        <item name="android:layout_marginStart">62dp</item>
         <item name="android:background">?attr/colorOutlineVariant</item>
     </style>
 </resources>

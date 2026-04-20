@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.card.MaterialCardView
 import com.notcvnt.rknhardering.checker.CheckSettings
+import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CdnPullingResponse
@@ -134,36 +135,6 @@ class MainActivityUiRenderingTest {
     }
 
     @Test
-    fun `prepare check session shows ip channels card when consensus sources are enabled`() {
-        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-
-        invokePrivate<Unit>(
-            activity,
-            "prepareCheckSessionUi",
-            CheckSettings(splitTunnelEnabled = true, networkRequestsEnabled = false),
-            false,
-        )
-
-        val card = activity.findViewById<MaterialCardView>(R.id.cardIpChannels)
-        assertEquals(View.VISIBLE, card.visibility)
-    }
-
-    @Test
-    fun `prepare check session keeps ip channels card hidden when consensus sources are disabled`() {
-        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-
-        invokePrivate<Unit>(
-            activity,
-            "prepareCheckSessionUi",
-            CheckSettings(splitTunnelEnabled = false, networkRequestsEnabled = false),
-            false,
-        )
-
-        val card = activity.findViewById<MaterialCardView>(R.id.cardIpChannels)
-        assertEquals(View.GONE, card.visibility)
-    }
-
-    @Test
     fun `ip channel row shows family together with channel metadata`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         val observedIp = ObservedIp(
@@ -187,37 +158,63 @@ class MainActivityUiRenderingTest {
     }
 
     @Test
-    fun `ip channels tile expands into detail content`() {
+    fun `accordion expands categories inline without collapsing previous body`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-        val consensus = IpConsensusResult(
-            observedIps = listOf(
-                ObservedIp(
-                    value = "203.0.113.64",
-                    family = IpFamily.V4,
-                    channel = Channel.VPN,
-                    sources = setOf("underlying-prober.non-ru.vpn"),
-                    countryCode = "FI",
-                    asn = "AS64502 Example VPN",
-                    targetGroup = TargetGroup.NON_RU,
-                ),
-            ),
-            probeTargetDivergence = true,
+        val geoBody = activity.findViewById<View>(R.id.bodyGeoIp)
+        val bypassBody = activity.findViewById<View>(R.id.bodyBypass)
+
+        invokePrivate<Unit>(activity, "expandCategory", "geo")
+        assertEquals(View.VISIBLE, geoBody.visibility)
+        assertEquals(View.GONE, bypassBody.visibility)
+        assertTrue(getPrivateField<Set<String>>(activity, "expandedCategoryIds").contains("geo"))
+
+        invokePrivate<Unit>(activity, "expandCategory", "byp")
+        assertEquals(View.VISIBLE, geoBody.visibility)
+        assertEquals(View.VISIBLE, bypassBody.visibility)
+        val expanded = getPrivateField<Set<String>>(activity, "expandedCategoryIds")
+        assertTrue(expanded.contains("geo"))
+        assertTrue(expanded.contains("byp"))
+    }
+
+    @Test
+    fun `tile auto expands when status becomes review or detected`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val geoBody = activity.findViewById<View>(R.id.bodyGeoIp)
+        val bypassBody = activity.findViewById<View>(R.id.bodyBypass)
+        val reviewResult = BypassResult(
+            proxyEndpoint = null,
+            directIp = null,
+            proxyIp = null,
+            xrayApiScanResult = null,
+            findings = listOf(Finding("Needs review")),
+            detected = false,
+            needsReview = true,
+        )
+        val detectedResult = reviewResult.copy(
+            findings = listOf(Finding("Detected", detected = true)),
+            detected = true,
+            needsReview = false,
+        )
+        val geoDetectedCategory = CategoryResult(
+            name = "geo",
+            detected = true,
+            findings = listOf(Finding("Geo detected", detected = true)),
         )
 
-        invokePrivate<Unit>(activity, "displayIpChannels", consensus, false)
-        invokePrivate<Unit>(activity, "updateTileFromIpConsensus", consensus)
-        invokePrivate<Unit>(activity, "expandCategory", "ip_channels")
+        invokePrivate<Unit>(activity, "updateTileFromBypass", reviewResult)
+        assertEquals(View.VISIBLE, bypassBody.visibility)
+        assertTrue(getPrivateField<Set<String>>(activity, "expandedCategoryIds").contains("byp"))
 
-        val expandedDetail = activity.findViewById<MaterialCardView>(R.id.expandedDetail)
-        val detailTitle = activity.findViewById<TextView>(R.id.detailTitle)
-        val detailContentSlot = activity.findViewById<ViewGroup>(R.id.detailContentSlot)
-        val renderedText = collectText(detailContentSlot)
+        invokePrivate<Unit>(activity, "collapseCategory", "byp")
+        assertEquals(View.GONE, bypassBody.visibility)
 
-        assertEquals(View.VISIBLE, expandedDetail.visibility)
-        assertEquals(activity.getString(R.string.ip_channels_title), detailTitle.text.toString())
-        assertTrue(renderedText.contains("203.0.113.64"))
-        assertTrue(renderedText.contains(activity.getString(R.string.ip_channels_target_non_ru)))
-        assertTrue(renderedText.contains(activity.getString(R.string.ip_channels_flag_probe_target_divergence)))
+        invokePrivate<Unit>(activity, "updateTileFromCategory", "geo", geoDetectedCategory)
+        assertEquals(View.VISIBLE, geoBody.visibility)
+        assertTrue(getPrivateField<Set<String>>(activity, "expandedCategoryIds").contains("geo"))
+
+        invokePrivate<Unit>(activity, "updateTileFromBypass", detectedResult)
+        assertEquals(View.VISIBLE, bypassBody.visibility)
+        assertTrue(getPrivateField<Set<String>>(activity, "expandedCategoryIds").contains("byp"))
     }
 
     private fun collectText(view: View): String {

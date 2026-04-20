@@ -4,7 +4,8 @@
     android:id="@+id/verdictHero"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="4dp"
     app:cardBackgroundColor="@color/status_neutral_container"
     app:cardCornerRadius="20dp"
     app:cardElevation="0dp"
@@ -14,10 +15,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingTop="20dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="16dp">
+        android:paddingStart="16dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="14dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -27,8 +28,8 @@
 
             <FrameLayout
                 android:id="@+id/verdictAvatar"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/bg_verdict_avatar">
 
                 <ImageView
@@ -45,7 +46,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -53,12 +54,12 @@
                     android:id="@+id/verdictLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:alpha="0.75"
-                    android:letterSpacing="0.1"
+                    android:alpha="0.8"
+                    android:letterSpacing="0.08"
                     android:text="@string/verdict_label"
                     android:textAllCaps="true"
                     android:textColor="@color/status_neutral"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -68,8 +69,39 @@
                     android:layout_marginTop="2dp"
                     android:text="@string/verdict_title_idle"
                     android:textColor="@color/status_neutral"
-                    android:textSize="20sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/btnCopyDiagnostics"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_verdict_action_button"
+                    android:contentDescription="@string/main_copy_diagnostics"
+                    android:padding="9dp"
+                    android:scaleType="centerInside"
+                    android:visibility="visible"
+                    android:src="@drawable/ic_content_copy"
+                    app:tint="?android:attr/textColorSecondary" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/btnExport"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_verdict_action_button"
+                    android:contentDescription="@string/main_export"
+                    android:padding="9dp"
+                    android:scaleType="centerInside"
+                    android:visibility="visible"
+                    android:src="@drawable/ic_download"
+                    app:tint="?android:attr/textColorSecondary" />
             </LinearLayout>
         </LinearLayout>
 
@@ -77,9 +109,8 @@
             android:id="@+id/verdictSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:lineSpacingExtra="1dp"
+            android:layout_marginTop="10dp"
             android:textColor="?android:attr/textColorSecondary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

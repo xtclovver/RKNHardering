@@ -9,6 +9,7 @@
 
     <color name="md_surface">#FF17151B</color>
     <color name="md_surface_container">#FF24212A</color>
+    <color name="md_surface_container_high">#FF2C2932</color>
     <color name="md_on_surface">#FFE8E1EB</color>
     <color name="md_on_surface_variant">#FFCAC4D0</color>
     <color name="md_outline_variant">#FF4B4653</color>

@@ -109,13 +109,14 @@
 
     <string name="main_subtitle">VPN/Proxy self-check</string>
     <string name="main_run_check">Run check</string>
+    <string name="main_run_check_again">Run check again</string>
     <string name="main_stop_check">Stop</string>
     <string name="main_card_geo_ip" translatable="false">GeoIP</string>
     <string name="main_card_ip_comparison">IP comparison</string>
     <string name="main_card_cdn_pulling">CDN pulling</string>
     <string name="main_card_direct_signs">Direct signs</string>
     <string name="main_card_indirect_signs">Indirect signs</string>
-    <string name="main_card_call_transport">STUN mapped IP</string>
+    <string name="main_card_call_transport">STUN servers</string>
     <string name="main_card_call_transport_status_baseline">Responded</string>
     <string name="main_card_call_transport_status_no_signal">No response</string>
     <string name="main_card_call_transport_status_needs_review">Needs review</string>
@@ -151,6 +152,7 @@
     <string name="main_card_call_transport_stun_no_response">No response</string>
     <string name="main_card_call_transport_stun_error">Error</string>
     <string name="main_card_location_signals">Location signals</string>
+    <string name="main_card_native_signs">Native signs</string>
     <string name="main_verdict_details">Details</string>
 
     <string name="main_perm_title">Additional permission</string>
@@ -482,7 +484,7 @@
     <string name="verdict_title_idle">Check not started</string>
     <string name="verdict_subtitle_idle">Run the check to see the verdict</string>
     <string name="verdict_subtitle_running">Check in progress\u2026</string>
-    <string name="verdict_subtitle_done">Check completed \u00b7 %1$d categories</string>
+    <string name="verdict_subtitle_done">Completed \u00b7 %1$d categories</string>
     <string name="section_check_details">Check details</string>
     <string name="privacy_footer_text">Check runs locally \u00b7 16 domains</string>
     <string name="privacy_footer_action">What\u2019s this?</string>
@@ -494,6 +496,12 @@
     <string name="tile_hint_detected_count">%1$d of %2$d detected</string>
     <string name="tile_hint_review">Needs review</string>
     <string name="tile_hint_error">Error</string>
+    <string name="settings_value_on">On</string>
+    <string name="settings_value_off">Off</string>
+    <string name="settings_value_network_all">All requests</string>
+    <string name="settings_value_network_disabled">Disabled</string>
+    <string name="settings_value_privacy_masking">IP masking</string>
+    <string name="settings_value_appearance_format">%1$s \u00b7 %2$s</string>
 
     <!-- NativeSignsChecker -->
     <string name="checker_native_category_name">Native signs β</string>
