@@ -10,6 +10,8 @@ import com.notcvnt.rknhardering.probe.PublicIpProbeMode
 import com.notcvnt.rknhardering.probe.PublicIpProbeStatus
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
 import com.notcvnt.rknhardering.probe.TunProbeModeOverride
+import com.notcvnt.rknhardering.model.TargetGroup
+import com.notcvnt.rknhardering.probe.PerTargetProbe
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -193,7 +195,7 @@ class DirectSignsCheckerTest {
             tunActiveProbeResult = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = false,
-                vpnIp = "198.51.100.10",
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.10"),
                 activeNetworkIsVpn = true,
             ),
         )
@@ -261,8 +263,7 @@ class DirectSignsCheckerTest {
             tunActiveProbeResult = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = false,
-                vpnIp = "198.51.100.31",
-                vpnIpComparison = comparison,
+                ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.31", comparison = comparison),
                 activeNetworkIsVpn = true,
                 tunProbeDiagnostics = TunProbeDiagnostics(
                     enabled = true,
@@ -300,21 +301,25 @@ class DirectSignsCheckerTest {
             tunActiveProbeResult = UnderlyingNetworkProber.ProbeResult(
                 vpnActive = true,
                 underlyingReachable = false,
-                vpnIp = "198.51.100.30",
-                vpnIpComparison = PublicIpNetworkComparison(
-                    strict = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.STRICT_SAME_PATH,
-                        status = PublicIpProbeStatus.FAILED,
-                        error = "strict timeout",
+                ruTarget = PerTargetProbe(
+                    targetHost = "",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "198.51.100.30",
+                    comparison = PublicIpNetworkComparison(
+                        strict = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                            status = PublicIpProbeStatus.FAILED,
+                            error = "strict timeout",
+                        ),
+                        curlCompatible = PublicIpModeProbeResult(
+                            mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                            status = PublicIpProbeStatus.SUCCEEDED,
+                            ip = "198.51.100.30",
+                        ),
+                        selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+                        selectedIp = "198.51.100.30",
+                        dnsPathMismatch = true,
                     ),
-                    curlCompatible = PublicIpModeProbeResult(
-                        mode = PublicIpProbeMode.CURL_COMPATIBLE,
-                        status = PublicIpProbeStatus.SUCCEEDED,
-                        ip = "198.51.100.30",
-                    ),
-                    selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
-                    selectedIp = "198.51.100.30",
-                    dnsPathMismatch = true,
                 ),
                 activeNetworkIsVpn = true,
                 tunProbeDiagnostics = TunProbeDiagnostics(

@@ -805,22 +805,24 @@ object BypassChecker {
     ): Boolean {
         val pathLabels = mutableListOf<String>()
         var usesInjectedResolve = false
+        val vpnComparison = result.vpnIpComparison
         if (
             result.vpnIp != null &&
-            result.vpnIpComparison?.usedCurlCompatibleFallback() == true
+            vpnComparison?.usedCurlCompatibleFallback() == true
         ) {
             pathLabels += context.getString(R.string.checker_bypass_transport_only_vpn_path)
             usesInjectedResolve = usesInjectedResolve ||
-                result.vpnIpComparison.curlCompatible.transportDiagnostics.resolveStrategy ==
+                vpnComparison.curlCompatible.transportDiagnostics.resolveStrategy ==
                 TunProbeResolveStrategy.KOTLIN_INJECTED
         }
+        val underlyingComparison = result.underlyingIpComparison
         if (
             result.underlyingIp != null &&
-            result.underlyingIpComparison?.usedCurlCompatibleFallback() == true
+            underlyingComparison?.usedCurlCompatibleFallback() == true
         ) {
             pathLabels += context.getString(R.string.checker_bypass_transport_only_underlying_path)
             usesInjectedResolve = usesInjectedResolve ||
-                result.underlyingIpComparison.curlCompatible.transportDiagnostics.resolveStrategy ==
+                underlyingComparison.curlCompatible.transportDiagnostics.resolveStrategy ==
                 TunProbeResolveStrategy.KOTLIN_INJECTED
         }
         if (pathLabels.isEmpty()) return false

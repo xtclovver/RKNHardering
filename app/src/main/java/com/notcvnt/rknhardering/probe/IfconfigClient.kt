@@ -73,8 +73,14 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
         collectTrace: Boolean = false,
+        targetHost: String? = null,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpNetworkComparison = withContext(Dispatchers.IO) {
+        val endpoints = if (targetHost != null) {
+            listOf(IpEndpointSpec("https://$targetHost", IpEndpointFamilyHint.IPV4))
+        } else {
+            ENDPOINTS
+        }
         val strict = if (modeOverride == TunProbeModeOverride.CURL_COMPATIBLE) {
             PublicIpModeProbeResult(
                 mode = PublicIpProbeMode.STRICT_SAME_PATH,
@@ -88,6 +94,7 @@ object IfconfigClient {
                 resolverConfig = resolverConfig,
                 binding = primaryBinding,
                 collectTrace = collectTrace,
+                endpoints = endpoints,
                 executionContext = executionContext,
             )
         }
@@ -103,6 +110,7 @@ object IfconfigClient {
                 resolverConfig = resolverConfig,
                 binding = fallbackBinding,
                 collectTrace = collectTrace,
+                endpoints = endpoints,
                 executionContext = executionContext,
             )
             else -> PublicIpModeProbeResult(
@@ -215,9 +223,10 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig,
         proxy: Proxy? = null,
         binding: ResolverBinding? = null,
+        endpoints: List<IpEndpointSpec> = ENDPOINTS,
         onEndpointResult: ((IpEndpointSpec, Result<String>) -> Unit)? = null,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
-    ): Result<String> = fetchFirstSuccessfulIp(ENDPOINTS) { endpoint ->
+    ): Result<String> = fetchFirstSuccessfulIp(endpoints) { endpoint ->
         executionContext.throwIfCancelled()
         val result = PublicIpClient.fetchIp(
             endpoint = endpoint.url,
@@ -246,12 +255,13 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig,
         binding: ResolverBinding,
         collectTrace: Boolean = false,
+        endpoints: List<IpEndpointSpec> = ENDPOINTS,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpModeProbeResult {
         if (mode == PublicIpProbeMode.CURL_COMPATIBLE && binding is ResolverBinding.OsDeviceBinding) {
             return NativeCurlTransportProbe.fetchModeProbeResult(
                 mode = mode,
-                endpoints = ENDPOINTS,
+                endpoints = endpoints,
                 timeoutMs = timeoutMs,
                 resolverConfig = resolverConfig,
                 binding = binding,
@@ -264,6 +274,7 @@ object IfconfigClient {
             timeoutMs = timeoutMs,
             resolverConfig = resolverConfig,
             binding = binding,
+            endpoints = endpoints,
             executionContext = executionContext,
             onEndpointResult = endpointAttempts?.let { attempts ->
                 { endpoint, endpointResult ->

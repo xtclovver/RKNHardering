@@ -20,6 +20,8 @@ import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.model.TargetGroup
+import com.notcvnt.rknhardering.probe.PerTargetProbe
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -148,7 +150,7 @@ class VpnCheckRunnerTest {
         val sharedProbe = UnderlyingNetworkProber.ProbeResult(
             vpnActive = true,
             underlyingReachable = false,
-            vpnIp = "198.51.100.10",
+            ruTarget = PerTargetProbe(targetHost = "", targetGroup = TargetGroup.RU, vpnIp = "198.51.100.10"),
             vpnError = "EPERM",
             activeNetworkIsVpn = true,
         )
