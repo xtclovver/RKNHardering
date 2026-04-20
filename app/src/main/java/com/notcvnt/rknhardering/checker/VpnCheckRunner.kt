@@ -389,6 +389,7 @@ object VpnCheckRunner {
                 cdnPulling = cdnPulling,
                 tunProbe = tunProbeResult,
                 bypass = bypassResult,
+                callTransportLeaks = indirectSigns.callTransportLeaks,
                 asnResolver = AsnResolver.default(context, settings.resolverConfig),
             )
         }.getOrElse { IpConsensusResult.empty(needsReview = true) }

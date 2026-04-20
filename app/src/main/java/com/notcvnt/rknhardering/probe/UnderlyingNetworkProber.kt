@@ -31,10 +31,32 @@ data class PerTargetProbe(
  * vulnerability is present.
  */
 object UnderlyingNetworkProber {
-    private data class BoundNetwork(
+    internal data class NetworkSnapshot(
         val network: Network,
         val interfaceName: String?,
+        val hasInternet: Boolean,
+        val hasVpnTransport: Boolean,
     )
+
+    internal data class ProbeEnvironment(
+        val activeNetwork: Network?,
+        val networks: List<NetworkSnapshot>,
+    )
+
+    internal data class Dependencies(
+        val initNativeCurl: (Context) -> Unit = NativeCurlBridge::initIfNeeded,
+        val environmentProvider: (Context) -> ProbeEnvironment = ::buildProbeEnvironment,
+        val comparisonFetcher: suspend (
+            NetworkSnapshot,
+            DnsResolverConfig,
+            Boolean,
+            TunProbeModeOverride,
+            String?,
+        ) -> PublicIpNetworkComparison = ::fetchIpViaNetworkComparison,
+    )
+
+    @Volatile
+    internal var dependenciesOverride: Dependencies? = null
 
     data class ProbeResult(
         val vpnActive: Boolean,
@@ -73,32 +95,16 @@ object UnderlyingNetworkProber {
         debugEnabled: Boolean = false,
         modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
     ): ProbeResult = withContext(Dispatchers.IO) {
-        NativeCurlBridge.initIfNeeded(context)
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetwork
-        val activeNetworkIsVpn = activeNetwork
-            ?.let(cm::getNetworkCapabilities)
-            ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        val dependencies = dependenciesOverride ?: Dependencies()
+        dependencies.initNativeCurl(context)
+        val environment = dependencies.environmentProvider(context)
+        val activeNetworkIsVpn = environment.activeNetwork
+            ?.let { active -> environment.networks.firstOrNull { it.network == active } }
+            ?.hasVpnTransport
 
-        val allNetworks = cm.allNetworks
-        var vpnNetwork: BoundNetwork? = null
-        val nonVpnNetworks = mutableListOf<BoundNetwork>()
-
-        for (network in allNetworks) {
-            val caps = cm.getNetworkCapabilities(network) ?: continue
-            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
-            val boundNetwork = BoundNetwork(
-                network = network,
-                interfaceName = NetworkInterfaceNameNormalizer.canonicalName(
-                    cm.getLinkProperties(network)?.interfaceName,
-                ),
-            )
-            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
-                vpnNetwork = boundNetwork
-            } else {
-                nonVpnNetworks.add(boundNetwork)
-            }
-        }
+        val internetNetworks = environment.networks.filter { it.hasInternet }
+        val vpnNetwork = internetNetworks.firstOrNull { it.hasVpnTransport }
+        val nonVpnNetworks = internetNetworks.filterNot { it.hasVpnTransport }
 
         if (vpnNetwork == null) {
             return@withContext ProbeResult(
@@ -108,19 +114,31 @@ object UnderlyingNetworkProber {
                 tunProbeDiagnostics = buildTunProbeDiagnostics(
                     debugEnabled = debugEnabled,
                     modeOverride = modeOverride,
-                    activeNetworkIsVpn = activeNetworkIsVpn,
-                    vpnNetworkPresent = false,
-                    underlyingNetworkPresent = nonVpnNetworks.isNotEmpty(),
-                    vpnInterfaceName = null,
-                    vpnComparison = null,
+                        activeNetworkIsVpn = activeNetworkIsVpn,
+                        vpnNetworkPresent = false,
+                        underlyingNetworkPresent = nonVpnNetworks.isNotEmpty(),
+                        vpnInterfaceName = null,
+                        vpnComparison = null,
                     underlyingInterfaceName = nonVpnNetworks.firstOrNull()?.interfaceName,
                     underlyingComparison = null,
                 ),
             )
         }
 
-        val ruVpnComparison = fetchIpViaNetworkComparison(vpnNetwork, resolverConfig, debugEnabled, modeOverride, RU_PROBE_HOST)
-        val nonRuVpnComparison = fetchIpViaNetworkComparison(vpnNetwork, resolverConfig, debugEnabled, modeOverride, NON_RU_PROBE_HOST)
+        val ruVpnComparison = dependencies.comparisonFetcher(
+            vpnNetwork,
+            resolverConfig,
+            debugEnabled,
+            modeOverride,
+            RU_PROBE_HOST,
+        )
+        val nonRuVpnComparison = dependencies.comparisonFetcher(
+            vpnNetwork,
+            resolverConfig,
+            debugEnabled,
+            modeOverride,
+            NON_RU_PROBE_HOST,
+        )
         val vpnError = ruVpnComparison.selectedError ?: nonRuVpnComparison.selectedError
 
         val ruVpnProbe = PerTargetProbe(
@@ -167,22 +185,34 @@ object UnderlyingNetworkProber {
         var nonRuUnderlyingIp: String? = null
         var nonRuUnderlyingError: String? = null
         var usedNetwork: Network? = null
-        var usedBoundNetwork: BoundNetwork? = null
+        var usedBoundNetwork: NetworkSnapshot? = null
         var ruUnderlyingComparison: PublicIpNetworkComparison? = null
         var nonRuUnderlyingComparison: PublicIpNetworkComparison? = null
-        var lastUnderlyingNetwork: BoundNetwork? = null
+        var lastUnderlyingNetwork: NetworkSnapshot? = null
 
         for (network in nonVpnNetworks) {
             lastUnderlyingNetwork = network
 
             // Probe RU target
-            val ruResult = fetchIpViaNetworkComparison(network, resolverConfig, debugEnabled, modeOverride, RU_PROBE_HOST)
+            val ruResult = dependencies.comparisonFetcher(
+                network,
+                resolverConfig,
+                debugEnabled,
+                modeOverride,
+                RU_PROBE_HOST,
+            )
             ruUnderlyingComparison = ruResult
             ruUnderlyingIp = ruResult.selectedIp
             ruUnderlyingError = ruResult.selectedError ?: ruUnderlyingError
 
             // Probe non-RU target
-            val nonRuResult = fetchIpViaNetworkComparison(network, resolverConfig, debugEnabled, modeOverride, NON_RU_PROBE_HOST)
+            val nonRuResult = dependencies.comparisonFetcher(
+                network,
+                resolverConfig,
+                debugEnabled,
+                modeOverride,
+                NON_RU_PROBE_HOST,
+            )
             nonRuUnderlyingComparison = nonRuResult
             nonRuUnderlyingIp = nonRuResult.selectedIp
             nonRuUnderlyingError = nonRuResult.selectedError ?: nonRuUnderlyingError
@@ -234,25 +264,48 @@ object UnderlyingNetworkProber {
         )
     }
 
+    private fun buildProbeEnvironment(context: Context): ProbeEnvironment {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networks = cm.allNetworks.mapNotNull { network ->
+            val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
+            NetworkSnapshot(
+                network = network,
+                interfaceName = NetworkInterfaceNameNormalizer.canonicalName(
+                    cm.getLinkProperties(network)?.interfaceName,
+                ),
+                hasInternet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+                hasVpnTransport = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN),
+            )
+        }
+        return ProbeEnvironment(
+            activeNetwork = cm.activeNetwork,
+            networks = networks,
+        )
+    }
+
     private suspend fun fetchIpViaNetworkComparison(
-        boundNetwork: BoundNetwork,
+        networkSnapshot: NetworkSnapshot,
         resolverConfig: DnsResolverConfig,
         debugEnabled: Boolean,
         modeOverride: TunProbeModeOverride,
         targetHost: String? = null,
     ): PublicIpNetworkComparison {
-        val fallbackBinding = boundNetwork.interfaceName
+        val fallbackBinding = networkSnapshot.interfaceName
             ?.takeIf { it.isNotBlank() }
             ?.let { ResolverBinding.OsDeviceBinding(it, dnsMode = ResolverBinding.DnsMode.SYSTEM) }
 
         return IfconfigClient.fetchIpViaNetworkComparison(
-            primaryBinding = ResolverBinding.AndroidNetworkBinding(boundNetwork.network),
+            primaryBinding = ResolverBinding.AndroidNetworkBinding(networkSnapshot.network),
             fallbackBinding = fallbackBinding,
             resolverConfig = resolverConfig,
             modeOverride = modeOverride,
             collectTrace = debugEnabled,
             targetHost = targetHost,
         )
+    }
+
+    internal fun resetForTests() {
+        dependenciesOverride = null
     }
 
     internal fun buildTunProbeDiagnostics(

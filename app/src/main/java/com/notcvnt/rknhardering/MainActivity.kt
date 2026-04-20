@@ -49,15 +49,19 @@ import com.notcvnt.rknhardering.model.CallTransportService
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
+import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
+import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunScope
+import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import kotlinx.coroutines.Job
@@ -495,6 +499,7 @@ class MainActivity : AppCompatActivity() {
             Spec(CATEGORY_GEO, getString(R.string.main_card_geo_ip), R.drawable.ic_globe),
             Spec(CATEGORY_IPC, getString(R.string.main_card_ip_comparison), R.drawable.ic_compare),
             Spec(CATEGORY_CDN, getString(R.string.main_card_cdn_pulling), R.drawable.ic_cloud),
+            Spec(CATEGORY_IPS, getString(R.string.ip_channels_title), R.drawable.ic_compare),
             Spec(CATEGORY_DIR, getString(R.string.main_card_direct_signs), R.drawable.ic_shield),
             Spec(CATEGORY_IND, getString(R.string.main_card_indirect_signs), R.drawable.ic_network),
             Spec(CATEGORY_STN, getString(R.string.main_card_call_transport), R.drawable.ic_phone),
@@ -1064,6 +1069,9 @@ class MainActivity : AppCompatActivity() {
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
 
+        ipChannelsContainer.removeAllViews()
+        cardIpChannels.visibility = View.GONE
+
         clearVerdictCard()
     }
 
@@ -1079,6 +1087,9 @@ class MainActivity : AppCompatActivity() {
         stages += RunningStage.DIRECT
         stages += RunningStage.INDIRECT
         stages += RunningStage.LOCATION
+        if (settings.networkRequestsEnabled || settings.splitTunnelEnabled) {
+            stages += RunningStage.IP_CONSENSUS
+        }
         if (settings.splitTunnelEnabled) {
             stages += RunningStage.BYPASS
         }
@@ -1186,6 +1197,7 @@ class MainActivity : AppCompatActivity() {
                 markStageCompleted(RunningStage.IP_CONSENSUS)
                 ensureCardVisible(cardIpChannels, animate = false)
                 displayIpChannels(update.result, activeCheckPrivacyMode)
+                updateTileFromIpConsensus(update.result)
                 if (animate) animateContentReveal(ipChannelsContainer)
             }
             is CheckUpdate.VerdictReady -> {
@@ -1201,7 +1213,7 @@ class MainActivity : AppCompatActivity() {
         RunningStage.DIRECT -> CATEGORY_DIR
         RunningStage.INDIRECT -> CATEGORY_IND
         RunningStage.LOCATION -> CATEGORY_LOC
-        RunningStage.IP_CONSENSUS -> "ip_channels"
+        RunningStage.IP_CONSENSUS -> CATEGORY_IPS
         RunningStage.BYPASS -> CATEGORY_BYP
     }
 
@@ -1210,7 +1222,9 @@ class MainActivity : AppCompatActivity() {
         if (stage in loadingStages && cardForStage(stage).isVisible) return
 
         setTileStatus(tileIdForStage(stage), TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
-        loadingStages += stage
+        if (stage != RunningStage.IP_CONSENSUS) {
+            loadingStages += stage
+        }
         when (stage) {
             RunningStage.GEO_IP -> showCategoryLoading(
                 stage = stage,
@@ -1581,6 +1595,7 @@ class MainActivity : AppCompatActivity() {
             cardGeoIp,
             cardIpComparison,
             cardCdnPulling,
+            cardIpChannels,
             cardDirect,
             cardIndirect,
             cardCallTransport,
@@ -2084,17 +2099,7 @@ class MainActivity : AppCompatActivity() {
 
             val warningColor = ContextCompat.getColor(themedContext(), R.color.finding_detected)
             val warningBackground = TextView(themedContext()).apply {
-                text = buildString {
-                    if (consensus.crossChannelMismatch) appendLine("⚠ Cross-channel mismatch detected")
-                    if (consensus.warpLikeIndicator) appendLine("⚠ WARP-like behavior detected")
-                    if (consensus.geoCountryMismatch) appendLine("⚠ Geo-country mismatch")
-                    if (consensus.probeTargetDivergence) appendLine("⚠ Probe-target divergence")
-                    if (consensus.probeTargetDirectDivergence) appendLine("⚠ Probe-target direct divergence")
-                    if (consensus.channelConflict.isNotEmpty()) {
-                        appendLine("⚠ Channel conflict: ${consensus.channelConflict.joinToString(", ")}")
-                    }
-                    if (consensus.needsReview) appendLine("⚠ Needs review")
-                }
+                text = buildIpConsensusWarningText(consensus)
                 textSize = 12f
                 setTextColor(warningColor)
                 setPadding(8.dp, 8.dp, 8.dp, 8.dp)
@@ -2105,7 +2110,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createIpChannelRow(ip: com.notcvnt.rknhardering.model.ObservedIp, privacyMode: Boolean): View {
+    private fun createIpChannelRow(ip: ObservedIp, privacyMode: Boolean): View {
         val row = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -2113,7 +2118,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val channelChip = TextView(themedContext()).apply {
-            text = ip.channel.name
+            text = ipChannelLabel(ip.channel)
             textSize = 11f
             setTextColor(onSurfaceColor())
             typeface = Typeface.DEFAULT_BOLD
@@ -2126,7 +2131,7 @@ class MainActivity : AppCompatActivity() {
 
         val targetChip = if (ip.targetGroup != null) {
             TextView(themedContext()).apply {
-                text = ip.targetGroup.name
+                text = ipTargetGroupLabel(ip.targetGroup)
                 textSize = 11f
                 setTextColor(onSurfaceColor())
                 typeface = Typeface.DEFAULT_BOLD
@@ -2143,6 +2148,7 @@ class MainActivity : AppCompatActivity() {
             append(maskedIp)
             if (ip.countryCode != null) append(" (${ip.countryCode})")
             if (ip.asn != null) append(" ${ip.asn}")
+            append(" • ${ipFamilyLabel(ip.family)}")
         }
 
         val infoView = TextView(themedContext()).apply {
@@ -2159,6 +2165,43 @@ class MainActivity : AppCompatActivity() {
         row.addView(infoView)
 
         return row
+    }
+
+    private fun buildIpConsensusWarningText(consensus: IpConsensusResult): String {
+        val warnings = buildList {
+            if (consensus.crossChannelMismatch) add(getString(R.string.ip_channels_flag_cross_channel_mismatch))
+            if (consensus.warpLikeIndicator) add(getString(R.string.ip_channels_flag_warp_like_behavior))
+            if (consensus.geoCountryMismatch) add(getString(R.string.ip_channels_flag_geo_country_mismatch))
+            if (consensus.probeTargetDivergence) add(getString(R.string.ip_channels_flag_probe_target_divergence))
+            if (consensus.probeTargetDirectDivergence) {
+                add(getString(R.string.ip_channels_flag_probe_target_direct_divergence))
+            }
+            if (consensus.channelConflict.isNotEmpty()) {
+                val channels = consensus.channelConflict
+                    .sortedBy { it.ordinal }
+                    .joinToString(", ") { ipChannelLabel(it) }
+                add(getString(R.string.ip_channels_flag_channel_conflict, channels))
+            }
+            if (consensus.needsReview) add(getString(R.string.ip_channels_flag_needs_review))
+        }
+        return warnings.joinToString(separator = "\n") { "\u26A0 $it" }
+    }
+
+    private fun ipChannelLabel(channel: Channel): String = when (channel) {
+        Channel.DIRECT -> getString(R.string.ip_channels_channel_direct)
+        Channel.VPN -> getString(R.string.ip_channels_channel_vpn)
+        Channel.PROXY -> getString(R.string.ip_channels_channel_proxy)
+        Channel.CDN -> getString(R.string.ip_channels_channel_cdn)
+    }
+
+    private fun ipTargetGroupLabel(targetGroup: TargetGroup): String = when (targetGroup) {
+        TargetGroup.RU -> getString(R.string.ip_channels_target_ru)
+        TargetGroup.NON_RU -> getString(R.string.ip_channels_target_non_ru)
+    }
+
+    private fun ipFamilyLabel(family: IpFamily): String = when (family) {
+        IpFamily.V4 -> getString(R.string.main_card_call_transport_stun_ipv4)
+        IpFamily.V6 -> getString(R.string.main_card_call_transport_stun_ipv6)
     }
 
     private fun displayBypass(bypass: BypassResult, privacyMode: Boolean = false) {
@@ -2755,6 +2798,7 @@ class MainActivity : AppCompatActivity() {
         private const val CATEGORY_GEO = "geo"
         private const val CATEGORY_IPC = "ipc"
         private const val CATEGORY_CDN = "cdn"
+        private const val CATEGORY_IPS = "ip_channels"
         private const val CATEGORY_DIR = "dir"
         private const val CATEGORY_IND = "ind"
         private const val CATEGORY_STN = "stn"
@@ -2854,7 +2898,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setEmbeddedCategoryHeaderVisible(id: String, visible: Boolean) {
-        if (id != CATEGORY_STN && id != CATEGORY_NAT) return
+        if (id != CATEGORY_STN && id != CATEGORY_NAT && id != CATEGORY_IPS) return
         val content = legacyContentFor(id) as? android.view.ViewGroup ?: return
         val header = content.getChildAt(0) ?: return
         header.visibility = if (visible) View.VISIBLE else View.GONE
@@ -2864,6 +2908,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_GEO -> cardGeoIp
         CATEGORY_IPC -> cardIpComparison
         CATEGORY_CDN -> cardCdnPulling
+        CATEGORY_IPS -> cardIpChannels
         CATEGORY_DIR -> cardDirect
         CATEGORY_IND -> cardIndirect
         CATEGORY_STN -> cardCallTransport
@@ -2878,6 +2923,7 @@ class MainActivity : AppCompatActivity() {
             CATEGORY_GEO -> R.id.cardGeoIpContent
             CATEGORY_IPC -> R.id.cardIpComparisonContent
             CATEGORY_CDN -> R.id.cardCdnPullingContent
+            CATEGORY_IPS -> R.id.cardIpChannelsContent
             CATEGORY_DIR -> R.id.cardDirectContent
             CATEGORY_IND -> R.id.cardIndirectContent
             CATEGORY_STN -> R.id.cardCallTransportContent
@@ -2894,6 +2940,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_GEO -> R.drawable.ic_globe
         CATEGORY_IPC -> R.drawable.ic_compare
         CATEGORY_CDN -> R.drawable.ic_cloud
+        CATEGORY_IPS -> R.drawable.ic_compare
         CATEGORY_DIR -> R.drawable.ic_shield
         CATEGORY_IND -> R.drawable.ic_network
         CATEGORY_STN -> R.drawable.ic_phone
@@ -2984,6 +3031,29 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.tile_hint_clean)
         }
         setTileStatus(CATEGORY_BYP, status, hint)
+    }
+
+    private fun updateTileFromIpConsensus(result: IpConsensusResult) {
+        val hasDetectedSignal = result.crossChannelMismatch ||
+            result.warpLikeIndicator ||
+            result.probeTargetDivergence ||
+            result.probeTargetDirectDivergence ||
+            result.geoCountryMismatch ||
+            result.foreignIps.isNotEmpty()
+        val hasReviewSignal = result.channelConflict.isNotEmpty() || result.needsReview
+        val observedCount = result.observedIps.size
+        val status = when {
+            hasDetectedSignal -> TILE_STATUS_DETECTED
+            hasReviewSignal -> TILE_STATUS_REVIEW
+            observedCount > 0 -> TILE_STATUS_CLEAN
+            else -> TILE_STATUS_NEUTRAL
+        }
+        val hint = when {
+            hasDetectedSignal || hasReviewSignal -> getString(R.string.tile_hint_review)
+            observedCount > 0 -> getString(R.string.tile_hint_clean_count, observedCount)
+            else -> getString(R.string.tile_hint_placeholder)
+        }
+        setTileStatus(CATEGORY_IPS, status, hint)
     }
 
     private fun updateTileFromCallTransport(leaks: List<CallTransportLeakResult>, stunGroups: List<StunProbeGroupResult>) {

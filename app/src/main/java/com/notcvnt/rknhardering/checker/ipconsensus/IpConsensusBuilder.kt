@@ -1,6 +1,8 @@
 package com.notcvnt.rknhardering.checker.ipconsensus
 
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.Channel
@@ -29,9 +31,17 @@ object IpConsensusBuilder {
         cdnPulling: CdnPullingResult,
         tunProbe: UnderlyingNetworkProber.ProbeResult?,
         bypass: BypassResult,
+        callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
         asnResolver: AsnResolver,
     ): IpConsensusResult {
-        val candidates = collectCandidates(geoIp, ipComparison, cdnPulling, tunProbe, bypass)
+        val candidates = collectCandidates(
+            geoIp = geoIp,
+            ipComparison = ipComparison,
+            cdn = cdnPulling,
+            probe = tunProbe,
+            bypass = bypass,
+            callTransportLeaks = callTransportLeaks,
+        )
 
         val unparsed = mutableListOf<UnparsedIp>()
         val parsed = mutableListOf<ParsedCandidate>()
@@ -125,6 +135,7 @@ object IpConsensusBuilder {
         cdn: CdnPullingResult,
         probe: UnderlyingNetworkProber.ProbeResult?,
         bypass: BypassResult,
+        callTransportLeaks: List<CallTransportLeakResult>,
     ): List<Candidate> {
         val out = mutableListOf<Candidate>()
 
@@ -191,6 +202,36 @@ object IpConsensusBuilder {
         bypass.underlyingIp?.let { out += Candidate(it, Channel.DIRECT, "bypass.underlying", null, null, null) }
         bypass.vpnNetworkIp?.let { out += Candidate(it, Channel.VPN, "bypass.vpn", null, null, null) }
         bypass.proxyIp?.let { out += Candidate(it, Channel.PROXY, "bypass.proxy", null, null, null) }
+        callTransportLeaks.forEach { leak ->
+            val mappedIp = leak.mappedIp ?: return@forEach
+            val channel = when (leak.networkPath) {
+                CallTransportNetworkPath.ACTIVE,
+                CallTransportNetworkPath.UNDERLYING -> Channel.DIRECT
+                CallTransportNetworkPath.LOCAL_PROXY -> Channel.PROXY
+            }
+            val source = buildString {
+                append("call-transport:")
+                append(leak.networkPath.name.lowercase())
+                append(':')
+                append(leak.probeKind.name.lowercase())
+                leak.targetHost?.let {
+                    append(':')
+                    append(it)
+                }
+                leak.targetPort?.let {
+                    append(':')
+                    append(it)
+                }
+            }
+            out += Candidate(
+                raw = mappedIp,
+                channel = channel,
+                source = source,
+                targetGroup = null,
+                countryCode = null,
+                asn = null,
+            )
+        }
 
         return out
     }

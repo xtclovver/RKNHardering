@@ -88,6 +88,8 @@ class CheckResultMarkdownExportFormatterTest {
 
         assertTrue(markdown.contains("## IP каналы"))
         assertTrue(markdown.contains("| Канал | Target | IP | Family | Страна | ASN | Источники |"))
+        assertTrue(markdown.contains("| DIRECT | RU | 198.51.100.7 | V4 | RU | AS64501 Example Direct |"))
+        assertTrue(markdown.contains("| VPN | NON_RU | 203.0.113.64 | V4 | FI | AS64502 Example VPN |"))
     }
 
     @Test

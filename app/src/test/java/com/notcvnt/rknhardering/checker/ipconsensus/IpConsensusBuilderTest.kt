@@ -2,6 +2,11 @@ package com.notcvnt.rknhardering.checker.ipconsensus
 
 import com.notcvnt.rknhardering.model.AsnInfo
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.CallTransportLeakResult
+import com.notcvnt.rknhardering.model.CallTransportNetworkPath
+import com.notcvnt.rknhardering.model.CallTransportProbeKind
+import com.notcvnt.rknhardering.model.CallTransportService
+import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
@@ -110,12 +115,29 @@ class IpConsensusBuilderTest {
         detected = false,
     )
 
+    private fun callTransportLeak(
+        mappedIp: String,
+        networkPath: CallTransportNetworkPath = CallTransportNetworkPath.ACTIVE,
+        probeKind: CallTransportProbeKind = CallTransportProbeKind.DIRECT_UDP_STUN,
+    ): CallTransportLeakResult = CallTransportLeakResult(
+        service = CallTransportService.TELEGRAM,
+        probeKind = probeKind,
+        networkPath = networkPath,
+        status = CallTransportStatus.NEEDS_REVIEW,
+        targetHost = "stun.example.com",
+        targetPort = 3478,
+        mappedIp = mappedIp,
+        observedPublicIp = null,
+        summary = "STUN mapped IP $mappedIp",
+    )
+
     private suspend fun build(
         geoIpResult: CategoryResult = geoIp(),
         ipComparisonResult: IpComparisonResult = ipComparison(),
         cdnResult: CdnPullingResult = cdn(),
         probeResult: UnderlyingNetworkProber.ProbeResult? = null,
         bypassResult: BypassResult = bypass(),
+        callTransportLeaks: List<CallTransportLeakResult> = emptyList(),
         asnLookup: suspend (String) -> AsnInfo? = { null },
     ) = IpConsensusBuilder.build(
         geoIp = geoIpResult,
@@ -123,6 +145,7 @@ class IpConsensusBuilderTest {
         cdnPulling = cdnResult,
         tunProbe = probeResult,
         bypass = bypassResult,
+        callTransportLeaks = callTransportLeaks,
         asnResolver = AsnResolver(maxIps = 6, lookup = asnLookup),
     )
 
@@ -183,6 +206,32 @@ class IpConsensusBuilderTest {
             bypassResult = bypass(proxyIp = "5.6.7.8"),
         )
         assertTrue(result.warpLikeIndicator)
+    }
+
+    @Test
+    fun `call transport mapped ip contributes direct channel`() = runBlocking {
+        val result = build(
+            callTransportLeaks = listOf(callTransportLeak(mappedIp = "203.0.113.55")),
+        )
+        val direct = result.observedIps.first { it.value == "203.0.113.55" }
+        assertEquals(Channel.DIRECT, direct.channel)
+        assertTrue(direct.sources.any { it.contains("call-transport:active") })
+    }
+
+    @Test
+    fun `proxy assisted udp stun contributes proxy channel`() = runBlocking {
+        val result = build(
+            callTransportLeaks = listOf(
+                callTransportLeak(
+                    mappedIp = "198.51.100.20",
+                    networkPath = CallTransportNetworkPath.LOCAL_PROXY,
+                    probeKind = CallTransportProbeKind.PROXY_ASSISTED_UDP_STUN,
+                ),
+            ),
+        )
+        val proxy = result.observedIps.first { it.value == "198.51.100.20" }
+        assertEquals(Channel.PROXY, proxy.channel)
+        assertTrue(proxy.sources.any { it.contains("call-transport:local_proxy") })
     }
 
     @Test

@@ -10,6 +10,7 @@ import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
+import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -19,12 +20,16 @@ import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
 import com.notcvnt.rknhardering.model.IpComparisonResult
+import com.notcvnt.rknhardering.model.IpConsensusResult
+import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.LocalProxyCheckResult
 import com.notcvnt.rknhardering.model.LocalProxyCheckStatus
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.LocalProxyOwnerStatus
 import com.notcvnt.rknhardering.model.LocalProxySummaryReason
 import com.notcvnt.rknhardering.model.MatchedVpnApp
+import com.notcvnt.rknhardering.model.ObservedIp
+import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VpnAppKind
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
@@ -302,6 +307,33 @@ internal fun exportRichCheckResult(): CheckResult {
                     description = "Xray exposed 198.51.100.7",
                 ),
             ),
+        ),
+        ipConsensus = IpConsensusResult(
+            observedIps = listOf(
+                ObservedIp(
+                    value = "198.51.100.7",
+                    family = IpFamily.V4,
+                    channel = Channel.DIRECT,
+                    sources = setOf("geoip", "ipcomp:ru:ru-main"),
+                    countryCode = "RU",
+                    asn = "AS64501 Example Direct",
+                    targetGroup = TargetGroup.RU,
+                ),
+                ObservedIp(
+                    value = "203.0.113.64",
+                    family = IpFamily.V4,
+                    channel = Channel.VPN,
+                    sources = setOf("underlying-prober.non-ru.vpn", "bypass.vpn"),
+                    countryCode = "FI",
+                    asn = "AS64502 Example VPN",
+                    targetGroup = TargetGroup.NON_RU,
+                ),
+            ),
+            crossChannelMismatch = true,
+            foreignIps = setOf("203.0.113.64"),
+            geoCountryMismatch = true,
+            probeTargetDivergence = true,
+            needsReview = true,
         ),
         verdict = Verdict.DETECTED,
     )

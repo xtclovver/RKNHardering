@@ -93,7 +93,9 @@ class CheckResultJsonExportFormatterTest {
             ),
         )
 
-        val ipConsensus = json.getJSONObject("results").getJSONObject("ipConsensus")
+        val ipConsensus = json.getJSONObject("ipConsensus")
+        val observedIps = ipConsensus.getJSONArray("observedIps")
+        assertEquals(2, observedIps.length())
         assertTrue(ipConsensus.has("observedIps"))
         assertTrue(ipConsensus.has("crossChannelMismatch"))
         assertTrue(ipConsensus.has("warpLikeIndicator"))
@@ -103,6 +105,9 @@ class CheckResultJsonExportFormatterTest {
         assertTrue(ipConsensus.has("channelConflict"))
         assertTrue(ipConsensus.has("foreignIps"))
         assertTrue(ipConsensus.has("needsReview"))
+        assertEquals("DIRECT", observedIps.getJSONObject(0).getString("channel"))
+        assertEquals("V4", observedIps.getJSONObject(0).getString("family"))
+        assertEquals("VPN", observedIps.getJSONObject(1).getString("channel"))
     }
 
     @Test
@@ -120,7 +125,7 @@ class CheckResultJsonExportFormatterTest {
             ),
         )
 
-        val ipConsensus = json.getJSONObject("results").getJSONObject("ipConsensus")
+        val ipConsensus = json.getJSONObject("ipConsensus")
         assertEquals(0, ipConsensus.getJSONArray("observedIps").length())
         assertFalse(ipConsensus.getBoolean("crossChannelMismatch"))
         assertFalse(ipConsensus.getBoolean("needsReview"))

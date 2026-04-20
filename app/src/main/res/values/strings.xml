@@ -130,7 +130,20 @@
     <string name="main_card_call_transport_reason_targets_unavailable">Targets for this check are unavailable</string>
     <string name="main_card_call_transport_stun_group_global">Global STUN</string>
     <string name="main_card_call_transport_stun_group_ru">RU STUN</string>
-    <string name="ip_channels_title" translatable="false">IP каналы</string>
+    <string name="ip_channels_title">IP channels</string>
+    <string name="ip_channels_channel_direct">Direct</string>
+    <string name="ip_channels_channel_vpn">VPN</string>
+    <string name="ip_channels_channel_proxy">Proxy</string>
+    <string name="ip_channels_channel_cdn">CDN</string>
+    <string name="ip_channels_target_ru">RU</string>
+    <string name="ip_channels_target_non_ru">Non-RU</string>
+    <string name="ip_channels_flag_cross_channel_mismatch">Cross-channel mismatch detected</string>
+    <string name="ip_channels_flag_warp_like_behavior">WARP-like behavior detected</string>
+    <string name="ip_channels_flag_geo_country_mismatch">Geo-country mismatch</string>
+    <string name="ip_channels_flag_probe_target_divergence">Probe-target divergence</string>
+    <string name="ip_channels_flag_probe_target_direct_divergence">Probe-target direct divergence</string>
+    <string name="ip_channels_flag_channel_conflict">Channel conflict: %1$s</string>
+    <string name="ip_channels_flag_needs_review">Needs review</string>
     <string name="main_card_call_transport_stun_responded">%1$d of %2$d responded</string>
     <string name="main_card_call_transport_stun_none_responded">No response</string>
     <string name="main_card_call_transport_stun_ipv4">IPv4</string>

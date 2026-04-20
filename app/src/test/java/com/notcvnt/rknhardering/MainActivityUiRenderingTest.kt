@@ -9,13 +9,19 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.card.MaterialCardView
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
+import com.notcvnt.rknhardering.model.IpFamily
+import com.notcvnt.rknhardering.model.IpConsensusResult
+import com.notcvnt.rknhardering.model.ObservedIp
+import com.notcvnt.rknhardering.model.TargetGroup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -125,6 +131,93 @@ class MainActivityUiRenderingTest {
         val hint = getPrivateField<TextView>(callTransportTile, "hint")
 
         assertEquals(activity.getString(R.string.tile_hint_loading), hint.text.toString())
+    }
+
+    @Test
+    fun `prepare check session shows ip channels card when consensus sources are enabled`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+
+        invokePrivate<Unit>(
+            activity,
+            "prepareCheckSessionUi",
+            CheckSettings(splitTunnelEnabled = true, networkRequestsEnabled = false),
+            false,
+        )
+
+        val card = activity.findViewById<MaterialCardView>(R.id.cardIpChannels)
+        assertEquals(View.VISIBLE, card.visibility)
+    }
+
+    @Test
+    fun `prepare check session keeps ip channels card hidden when consensus sources are disabled`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+
+        invokePrivate<Unit>(
+            activity,
+            "prepareCheckSessionUi",
+            CheckSettings(splitTunnelEnabled = false, networkRequestsEnabled = false),
+            false,
+        )
+
+        val card = activity.findViewById<MaterialCardView>(R.id.cardIpChannels)
+        assertEquals(View.GONE, card.visibility)
+    }
+
+    @Test
+    fun `ip channel row shows family together with channel metadata`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val observedIp = ObservedIp(
+            value = "203.0.113.64",
+            family = IpFamily.V4,
+            channel = Channel.VPN,
+            sources = setOf("underlying-prober.non-ru.vpn"),
+            countryCode = "FI",
+            asn = "AS64502 Example VPN",
+            targetGroup = TargetGroup.NON_RU,
+        )
+
+        val view = invokePrivate<View>(activity, "createIpChannelRow", observedIp, false)
+        val text = collectText(view)
+
+        assertTrueContains(text, activity.getString(R.string.ip_channels_channel_vpn))
+        assertTrueContains(text, activity.getString(R.string.ip_channels_target_non_ru))
+        assertTrueContains(text, "203.0.113.64")
+        assertTrueContains(text, "AS64502 Example VPN")
+        assertTrueContains(text, activity.getString(R.string.main_card_call_transport_stun_ipv4))
+    }
+
+    @Test
+    fun `ip channels tile expands into detail content`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val consensus = IpConsensusResult(
+            observedIps = listOf(
+                ObservedIp(
+                    value = "203.0.113.64",
+                    family = IpFamily.V4,
+                    channel = Channel.VPN,
+                    sources = setOf("underlying-prober.non-ru.vpn"),
+                    countryCode = "FI",
+                    asn = "AS64502 Example VPN",
+                    targetGroup = TargetGroup.NON_RU,
+                ),
+            ),
+            probeTargetDivergence = true,
+        )
+
+        invokePrivate<Unit>(activity, "displayIpChannels", consensus, false)
+        invokePrivate<Unit>(activity, "updateTileFromIpConsensus", consensus)
+        invokePrivate<Unit>(activity, "expandCategory", "ip_channels")
+
+        val expandedDetail = activity.findViewById<MaterialCardView>(R.id.expandedDetail)
+        val detailTitle = activity.findViewById<TextView>(R.id.detailTitle)
+        val detailContentSlot = activity.findViewById<ViewGroup>(R.id.detailContentSlot)
+        val renderedText = collectText(detailContentSlot)
+
+        assertEquals(View.VISIBLE, expandedDetail.visibility)
+        assertEquals(activity.getString(R.string.ip_channels_title), detailTitle.text.toString())
+        assertTrue(renderedText.contains("203.0.113.64"))
+        assertTrue(renderedText.contains(activity.getString(R.string.ip_channels_target_non_ru)))
+        assertTrue(renderedText.contains(activity.getString(R.string.ip_channels_flag_probe_target_divergence)))
     }
 
     private fun collectText(view: View): String {

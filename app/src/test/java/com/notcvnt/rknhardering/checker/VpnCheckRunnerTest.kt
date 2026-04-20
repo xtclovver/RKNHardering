@@ -13,6 +13,7 @@ import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
@@ -102,6 +103,9 @@ class VpnCheckRunnerTest {
         )
 
         assertTrue(result.indirectSigns.callTransportLeaks.any { it.status == CallTransportStatus.NEEDS_REVIEW })
+        assertTrue(
+            result.ipConsensus.observedIps.any { it.channel == Channel.DIRECT && it.value == "198.51.100.20" },
+        )
         assertEquals(Verdict.NEEDS_REVIEW, result.verdict)
     }
 

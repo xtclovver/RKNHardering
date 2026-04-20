@@ -75,10 +75,10 @@ internal object CheckResultJsonExportFormatter {
                 put("directSigns", categoryToJson(snapshot.result.directSigns, snapshot.privacyMode))
                 put("indirectSigns", categoryToJson(snapshot.result.indirectSigns, snapshot.privacyMode))
                 put("locationSignals", categoryToJson(snapshot.result.locationSignals, snapshot.privacyMode))
-                put("ipConsensus", buildIpConsensusJson(snapshot.result.ipConsensus, snapshot.privacyMode))
                 put("bypass", bypassToJson(context, snapshot.result.bypassResult, snapshot.privacyMode))
             },
         )
+        root.put("ipConsensus", buildIpConsensusJson(snapshot.result.ipConsensus, snapshot.privacyMode))
         return root.toString(2)
     }
 
