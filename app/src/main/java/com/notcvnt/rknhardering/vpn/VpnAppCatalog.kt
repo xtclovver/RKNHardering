@@ -23,7 +23,19 @@ object VpnAppCatalog {
     const val FAMILY_SING_BOX = "sing-box"
     const val FAMILY_NEKOBOX = "NekoBox"
     const val FAMILY_HAPP = "HAPP"
+    const val FAMILY_KARING = "Karing"
+    const val FAMILY_NEBULA = "Nebula"
     const val FAMILY_HIDDIFY = "Hiddify"
+    const val FAMILY_MIKUBOX = "MikuBox"
+    const val FAMILY_AEROBOX = "AeroBox"
+    const val FAMILY_FIREFLY = "FireflyVPN"
+    const val FAMILY_V2FLY = "V2fly"
+    const val FAMILY_FLARE = "FlareVPN"
+    const val FAMILY_HUSI = "Husi"
+    const val FAMILY_V2RAYTUN = "v2RayTun"
+    const val FAMILY_V2BOX = "v2box"
+    const val FAMILY_CATBOX = "CatBox"
+    const val FAMILY_EXCLAVE = "Exclave"
     const val FAMILY_CLASH = "Clash"
     const val FAMILY_SHADOWSOCKS = "Shadowsocks"
     const val FAMILY_TOR = "Tor/Orbot"
@@ -38,6 +50,14 @@ object VpnAppCatalog {
     const val FAMILY_TERMUX = "Termux"
 
     val signatures: List<VpnAppSignature> = listOf(
+        VpnAppSignature(
+            packageName = "com.aerobox",
+            appName = "AeroBox",
+            family = FAMILY_AEROBOX,
+            kind = VpnAppKind.TARGETED_BYPASS,
+            defaultPorts = setOf(1080, 2080, 2081),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
         VpnAppSignature(
             packageName = "com.v2ray.ang",
             appName = "v2rayNG",
@@ -71,12 +91,79 @@ object VpnAppCatalog {
             signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
         ),
         VpnAppSignature(
+            packageName = "io.nekohasekai.sagernet",
+            appName = "CatBox",
+            family = FAMILY_CATBOX,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(1080, 2080, 2081),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
+        VpnAppSignature(
+            packageName = "uwu.mb4a",
+            appName = "MikuBox",
+            family = FAMILY_MIKUBOX,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(1080, 2080, 2081),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
+        VpnAppSignature(
+            packageName = "xyz.a202132.app",
+            appName = "FireflyVPN",
+            family = FAMILY_FIREFLY,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(1080, 2080, 2081),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
+        VpnAppSignature(
+            packageName = "com.nebula.karing",
+            appName = "Karing",
+            family = FAMILY_KARING,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(3067),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
+        VpnAppSignature(
+            packageName = "app.husi.singbox",
+            appName = "Husi",
+            family = FAMILY_HUSI,
+            kind = VpnAppKind.GENERIC_VPN,
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+        ),
+        VpnAppSignature(
+            packageName = "com.v2raytun.android",
+            appName = "v2RayTun",
+            family = FAMILY_V2RAYTUN,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(1080, 10808, 10809),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY, VpnClientSignal.XRAY_API),
+        ),
+        VpnAppSignature(
+            packageName = "dev.hexasoftware.v2box",
+            appName = "v2box",
+            family = FAMILY_V2BOX,
+            kind = VpnAppKind.GENERIC_VPN,
+            defaultPorts = setOf(1080, 10808, 10809),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY, VpnClientSignal.XRAY_API),
+        ),
+        VpnAppSignature(
+            packageName = "net.defined.mobileNebula",
+            appName = "Nebula",
+            family = FAMILY_NEBULA,
+            kind = VpnAppKind.GENERIC_VPN,
+        ),
+        VpnAppSignature(
+            packageName = "com.github.dyhkwong.sagernet",
+            appName = "Exclave",
+            family = FAMILY_EXCLAVE,
+            kind = VpnAppKind.GENERIC_VPN,
+        ),
+        VpnAppSignature(
             packageName = "com.happproxy",
             appName = "HAPP VPN",
             family = FAMILY_HAPP,
             kind = VpnAppKind.TARGETED_BYPASS,
             defaultPorts = setOf(1080, 8080),
-            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY),
+            signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY, VpnClientSignal.XRAY_API),
         ),
         VpnAppSignature(
             packageName = "app.hiddify.com",
