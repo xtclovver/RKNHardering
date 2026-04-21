@@ -24,7 +24,7 @@ object VpnAppCatalog {
     const val FAMILY_NEKOBOX = "NekoBox"
     const val FAMILY_HAPP = "HAPP"
     const val FAMILY_KARING = "Karing"
-    const val FAMILY_NEBULA = "Nebula"
+    const val FAMILY_AVOVPN = "avoVPN"
     const val FAMILY_HIDDIFY = "Hiddify"
     const val FAMILY_MIKUBOX = "MikuBox"
     const val FAMILY_AEROBOX = "AeroBox"
@@ -146,9 +146,9 @@ object VpnAppCatalog {
             signals = setOf(VpnClientSignal.VPN_SERVICE, VpnClientSignal.LOCAL_PROXY, VpnClientSignal.XRAY_API),
         ),
         VpnAppSignature(
-            packageName = "net.defined.mobileNebula",
-            appName = "Nebula",
-            family = FAMILY_NEBULA,
+            packageName = "com.avo.vpn",
+            appName = "avoVPN",
+            family = FAMILY_AVOVPN,
             kind = VpnAppKind.GENERIC_VPN,
         ),
         VpnAppSignature(
