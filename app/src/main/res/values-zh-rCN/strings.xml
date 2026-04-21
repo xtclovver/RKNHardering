@@ -447,9 +447,13 @@
     </plurals>
     <string name="checker_bypass_vpn_not_active">Underlying network：VPN 未激活，无需执行此检查</string>
     <string name="checker_bypass_vpn_network_binding">VPN network binding：应用同时访问到了默认非 VPN 路径和 VPN Network（VPN IP：%1$s，默认 IP：%2$s）</string>
-    <string name="checker_bypass_tun_probe_success">TUN active probe：通过 VPN Network 发起的请求返回了 IP %1$s（TUN 是一个可路由的活动接口）</string>
-    <string name="checker_bypass_tun_probe_success_transport_only">TUN active probe：curl-compatible transport-only 路径返回了 IP %1$s（SO_BINDTODEVICE + system DNS）</string>
-    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN 活跃探测：curl-compatible 路径返回了 IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success">TUN 活跃探测：IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct">TUN 活跃探测，直连：IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy">TUN 活跃探测，代理：IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct_target">TUN 活跃探测，%1$s，直连：IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy_target">TUN 活跃探测，%1$s，经代理：IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_transport_only">TUN 活跃探测：IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN 活跃探测：IP %1$s</string>
     <string name="checker_bypass_tun_probe_failure">TUN active probe：通过 VPN Network 发起的请求不可用（接口被阻止或被 filtered）</string>
     <string name="checker_bypass_tun_probe_failure_reason">TUN 活跃探测：通过 VPN Network 发起的请求失败（%1$s）</string>
     <string name="checker_bypass_tun_probe_dns_mismatch">TUN 活跃探测：strict same-path 失败（%1$s），但 curl-compatible transport-only 路径成功；很可能存在 DNS path mismatch</string>

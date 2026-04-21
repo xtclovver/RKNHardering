@@ -454,9 +454,13 @@
     </plurals>
     <string name="checker_bypass_vpn_not_active">Underlying network: VPN не активен, проверка не требуется</string>
     <string name="checker_bypass_vpn_network_binding">VPN network binding: приложение видит и VPN Network, и non-VPN default сеть (VPN IP: %1$s, direct IP: %2$s)</string>
-    <string name="checker_bypass_tun_probe_success">TUN активный зонд: запрос через VPN Network вернул IP %1$s (TUN — живой маршрутизируемый интерфейс)</string>
-    <string name="checker_bypass_tun_probe_success_transport_only">TUN активный зонд: curl-compatible transport-only путь вернул IP %1$s (SO_BINDTODEVICE + системный DNS)</string>
-    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN активный зонд: curl-compatible путь вернул IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success">TUN активный зонд: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct">TUN активный зонд, напрямую: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy">TUN активный зонд, прокси: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct_target">TUN активный зонд, %1$s, напрямую: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy_target">TUN активный зонд, %1$s, через прокси: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_transport_only">TUN активный зонд: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN активный зонд: IP %1$s</string>
     <string name="checker_bypass_tun_probe_failure">TUN активный зонд: запрос через VPN Network недоступен (интерфейс заблокирован или filtered)</string>
     <string name="checker_bypass_tun_probe_failure_reason">TUN активный зонд: запрос через VPN Network завершился ошибкой (%1$s)</string>
     <string name="checker_bypass_tun_probe_dns_mismatch">TUN активный зонд: strict same-path завершился ошибкой (%1$s), но curl-compatible transport-only путь сработал; вероятен mismatch DNS-path</string>

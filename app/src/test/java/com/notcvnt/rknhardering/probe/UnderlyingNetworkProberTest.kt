@@ -107,12 +107,22 @@ class UnderlyingNetworkProberTest {
             ),
             comparisons = mapOf(
                 vpnNetwork to mapOf(
-                    "ifconfig.yandex.ru" to successfulComparison("198.51.100.10"),
-                    "api.ipify.org" to successfulComparison("203.0.113.10"),
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to successfulComparison("198.51.100.10"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to successfulComparison("203.0.113.10"),
                 ),
                 wifiNetwork to mapOf(
-                    "ifconfig.yandex.ru" to successfulComparison("203.0.113.1"),
-                    "api.ipify.org" to successfulComparison("203.0.113.2"),
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to successfulComparison("203.0.113.1"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to successfulComparison("203.0.113.2"),
                 ),
             ),
         )
@@ -128,8 +138,10 @@ class UnderlyingNetworkProberTest {
         assertEquals("203.0.113.10", result.nonRuTarget.vpnIp)
         assertEquals("203.0.113.1", result.ruTarget.directIp)
         assertEquals("203.0.113.2", result.nonRuTarget.directIp)
-        assertEquals("ifconfig.yandex.ru", result.ruTarget.targetHost)
-        assertEquals("api.ipify.org", result.nonRuTarget.targetHost)
+        assertEquals("ipv4-internet.yandex.net", result.ruTarget.targetHost)
+        assertEquals("api-ipv4.ip.sb", result.nonRuTarget.targetHost)
+        assertEquals("203.0.113.10", result.vpnIp)
+        assertEquals("203.0.113.2", result.underlyingIp)
     }
 
     @Test
@@ -140,8 +152,13 @@ class UnderlyingNetworkProberTest {
             snapshots = listOf(snapshot(vpnNetwork, "tun0", hasVpnTransport = true)),
             comparisons = mapOf(
                 vpnNetwork to mapOf(
-                    "ifconfig.yandex.ru" to failureComparison("RU endpoint timeout"),
-                    "api.ipify.org" to successfulComparison("203.0.113.10"),
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to failureComparison("RU endpoint timeout"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to successfulComparison("203.0.113.10"),
                 ),
             ),
         )
@@ -166,8 +183,13 @@ class UnderlyingNetworkProberTest {
             snapshots = listOf(snapshot(vpnNetwork, "tun0", hasVpnTransport = true)),
             comparisons = mapOf(
                 vpnNetwork to mapOf(
-                    "ifconfig.yandex.ru" to successfulComparison("198.51.100.10"),
-                    "api.ipify.org" to successfulComparison("203.0.113.10"),
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to successfulComparison("198.51.100.10"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to successfulComparison("203.0.113.10"),
                 ),
             ),
         )
@@ -185,7 +207,7 @@ class UnderlyingNetworkProberTest {
     private fun installDependencies(
         activeNetwork: Network?,
         snapshots: List<UnderlyingNetworkProber.NetworkSnapshot>,
-        comparisons: Map<Network, Map<String, PublicIpNetworkComparison>>,
+        comparisons: Map<Network, Map<List<String>, PublicIpNetworkComparison>>,
     ) {
         UnderlyingNetworkProber.dependenciesOverride = UnderlyingNetworkProber.Dependencies(
             initNativeCurl = {},
@@ -195,12 +217,54 @@ class UnderlyingNetworkProberTest {
                     networks = snapshots,
                 )
             },
-            comparisonFetcher = { snapshot, _, _, _, targetHost ->
-                val host = requireNotNull(targetHost)
-                comparisons[snapshot.network]?.get(host)
-                    ?: failureComparison("Missing test comparison for ${snapshot.network} $host")
+            comparisonFetcher = { snapshot, _, _, _, targetUrls ->
+                val urls = requireNotNull(targetUrls)
+                comparisons[snapshot.network]?.get(urls)
+                    ?: failureComparison("Missing test comparison for ${snapshot.network} $urls")
             },
         )
+    }
+
+    @Test
+    fun `probe keeps vpn error separate from underlying error`() = runBlocking {
+        val vpnNetwork = newNetwork(305)
+        val wifiNetwork = newNetwork(306)
+        installDependencies(
+            activeNetwork = vpnNetwork,
+            snapshots = listOf(
+                snapshot(vpnNetwork, "tun0", hasVpnTransport = true),
+                snapshot(wifiNetwork, "wlan0", hasVpnTransport = false),
+            ),
+            comparisons = mapOf(
+                vpnNetwork to mapOf(
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to successfulComparison("198.51.100.10"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to failureComparison("vpn non-ru timeout"),
+                ),
+                wifiNetwork to mapOf(
+                    listOf("https://ipv4-internet.yandex.net/api/v0/ip", "https://ip.mail.ru") to successfulComparison("203.0.113.1"),
+                    listOf(
+                        "https://api-ipv4.ip.sb/ip",
+                        "https://checkip.amazonaws.com",
+                        "https://ifconfig.me/ip",
+                        "https://api4.ipify.org",
+                    ) to failureComparison("underlying non-ru timeout"),
+                ),
+            ),
+        )
+
+        val result = UnderlyingNetworkProber.probe(
+            context = context,
+            resolverConfig = DnsResolverConfig.system(),
+        )
+
+        assertEquals(null, result.ruTarget.error)
+        assertEquals("vpn non-ru timeout", result.nonRuTarget.error)
+        assertEquals("underlying non-ru timeout", result.underlyingError)
     }
 
     private fun snapshot(

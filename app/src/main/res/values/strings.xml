@@ -450,9 +450,13 @@
     </plurals>
     <string name="checker_bypass_vpn_not_active">Underlying network: VPN is not active, the check is not required</string>
     <string name="checker_bypass_vpn_network_binding">VPN network binding: the app can reach both the default non-VPN path and VPN Network (VPN IP: %1$s, default IP: %2$s)</string>
-    <string name="checker_bypass_tun_probe_success">TUN active probe: a request via VPN Network returned IP %1$s (TUN is a live routable interface)</string>
-    <string name="checker_bypass_tun_probe_success_transport_only">TUN active probe: a curl-compatible transport-only path returned IP %1$s (SO_BINDTODEVICE + system DNS)</string>
-    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN active probe: a curl-compatible path returned IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success">TUN active probe: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct">TUN active probe, direct: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy">TUN active probe, proxy: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct_target">TUN active probe, %1$s, direct: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy_target">TUN active probe, %1$s, via proxy: IP %2$s</string>
+    <string name="checker_bypass_tun_probe_success_transport_only">TUN active probe: IP %1$s</string>
+    <string name="checker_bypass_tun_probe_success_curl_compatible">TUN active probe: IP %1$s</string>
     <string name="checker_bypass_tun_probe_failure">TUN active probe: a request via VPN Network is unavailable (the interface is blocked or filtered)</string>
     <string name="checker_bypass_tun_probe_failure_reason">TUN active probe: a request via VPN Network failed (%1$s)</string>
     <string name="checker_bypass_tun_probe_dns_mismatch">TUN active probe: strict same-path failed (%1$s), but the curl-compatible transport-only path succeeded; DNS path mismatch is likely</string>

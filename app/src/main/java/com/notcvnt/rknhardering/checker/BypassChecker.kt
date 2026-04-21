@@ -601,7 +601,6 @@ object BypassChecker {
             )
         }
         val usedTransportOnlyFallback = addTransportOnlyFinding(context, result, findings)
-        addDebugTunProbeFindings(context, result, findings)
 
         if (result.activeNetworkIsVpn == false) {
             when {
@@ -841,40 +840,6 @@ object BypassChecker {
             ),
         )
         return true
-    }
-
-    private fun addDebugTunProbeFindings(
-        context: Context,
-        result: UnderlyingNetworkProber.ProbeResult,
-        findings: MutableList<Finding>,
-    ) {
-        val diagnostics = result.tunProbeDiagnostics ?: return
-        diagnostics.vpnPath?.let { vpnPath ->
-            findings.add(
-                Finding(
-                    description = TunProbeDiagnosticsFormatter.formatUiSummary(
-                        context = context,
-                        pathLabel = context.getString(R.string.checker_tun_probe_path_vpn),
-                        modeOverride = diagnostics.modeOverride,
-                        path = vpnPath,
-                    ),
-                    isInformational = true,
-                ),
-            )
-        }
-        diagnostics.underlyingPath?.let { underlyingPath ->
-            findings.add(
-                Finding(
-                    description = TunProbeDiagnosticsFormatter.formatUiSummary(
-                        context = context,
-                        pathLabel = context.getString(R.string.checker_tun_probe_path_underlying),
-                        modeOverride = diagnostics.modeOverride,
-                        path = underlyingPath,
-                    ),
-                    isInformational = true,
-                ),
-            )
-        }
     }
 
     private fun resolveProxyOwner(context: Context, proxyEndpoint: ProxyEndpoint): ProxyOwnerMatch {

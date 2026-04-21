@@ -361,6 +361,82 @@ class IfconfigClientTest {
     }
 
     @Test
+    fun `network comparison uses exact target url for strict and curl compatible probes`() {
+        val requestedEndpoints = mutableListOf<String>()
+        PublicIpClient.fetchIpOverride = { endpoint, _, _, _, binding ->
+            requestedEndpoints += "strict:$endpoint:${binding?.javaClass?.simpleName}"
+            when (binding) {
+                is ResolverBinding.AndroidNetworkBinding -> Result.failure(IOException("strict failed"))
+                null -> Result.failure(IOException("unexpected unbound path"))
+                else -> Result.failure(IOException("unexpected binding"))
+            }
+        }
+        NativeCurlBridge.executeOverride = { request ->
+            requestedEndpoints += "curl:${request.url}"
+            NativeCurlResponse(
+                curlCode = 0,
+                httpCode = 200,
+                body = "203.0.113.57",
+            )
+        }
+
+        val comparison = kotlinx.coroutines.runBlocking {
+            IfconfigClient.fetchIpViaNetworkComparison(
+                primaryBinding = ResolverBinding.AndroidNetworkBinding(newNetwork(212)),
+                fallbackBinding = ResolverBinding.OsDeviceBinding(
+                    interfaceName = "tun0",
+                    dnsMode = ResolverBinding.DnsMode.SYSTEM,
+                ),
+                resolverConfig = DnsResolverConfig.system(),
+                targetUrls = listOf("https://ipv4-internet.yandex.net/api/v0/ip"),
+            )
+        }
+
+        assertEquals(PublicIpProbeMode.CURL_COMPATIBLE, comparison.selectedMode)
+        assertTrue(
+            requestedEndpoints.contains(
+                "strict:https://ipv4-internet.yandex.net/api/v0/ip:AndroidNetworkBinding",
+            ),
+        )
+        assertTrue(requestedEndpoints.contains("curl:https://ipv4-internet.yandex.net/api/v0/ip"))
+    }
+
+    @Test
+    fun `network comparison falls back to next custom target url`() {
+        val strictEndpoints = mutableListOf<String>()
+        PublicIpClient.fetchIpOverride = { endpoint, _, _, _, binding ->
+            strictEndpoints += endpoint
+            when {
+                binding is ResolverBinding.AndroidNetworkBinding && endpoint.contains("checkip.amazonaws.com") ->
+                    Result.failure(IOException("connection closed"))
+                binding is ResolverBinding.AndroidNetworkBinding && endpoint.contains("api-ipv4.ip.sb") ->
+                    Result.success("203.0.113.58")
+                binding == null -> Result.failure(IOException("unexpected unbound path"))
+                else -> Result.failure(IOException("unexpected binding"))
+            }
+        }
+
+        val comparison = kotlinx.coroutines.runBlocking {
+            IfconfigClient.fetchIpViaNetworkComparison(
+                primaryBinding = ResolverBinding.AndroidNetworkBinding(newNetwork(213)),
+                fallbackBinding = null,
+                resolverConfig = DnsResolverConfig.system(),
+                targetUrls = listOf(
+                    "https://checkip.amazonaws.com",
+                    "https://api-ipv4.ip.sb/ip",
+                ),
+            )
+        }
+
+        assertEquals(PublicIpProbeMode.STRICT_SAME_PATH, comparison.selectedMode)
+        assertEquals("203.0.113.58", comparison.selectedIp)
+        assertEquals(
+            listOf("https://checkip.amazonaws.com", "https://api-ipv4.ip.sb/ip"),
+            strictEndpoints,
+        )
+    }
+
+    @Test
     fun `curl compatible uses injected resolve for direct resolver`() {
         var observedBinding: ResolverBinding? = null
         PublicIpClient.fetchIpOverride = { _, _, _, _, binding ->

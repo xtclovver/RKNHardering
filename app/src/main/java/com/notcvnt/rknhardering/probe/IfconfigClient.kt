@@ -20,6 +20,7 @@ object IfconfigClient {
         IpEndpointSpec("https://ifconfig.me/ip", IpEndpointFamilyHint.IPV4),
         IpEndpointSpec("https://checkip.amazonaws.com", IpEndpointFamilyHint.IPV4),
         IpEndpointSpec("https://ip.mail.ru", IpEndpointFamilyHint.IPV4),
+        IpEndpointSpec("https://api-ipv4.ip.sb/ip", IpEndpointFamilyHint.IPV4),
         IpEndpointSpec("https://api4.ipify.org", IpEndpointFamilyHint.IPV4),
         IpEndpointSpec("https://api6.ipify.org", IpEndpointFamilyHint.IPV6),
     )
@@ -87,13 +88,13 @@ object IfconfigClient {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
         collectTrace: Boolean = false,
-        targetHost: String? = null,
+        targetUrls: List<String>? = null,
         okHttpRetryCount: Int = ResolverNetworkStack.OKHTTP_RETRY_COUNT,
         nativeCurlRetryCount: Int = ResolverNetworkStack.NATIVE_CURL_RETRY_COUNT,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): PublicIpNetworkComparison = withContext(Dispatchers.IO) {
-        val endpoints = if (targetHost != null) {
-            listOf(IpEndpointSpec("https://$targetHost", IpEndpointFamilyHint.IPV4))
+        val endpoints = if (!targetUrls.isNullOrEmpty()) {
+            targetUrls.map(::IpEndpointSpec)
         } else {
             ENDPOINTS
         }

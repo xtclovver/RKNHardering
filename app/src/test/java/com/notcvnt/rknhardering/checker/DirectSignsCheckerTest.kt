@@ -385,21 +385,14 @@ class DirectSignsCheckerTest {
             result.findings.any {
                 it.isInformational &&
                     it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
-                    it.description.contains("SO_BINDTODEVICE + system DNS")
-            },
-        )
-        assertTrue(
-            result.findings.any {
-                it.isInformational &&
-                    it.description.contains("effective mode Curl-compatible") &&
-                    it.description.contains("selected mode Curl-compatible") &&
-                    it.description.contains("dnsPathMismatch true")
+                    (it.description.contains("proxy") || it.description.contains("прокси")) &&
+                    (it.description.contains("RU") || it.description.contains("Не-RU"))
             },
         )
         assertFalse(
             result.findings.any {
                 it.isInformational &&
-                    it.description.contains("effective mode Auto")
+                    it.description.contains("VPN path debug")
             },
         )
     }

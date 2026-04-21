@@ -449,8 +449,12 @@
     </plurals>
     <string name="checker_bypass_vpn_not_active">Underlying network: VPN فعال نیست، این بررسی لازم نیست</string>
     <string name="checker_bypass_vpn_network_binding">VPN network binding: برنامه هم به مسیر پیش‌فرض غیر VPN و هم به VPN Network دسترسی دارد (VPN IP: %1$s, IP پیش‌فرض: %2$s)</string>
-    <string name="checker_bypass_tun_probe_success">TUN active probe: درخواست از طریق VPN Network، IP %1$s را برگرداند (TUN یک اینترفیس زنده و قابل مسیریابی است)</string>
-    <string name="checker_bypass_tun_probe_success_transport_only">TUN active probe: مسیر transport-only سازگار با curl، IP %1$s را برگرداند (SO_BINDTODEVICE + DNS سیستم)</string>
+    <string name="checker_bypass_tun_probe_success">کاوش فعال TUN: آی‌پی %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct">کاوش فعال TUN، مستقیم: آی‌پی %1$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy">کاوش فعال TUN، پراکسی: آی‌پی %1$s</string>
+    <string name="checker_bypass_tun_probe_success_direct_target">کاوش فعال TUN، %1$s، مستقیم: آی‌پی %2$s</string>
+    <string name="checker_bypass_tun_probe_success_proxy_target">کاوش فعال TUN، %1$s، از طریق پراکسی: آی‌پی %2$s</string>
+    <string name="checker_bypass_tun_probe_success_transport_only">کاوش فعال TUN: آی‌پی %1$s</string>
     <string name="checker_bypass_tun_probe_failure">TUN active probe: درخواست از طریق VPN Network در دسترس نیست (اینترفیس مسدود یا filtered است)</string>
     <string name="checker_bypass_tun_probe_failure_reason">بررسی فعال TUN: درخواست از طریق VPN Network با خطا شکست خورد (%1$s)</string>
     <string name="checker_bypass_tun_probe_dns_mismatch">بررسی فعال TUN: strict same-path شکست خورد (%1$s)، اما مسیر transport-only سازگار با curl موفق شد؛ احتمال mismatch در مسیر DNS وجود دارد</string>
@@ -471,7 +475,7 @@
     <string name="checker_tun_probe_status_succeeded">succeeded</string>
     <string name="checker_tun_probe_status_failed">failed</string>
     <string name="checker_tun_probe_status_skipped">skipped</string>
-    <string name="checker_bypass_tun_probe_success_curl_compatible">کاوش فعال TUN: مسیر curl-compatible آی‌پی %1$s را برگرداند</string>
+    <string name="checker_bypass_tun_probe_success_curl_compatible">کاوش فعال TUN: آی‌پی %1$s</string>
     <string name="checker_bypass_tun_probe_dns_mismatch_curl_compatible">کاوش فعال TUN: strict same-path شکست خورد (%1$s)، اما مسیر curl-compatible موفق شد؛ احتمال mismatch در DNS-path زیاد است</string>
     <string name="checker_bypass_curl_compatible_used">مقایسه split tunnel از fallback نوع curl-compatible برای این مسیرها استفاده کرد: %1$s</string>
 
