@@ -117,7 +117,7 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 - امضاهای شناخته‌شده package از [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt)؛
 - برنامه‌هایی که از طریق `PackageManager.queryIntentServices`، رابط `VpnService.SERVICE_INTERFACE` را اعلان می‌کنند.
-
+- برنامه در نام خود «VPN» دارد (البته این ۱۰۰٪ تضمین نمی‌کند که VPN باشد)
 این‌ها سیگنال‌های تشخیصی نصب برنامه یا اعلان `VpnService` هستند، نه تأیید یک تونل فعال. تطبیق‌ها دسته را به `needsReview` می‌برند، اما به‌تنهایی باعث `DirectSignsChecker.detected = true` نمی‌شوند.
 
 ---

@@ -117,7 +117,7 @@ The module checks two sources:
 
 - known package signatures from [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt);
 - apps that declare `VpnService.SERVICE_INTERFACE` through `PackageManager.queryIntentServices`.
-
+- the app has "VPN" in the name (this, of course, doesn't 100% guarantee that it's a VPN)
 These are diagnostic signals of installation or `VpnService` declaration, not confirmation of an active tunnel. Matches move the category into `needsReview`, but do not by themselves make `DirectSignsChecker.detected = true`.
 
 ---
