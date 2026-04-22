@@ -30,6 +30,7 @@ object InstalledVpnAppDetector {
 
         detectKnownInstalledPackages(context, pm, findings, evidence, matchedApps)
         detectDeclaredVpnServices(context, pm, findings, evidence, matchedApps)
+        detectPackagesWithVpnInName(context, pm, findings, evidence, matchedApps)
 
         if (matchedApps.isEmpty()) {
             findings.add(
@@ -164,6 +165,68 @@ object InstalledVpnAppDetector {
                 source = EvidenceSource.VPN_SERVICE_DECLARATION,
                 active = false,
                 confidence = confidence,
+            )
+        }
+    }
+
+    private fun detectPackagesWithVpnInName(
+        context: Context,
+        pm: PackageManager,
+        findings: MutableList<Finding>,
+        evidence: MutableList<EvidenceItem>,
+        matchedApps: MutableMap<String, MatchedVpnApp>,
+    ) {
+        val installedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0L))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getInstalledPackages(0)
+        }
+
+        for (pkg in installedPackages) {
+            val packageName = pkg.packageName
+            if (matchedApps.containsKey(packageName)) continue
+
+            val appName = resolveAppName(pm, packageName)
+            if (!appName.contains("VPN", ignoreCase = true)) continue
+
+            val confidence = EvidenceConfidence.LOW
+            val description = context.getString(
+                R.string.checker_vpn_installed_app_by_name,
+                appName,
+                packageName,
+            )
+
+            findings.add(
+                Finding(
+                    description = description,
+                    isInformational = true,
+                    source = EvidenceSource.INSTALLED_APP,
+                    confidence = confidence,
+                    packageName = packageName,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.INSTALLED_APP,
+                    detected = true,
+                    confidence = confidence,
+                    description = description,
+                    packageName = packageName,
+                    kind = VpnAppKind.GENERIC_VPN,
+                ),
+            )
+            matchedApps.putIfAbsent(
+                packageName,
+                MatchedVpnApp(
+                    packageName = packageName,
+                    appName = appName,
+                    family = null,
+                    kind = VpnAppKind.GENERIC_VPN,
+                    source = EvidenceSource.INSTALLED_APP,
+                    active = false,
+                    confidence = confidence,
+                ),
             )
         }
     }
