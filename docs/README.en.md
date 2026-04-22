@@ -6,6 +6,23 @@ Android app for detecting VPNs and proxies on a device. Implements the Roskomnad
 
 Minimum Android version: 8.0 (API 26).
 
+## Community Help Wanted
+
+This project documents methods for detecting VPNs and proxies on Android devices. However, **the inverse problem** how to prevent the detection of an active VPN has been studied much less thoroughly.
+
+I am looking for people willing to help collect, organize, and test information about ways to bypass detection, including, but not limited to:
+
+- **Network interface masking** (how to hide `tun0`, `wg0`, and other VPN-like interfaces from `NetworkInterface.getNetworkInterfaces()` and `/proc/net/route`)
+- **NetworkCapabilities spoofing** (ways to remove `TRANSPORT_VPN`, `IS_VPN`, and `VpnTransportInfo` from `ConnectivityManager` responses)
+- **Hiding from dumpsys** (preventing information leakage through `dumpsys vpn_management` and `dumpsys activity services android.net.VpnService`)
+- **MTU normalization** (setting a standard MTU of 1500 for tunnel interfaces across different clients)
+- **DNS leaks** (preventing detection of loopback/private DNS while a VPN is active)
+- **Hiding localhost proxies** (how to prevent detection via `/proc/net/tcp` and port scanning)
+- **Bypassing native checks** (countering JNI-based checks through `/proc/self/maps`, `getifaddrs()`, and `dlsym`)
+- **Masking installed applications** (hiding VPN app packages from `PackageManager`)
+
+If you have expertise in these areas, please open an Issue or Pull Request describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
+
 ## Architecture
 
 Six independent check modules run in parallel. The final verdict is calculated in `VerdictEngine`.
