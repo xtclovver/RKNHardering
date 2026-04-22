@@ -55,6 +55,12 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
             title = getString(R.string.settings_cat_about),
         ) { activity.navigateTo(SettingsAboutFragment(), R.string.settings_cat_about) }
 
+        bindRow(
+            view, R.id.rowDebug,
+            iconRes = R.drawable.ic_error,
+            title = getString(R.string.settings_cat_debug),
+        ) { activity.navigateTo(SettingsDebugFragment(), R.string.settings_cat_debug) }
+
         renderValues(view)
     }
 
@@ -83,6 +89,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         setRowValue(root, R.id.rowPrivacy, if (privacyModeEnabled()) R.string.settings_value_privacy_masking else R.string.settings_value_off)
         setRowValue(root, R.id.rowAppearance, appearanceValue())
         setRowValue(root, R.id.rowAbout, versionValue())
+        setRowValue(root, R.id.rowDebug, R.string.settings_cat_debug_desc)
     }
 
     private fun setRowValue(root: View, rowId: Int, valueRes: Int) {

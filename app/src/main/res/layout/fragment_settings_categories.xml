@@ -85,6 +85,12 @@
                 <include
                     android:id="@+id/rowAbout"
                     layout="@layout/view_settings_row" />
+
+                <View style="@style/SettingsRowDivider" />
+
+                <include
+                    android:id="@+id/rowDebug"
+                    layout="@layout/view_settings_row" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
