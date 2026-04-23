@@ -22,6 +22,7 @@ data class InstalledVpnDetectionResult(
 )
 
 object InstalledVpnAppDetector {
+    private const val TAG = "VpnAppDetector"
 
     fun detect(context: Context): InstalledVpnDetectionResult {
         val pm = context.packageManager
@@ -187,8 +188,11 @@ object InstalledVpnAppDetector {
         for (pkg in installedPackages) {
             val packageName = pkg.packageName
             if (matchedApps.containsKey(packageName)) continue
-
             val appInfo = pkg.applicationInfo ?: continue
+            val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isUpdatedSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (isSystemApp || isUpdatedSystemApp) continue
+            
             val appName = resolveDisplayAppName(pm, packageName, appInfo)
             val normalizedAppName = appName.uppercase(Locale.ROOT)
             if (!normalizedAppName.contains("VPN")) continue
@@ -212,7 +216,7 @@ object InstalledVpnAppDetector {
             evidence.add(
                 EvidenceItem(
                     source = EvidenceSource.INSTALLED_APP,
-                    detected = true,
+                    detected = false,
                     confidence = confidence,
                     description = description,
                     packageName = packageName,

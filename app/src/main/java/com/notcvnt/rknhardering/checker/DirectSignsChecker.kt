@@ -88,9 +88,6 @@ object DirectSignsChecker {
         findings += appDetection.findings
         evidence += appDetection.evidence
         matchedApps += appDetection.matchedApps
-        if (appDetection.matchedApps.isNotEmpty()) {
-            needsReview = true
-        }
 
         return CategoryResult(
             name = context.getString(R.string.checker_direct_category_name),
