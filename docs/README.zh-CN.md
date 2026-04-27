@@ -117,7 +117,7 @@ API：`ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 - [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt) 中的已知包名签名；
 - 通过 `PackageManager.queryIntentServices` 声明了 `VpnService.SERVICE_INTERFACE` 的应用。
-
+- 该应用程序名称中包含“VPN”（当然，这并不能100%保证它就是VPN）。
 这些只是安装状态或 `VpnService` 声明的诊断信号，并不表示活动隧道已被确认。匹配结果会将该类别标记为 `needsReview`，但不会单独让 `DirectSignsChecker.detected = true`。
 
 ---

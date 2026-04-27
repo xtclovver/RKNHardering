@@ -496,6 +496,7 @@
     <!-- InstalledVpnAppDetector -->
     <string name="checker_vpn_known_apps_none">Known VPN/Proxy apps and VpnService providers: none detected</string>
     <string name="checker_vpn_installed_app">Installed app: %1$s (%2$s)</string>
+    <string name="checker_vpn_installed_app_by_name">Installed app with "VPN" in name: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">App declares VpnService: %1$s (%2$s)</string>
 
     <!-- Redesign: main screen -->

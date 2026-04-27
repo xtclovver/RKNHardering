@@ -492,6 +492,7 @@
 
     <string name="checker_vpn_known_apps_none">已知 VPN/代理应用和 VpnService 提供方：未发现</string>
     <string name="checker_vpn_installed_app">已安装应用：%1$s（%2$s）</string>
+    <string name="checker_vpn_installed_app_by_name">名称中带有“VPN”的已安装应用：%1$s（%2$s）</string>
     <string name="checker_vpn_declares_service">应用声明了 VpnService：%1$s（%2$s）</string>
 
     <!-- Redesign: main screen -->

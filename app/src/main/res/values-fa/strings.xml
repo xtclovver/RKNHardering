@@ -494,6 +494,7 @@
 
     <string name="checker_vpn_known_apps_none">برنامه‌های شناخته‌شده VPN/Proxy و ارائه‌دهندگان VpnService: موردی پیدا نشد</string>
     <string name="checker_vpn_installed_app">برنامه نصب‌شده: %1$s (%2$s)</string>
+    <string name="checker_vpn_installed_app_by_name">برنامه نصب‌شده با «VPN» در نام: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">برنامه VpnService را اعلان می‌کند: %1$s (%2$s)</string>
 
     <!-- Redesign: main screen -->

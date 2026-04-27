@@ -500,6 +500,7 @@
     <!-- InstalledVpnAppDetector -->
     <string name="checker_vpn_known_apps_none">Известные VPN/Proxy-приложения и VpnService-провайдеры: не обнаружены</string>
     <string name="checker_vpn_installed_app">Установлено приложение: %1$s (%2$s)</string>
+    <string name="checker_vpn_installed_app_by_name">Установлено приложение с "VPN" в названии: %1$s (%2$s)</string>
     <string name="checker_vpn_declares_service">Приложение объявляет VpnService: %1$s (%2$s)</string>
 
     <!-- Redesign: main screen -->

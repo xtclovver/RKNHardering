@@ -12,6 +12,7 @@ import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.MatchedVpnApp
 import com.notcvnt.rknhardering.model.VpnAppKind
+import java.util.Locale
 
 data class InstalledVpnDetectionResult(
     val findings: List<Finding>,
@@ -21,6 +22,7 @@ data class InstalledVpnDetectionResult(
 )
 
 object InstalledVpnAppDetector {
+    private const val TAG = "VpnAppDetector"
 
     fun detect(context: Context): InstalledVpnDetectionResult {
         val pm = context.packageManager
@@ -30,6 +32,7 @@ object InstalledVpnAppDetector {
 
         detectKnownInstalledPackages(context, pm, findings, evidence, matchedApps)
         detectDeclaredVpnServices(context, pm, findings, evidence, matchedApps)
+        detectPackagesWithVpnInName(context, pm, findings, evidence, matchedApps)
 
         if (matchedApps.isEmpty()) {
             findings.add(
@@ -166,6 +169,106 @@ object InstalledVpnAppDetector {
                 confidence = confidence,
             )
         }
+    }
+
+    private fun detectPackagesWithVpnInName(
+        context: Context,
+        pm: PackageManager,
+        findings: MutableList<Finding>,
+        evidence: MutableList<EvidenceItem>,
+        matchedApps: MutableMap<String, MatchedVpnApp>,
+    ) {
+        val installedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0L))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getInstalledPackages(0)
+        }
+
+        for (pkg in installedPackages) {
+            val packageName = pkg.packageName
+            if (matchedApps.containsKey(packageName)) continue
+            val appInfo = pkg.applicationInfo ?: continue
+            val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isUpdatedSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (isSystemApp || isUpdatedSystemApp) continue
+            
+            val appName = resolveDisplayAppName(pm, packageName, appInfo)
+            val normalizedAppName = appName.uppercase(Locale.ROOT)
+            if (!normalizedAppName.contains("VPN")) continue
+
+            val confidence = EvidenceConfidence.LOW
+            val description = context.getString(
+                R.string.checker_vpn_installed_app_by_name,
+                appName,
+                packageName,
+            )
+
+            findings.add(
+                Finding(
+                    description = description,
+                    isInformational = true,
+                    source = EvidenceSource.INSTALLED_APP,
+                    confidence = confidence,
+                    packageName = packageName,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.INSTALLED_APP,
+                    detected = false,
+                    confidence = confidence,
+                    description = description,
+                    packageName = packageName,
+                    kind = VpnAppKind.GENERIC_VPN,
+                ),
+            )
+            matchedApps.putIfAbsent(
+                packageName,
+                MatchedVpnApp(
+                    packageName = packageName,
+                    appName = appName,
+                    family = null,
+                    kind = VpnAppKind.GENERIC_VPN,
+                    source = EvidenceSource.INSTALLED_APP,
+                    active = false,
+                    confidence = confidence,
+                ),
+            )
+        }
+    }
+
+    private fun resolveDisplayAppName(
+        pm: PackageManager,
+        packageName: String,
+        appInfo: android.content.pm.ApplicationInfo,
+    ): String {
+        val launcherLabel = resolveLauncherLabel(pm, packageName)
+        if (!launcherLabel.isNullOrBlank()) return launcherLabel
+
+        val applicationLabel = appInfo.loadLabel(pm).toString().trim()
+        if (applicationLabel.isNotBlank()) return applicationLabel
+
+        return packageName
+    }
+
+    private fun resolveLauncherLabel(pm: PackageManager, packageName: String): String? {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            `package` = packageName
+        }
+
+        val resolveInfos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0L))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.queryIntentActivities(intent, 0)
+        }
+
+        return resolveInfos
+            .asSequence()
+            .mapNotNull { it.loadLabel(pm)?.toString()?.trim() }
+            .firstOrNull { it.isNotBlank() }
     }
 
     private fun queryVpnServiceProviders(pm: PackageManager): Map<String, List<String>> {
