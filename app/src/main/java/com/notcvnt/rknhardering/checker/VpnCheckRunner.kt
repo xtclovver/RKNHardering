@@ -268,7 +268,7 @@ object VpnCheckRunner {
             }
         } else null
 
-        val directDeferred = safeAsync(fallback = { Fallbacks.direct(context, it) }) {
+        val directDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.direct(context, it) }) {
             dependencies.directCheck(
                 context,
                 tunActiveProbeDeferred?.await(),

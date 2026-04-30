@@ -151,4 +151,32 @@ class CheckResultJsonExportFormatterTest {
         assertTrue(icmp.getBoolean("needsReview"))
         assertEquals("ICMP spoofing", icmp.getString("name"))
     }
+
+    @Test
+    fun `json export includes vpn app technical metadata`() {
+        val json = JSONObject(
+            CheckResultJsonExportFormatter.format(
+                context = context,
+                snapshot = createCompletedExportSnapshot(
+                    result = exportRichCheckResult(),
+                    privacyMode = false,
+                    finishedAtMillis = 0L,
+                ),
+                appVersionName = "1.0",
+                buildType = "debug",
+            ),
+        )
+
+        val metadata = json
+            .getJSONObject("results")
+            .getJSONObject("directSigns")
+            .getJSONArray("matchedApps")
+            .getJSONObject(0)
+            .getJSONObject("technicalMetadata")
+
+        assertEquals("V2RayNG", metadata.getString("appType"))
+        assertEquals("Xray/V2Ray", metadata.getString("coreType"))
+        assertEquals("1.2.3", metadata.getString("versionName"))
+        assertEquals("ExampleService", metadata.getJSONArray("serviceNames").getString(0))
+    }
 }

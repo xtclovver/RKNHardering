@@ -129,6 +129,17 @@ enum class VpnAppKind {
     GENERIC_VPN,
 }
 
+data class VpnAppTechnicalMetadata(
+    val versionName: String? = null,
+    val serviceNames: List<String> = emptyList(),
+    val appType: String? = null,
+    val coreType: String? = null,
+    val corePath: String? = null,
+    val goVersion: String? = null,
+    val systemApp: Boolean = false,
+    val matchedByNameHeuristic: Boolean = false,
+)
+
 data class Finding(
     val description: String,
     val detected: Boolean = false,
@@ -159,6 +170,7 @@ data class MatchedVpnApp(
     val source: EvidenceSource,
     val active: Boolean,
     val confidence: EvidenceConfidence,
+    val technicalMetadata: VpnAppTechnicalMetadata? = null,
 )
 
 data class ActiveVpnApp(
@@ -168,6 +180,7 @@ data class ActiveVpnApp(
     val kind: VpnAppKind?,
     val source: EvidenceSource,
     val confidence: EvidenceConfidence,
+    val technicalMetadata: VpnAppTechnicalMetadata? = null,
 )
 
 data class LocalProxyOwner(

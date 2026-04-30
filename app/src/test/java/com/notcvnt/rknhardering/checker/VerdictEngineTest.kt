@@ -47,6 +47,32 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `metadata-only installed app evidence does not affect verdict`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = CategoryResult(
+                name = "direct",
+                detected = false,
+                findings = emptyList(),
+                evidence = listOf(
+                    EvidenceItem(
+                        source = EvidenceSource.INSTALLED_APP,
+                        detected = false,
+                        confidence = EvidenceConfidence.LOW,
+                        description = "Installed app with VPN in name",
+                    ),
+                ),
+            ),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+
+        assertEquals(Verdict.NOT_DETECTED, verdict)
+    }
+
+    @Test
     fun `R3a probeTargetDivergence with geoCountryMismatch yields detected`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),

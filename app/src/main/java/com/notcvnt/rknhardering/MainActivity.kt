@@ -66,6 +66,7 @@ import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunScope
 import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.model.Verdict
+import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -1852,9 +1853,10 @@ class MainActivity : AppCompatActivity() {
 
         if (infoSection != null && infoDivider != null) {
             val infoFindings = category.findings.filter { it.isInformational }
+            val husiModelFindings = buildHusiModelFindings(category)
             val checkFindings = category.findings.filterNot { it.isInformational || it.isError }
 
-            bindInfoSection(infoFindings, infoSection, infoDivider, checkFindings.isNotEmpty(), privacyMode)
+            bindInfoSection(infoFindings + husiModelFindings, infoSection, infoDivider, checkFindings.isNotEmpty(), privacyMode)
             findingsContainer.removeAllViews()
             for (finding in checkFindings) {
                 if (finding.description.startsWith("network_mcc_ru:")) continue
@@ -1864,11 +1866,81 @@ class MainActivity : AppCompatActivity() {
         }
 
         findingsContainer.removeAllViews()
-        for (finding in category.findings) {
+        for (finding in category.findings + buildHusiModelFindings(category)) {
             if (finding.isError) continue
             if (finding.description.startsWith("network_mcc_ru:")) continue
             findingsContainer.addView(createFindingView(finding, privacyMode))
         }
+    }
+
+    private fun buildHusiModelFindings(category: CategoryResult): List<Finding> {
+        val findings = buildList {
+            category.matchedApps.forEach { app ->
+                husiModelFinding(
+                    label = app.appName,
+                    packageName = app.packageName,
+                    serviceName = app.technicalMetadata?.serviceNames?.firstOrNull(),
+                    metadata = app.technicalMetadata,
+                    source = app.source,
+                )?.let(::add)
+            }
+            category.activeApps.forEach { app ->
+                husiModelFinding(
+                    label = app.packageName ?: app.serviceName ?: "active VPN",
+                    packageName = app.packageName,
+                    serviceName = app.serviceName,
+                    metadata = app.technicalMetadata,
+                    source = app.source,
+                )?.let(::add)
+            }
+        }
+        return findings.distinctBy { it.packageName.orEmpty() to it.description }
+    }
+
+    private fun husiModelFinding(
+        label: String,
+        packageName: String?,
+        serviceName: String?,
+        metadata: VpnAppTechnicalMetadata?,
+        source: com.notcvnt.rknhardering.model.EvidenceSource?,
+    ): Finding? {
+        val hasMeaningfulMetadata = metadata != null || !serviceName.isNullOrBlank() || !packageName.isNullOrBlank()
+        if (!hasMeaningfulMetadata) return null
+
+        val description = buildString {
+            append("HUSI model: ")
+            append(label)
+            packageName?.takeIf { it.isNotBlank() }?.let {
+                append(" · package: ")
+                append(it)
+            }
+            metadata?.versionName?.takeIf { it.isNotBlank() }?.let {
+                append(" · app version: ")
+                append(it)
+            }
+            append(" · app type: ")
+            append(metadata?.appType ?: "Other")
+            append(" · core type: ")
+            append(metadata?.coreType ?: "Unknown")
+            metadata?.corePath?.takeIf { it.isNotBlank() }?.let {
+                append(" · core path: ")
+                append(it)
+            }
+            metadata?.goVersion?.takeIf { it.isNotBlank() }?.let {
+                append(" · Go: ")
+                append(it)
+            }
+            serviceName?.takeIf { it.isNotBlank() }?.let {
+                append(" · service: ")
+                append(it)
+            }
+        }
+        return Finding(
+            description = description,
+            isInformational = true,
+            source = source,
+            packageName = packageName,
+        )
     }
 
     private fun bindInfoSection(
@@ -1967,6 +2039,18 @@ class MainActivity : AppCompatActivity() {
 
         row.addView(indicator)
         row.addView(description)
+        finding.packageName
+            ?.takeIf { it.isNotBlank() }
+            ?.let { packageName ->
+                row.isClickable = true
+                row.isFocusable = true
+                row.setOnClickListener {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }
+            }
         return row
     }
 

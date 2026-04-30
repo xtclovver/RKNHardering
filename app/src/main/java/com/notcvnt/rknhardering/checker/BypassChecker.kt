@@ -33,11 +33,14 @@ import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
+import com.notcvnt.rknhardering.vpn.VpnAppMetadataScanner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import java.net.InetAddress
 
 object BypassChecker {
@@ -396,7 +399,7 @@ object BypassChecker {
         )
     }
 
-    private fun reportProxyResults(
+    private suspend fun reportProxyResults(
         context: Context,
         directIp: String?,
         proxyChecks: List<LocalProxyCheckResult>,
@@ -416,7 +419,7 @@ object BypassChecker {
         }
     }
 
-    private fun reportProxyCheck(
+    private suspend fun reportProxyCheck(
         context: Context,
         proxyCheck: LocalProxyCheckResult,
         findings: MutableList<Finding>,
@@ -426,6 +429,7 @@ object BypassChecker {
         val proxyEndpoint = proxyCheck.endpoint
         val candidateFamilies = VpnAppCatalog.familiesForPort(proxyEndpoint.port)
         val familySuffix = candidateFamilies.takeIf { it.isNotEmpty() }?.joinToString()
+        val ownerMetadataSuffix = formatProxyOwnerMetadataSuffix(context, proxyCheck.owner, proxyCheck.ownerStatus)
         val description = buildString {
             append(
                 context.getString(
@@ -440,6 +444,7 @@ object BypassChecker {
                 append("]")
             }
             append(formatOwnerSuffix(context, proxyCheck.owner, proxyCheck.ownerStatus))
+            append(ownerMetadataSuffix)
             if (proxyCheck.status != LocalProxyCheckStatus.CONFIRMED_BYPASS) {
                 append(context.getString(R.string.checker_bypass_open_proxy_review_suffix))
             }
@@ -463,6 +468,7 @@ object BypassChecker {
                 description = buildString {
                     append("Detected open ${proxyEndpoint.type.name} proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)}")
                     append(formatOwnerSuffix(context, proxyCheck.owner, proxyCheck.ownerStatus))
+                    append(ownerMetadataSuffix)
                 },
                 family = familySuffix,
                 packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
@@ -913,6 +919,19 @@ object BypassChecker {
             LocalProxyOwnerStatus.UNRESOLVED -> context.getString(R.string.checker_proxy_owner_unresolved)
         } ?: context.getString(R.string.checker_proxy_owner_unresolved)
         return context.getString(R.string.checker_proxy_owner_suffix, ownerText)
+    }
+
+    private suspend fun formatProxyOwnerMetadataSuffix(
+        context: Context,
+        owner: LocalProxyOwner?,
+        status: LocalProxyOwnerStatus,
+    ): String {
+        if (status != LocalProxyOwnerStatus.RESOLVED) return ""
+        val packageName = LocalProxyOwnerFormatter.packageName(owner) ?: return ""
+        val metadata = withContext(Dispatchers.IO) {
+            VpnAppMetadataScanner.scan(context, packageName)
+        }
+        return VpnAppMetadataScanner.formatMetadataSuffix(metadata)
     }
 
     private fun normalizeHost(host: String): String = host.substringBefore('%').lowercase()

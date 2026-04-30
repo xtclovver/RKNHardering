@@ -22,10 +22,19 @@ class InstalledVpnAppDetectorByNameTest {
     private val pm get() = context.packageManager
     private val shadow get() = shadowOf(pm)
 
-    private fun installApp(packageName: String, label: String, systemApp: Boolean = false) {
+    private fun installApp(
+        packageName: String,
+        label: String,
+        systemApp: Boolean = false,
+        updatedSystemApp: Boolean = false,
+    ) {
         val appInfo = ApplicationInfo().apply {
             this.packageName = packageName
-            flags = if (systemApp) ApplicationInfo.FLAG_SYSTEM else 0
+            flags = when {
+                systemApp -> ApplicationInfo.FLAG_SYSTEM
+                updatedSystemApp -> ApplicationInfo.FLAG_UPDATED_SYSTEM_APP
+                else -> 0
+            }
             nonLocalizedLabel = label
         }
         val pkgInfo = PackageInfo().apply {
@@ -89,6 +98,16 @@ class InstalledVpnAppDetectorByNameTest {
 
         assertFalse(result.matchedApps.any { it.packageName == "com.android.vpndialogs" })
         assertFalse(result.evidence.any { it.packageName == "com.android.vpndialogs" })
+    }
+
+    @Test
+    fun `updated system app with VPN in label is not detected`() {
+        installApp("com.android.updatedvpn", "Updated VPN", updatedSystemApp = true)
+
+        val result = InstalledVpnAppDetector.detect(context)
+
+        assertFalse(result.matchedApps.any { it.packageName == "com.android.updatedvpn" })
+        assertFalse(result.evidence.any { it.packageName == "com.android.updatedvpn" })
     }
 
     @Test

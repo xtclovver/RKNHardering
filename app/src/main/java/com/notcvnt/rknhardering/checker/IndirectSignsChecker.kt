@@ -18,6 +18,7 @@ import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
 import com.notcvnt.rknhardering.probe.LocalSocketInspector
 import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
+import com.notcvnt.rknhardering.vpn.VpnAppMetadataScanner
 import com.notcvnt.rknhardering.vpn.VpnClientSignal
 import com.notcvnt.rknhardering.vpn.VpnDumpsysParser
 import java.io.BufferedReader
@@ -1133,6 +1134,12 @@ object IndirectSignsChecker {
             var needsReview = false
             for (record in records) {
                 val signature = record.packageName?.let { VpnAppCatalog.findByPackageName(it) }
+                val metadata = VpnAppMetadataScanner.scan(
+                    context = context,
+                    packageName = record.packageName,
+                    serviceNames = listOfNotNull(record.serviceName),
+                )
+                val appLabel = VpnAppMetadataScanner.resolveAppLabel(context, record.packageName)
                 val confidence = when {
                     signature != null -> EvidenceConfidence.HIGH
                     record.packageName != null -> EvidenceConfidence.MEDIUM
@@ -1141,7 +1148,9 @@ object IndirectSignsChecker {
                 val familySuffix = signature?.family?.let { " [$it]" }.orEmpty()
                 val description = buildString {
                     append(context.getString(R.string.checker_indirect_dumpsys_vpn_line, record.rawLine))
+                    appLabel?.let { append(" ($it)") }
                     append(familySuffix)
+                    append(VpnAppMetadataScanner.formatMetadataSuffix(metadata))
                 }
                 findings.add(
                     Finding(
@@ -1172,6 +1181,7 @@ object IndirectSignsChecker {
                         kind = signature?.kind,
                         source = EvidenceSource.ACTIVE_VPN,
                         confidence = confidence,
+                        technicalMetadata = metadata,
                     ),
                 )
                 detected = true
@@ -1211,6 +1221,12 @@ object IndirectSignsChecker {
             var needsReview = false
             for (record in records) {
                 val signature = record.packageName?.let { VpnAppCatalog.findByPackageName(it) }
+                val metadata = VpnAppMetadataScanner.scan(
+                    context = context,
+                    packageName = record.packageName,
+                    serviceNames = listOfNotNull(record.serviceName),
+                )
+                val appLabel = VpnAppMetadataScanner.resolveAppLabel(context, record.packageName)
                 val confidence = when {
                     signature != null -> EvidenceConfidence.HIGH
                     record.packageName != null -> EvidenceConfidence.MEDIUM
@@ -1224,7 +1240,9 @@ object IndirectSignsChecker {
                 val familySuffix = signature?.family?.let { " [$it]" }.orEmpty()
                 val description = buildString {
                     append(context.getString(R.string.checker_indirect_dumpsys_service_active, serviceDisplay))
+                    appLabel?.let { append(" ($it)") }
                     append(familySuffix)
+                    append(VpnAppMetadataScanner.formatMetadataSuffix(metadata))
                 }
                 findings.add(
                     Finding(
@@ -1255,6 +1273,7 @@ object IndirectSignsChecker {
                         kind = signature?.kind,
                         source = EvidenceSource.ACTIVE_VPN,
                         confidence = confidence,
+                        technicalMetadata = metadata,
                     ),
                 )
                 detected = true

@@ -20,6 +20,7 @@ import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.LocalProxyCheckResult
 import com.notcvnt.rknhardering.model.MatchedVpnApp
+import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.probe.NativeInterfaceProbe
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
@@ -589,6 +590,7 @@ object DebugDiagnosticsFormatter {
             add("source=${app.source}")
             add("active=${app.active}")
             add("confidence=${app.confidence}")
+            addAll(formatTechnicalMetadata(app.technicalMetadata))
         }.joinToString(" ")
     }
 
@@ -600,7 +602,22 @@ object DebugDiagnosticsFormatter {
             add("kind=${app.kind ?: "<none>"}")
             add("source=${app.source}")
             add("confidence=${app.confidence}")
+            addAll(formatTechnicalMetadata(app.technicalMetadata))
         }.joinToString(" ")
+    }
+
+    private fun formatTechnicalMetadata(metadata: VpnAppTechnicalMetadata?): List<String> {
+        if (metadata == null) return emptyList()
+        return buildList {
+            metadata.versionName?.let { add("version=$it") }
+            if (metadata.serviceNames.isNotEmpty()) add("services=${metadata.serviceNames.joinToString(",")}")
+            metadata.appType?.let { add("appType=$it") }
+            metadata.coreType?.let { add("coreType=$it") }
+            metadata.corePath?.let { add("corePath=$it") }
+            metadata.goVersion?.let { add("goVersion=$it") }
+            add("systemApp=${metadata.systemApp}")
+            add("matchedByNameHeuristic=${metadata.matchedByNameHeuristic}")
+        }
     }
 
     private fun formatCallTransportLeak(leak: CallTransportLeakResult): String {

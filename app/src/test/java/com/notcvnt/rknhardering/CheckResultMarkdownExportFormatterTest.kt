@@ -108,4 +108,22 @@ class CheckResultMarkdownExportFormatterTest {
 
         assertFalse(markdown.contains("## IP каналы"))
     }
+
+    @Test
+    fun `markdown export includes vpn app technical metadata`() {
+        val markdown = CheckResultMarkdownExportFormatter.format(
+            context = context,
+            snapshot = createCompletedExportSnapshot(
+                result = exportRichCheckResult(),
+                privacyMode = false,
+                finishedAtMillis = 0L,
+            ),
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(markdown.contains("appType=V2RayNG"))
+        assertTrue(markdown.contains("coreType=Xray/V2Ray"))
+        assertTrue(markdown.contains("goVersion=go1.24.1"))
+    }
 }

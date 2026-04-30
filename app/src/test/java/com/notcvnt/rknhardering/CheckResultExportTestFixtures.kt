@@ -32,6 +32,7 @@ import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VpnAppKind
+import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.XrayApiEndpoint
@@ -192,6 +193,14 @@ internal fun exportRichCheckResult(): CheckResult {
                     source = EvidenceSource.INSTALLED_APP,
                     active = true,
                     confidence = EvidenceConfidence.HIGH,
+                    technicalMetadata = VpnAppTechnicalMetadata(
+                        versionName = "1.2.3",
+                        serviceNames = listOf("ExampleService"),
+                        appType = "V2RayNG",
+                        coreType = "Xray/V2Ray",
+                        corePath = "lib/arm64-v8a/libxray.so",
+                        goVersion = "go1.24.1",
+                    ),
                 ),
             ),
             activeApps = listOf(
@@ -202,6 +211,14 @@ internal fun exportRichCheckResult(): CheckResult {
                     kind = VpnAppKind.TARGETED_BYPASS,
                     source = EvidenceSource.ACTIVE_VPN,
                     confidence = EvidenceConfidence.HIGH,
+                    technicalMetadata = VpnAppTechnicalMetadata(
+                        versionName = "1.2.3",
+                        serviceNames = listOf("ExampleService"),
+                        appType = "V2RayNG",
+                        coreType = "Xray/V2Ray",
+                        corePath = "lib/arm64-v8a/libxray.so",
+                        goVersion = "go1.24.1",
+                    ),
                 ),
             ),
         ),

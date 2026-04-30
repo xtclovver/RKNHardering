@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering.vpn
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -22,7 +23,6 @@ data class InstalledVpnDetectionResult(
 )
 
 object InstalledVpnAppDetector {
-    private const val TAG = "VpnAppDetector"
 
     fun detect(context: Context): InstalledVpnDetectionResult {
         val pm = context.packageManager
@@ -60,6 +60,7 @@ object InstalledVpnAppDetector {
         for (signature in VpnAppCatalog.signatures) {
             if (!isPackageInstalled(pm, signature.packageName)) continue
 
+            val metadata = VpnAppMetadataScanner.scan(context, signature.packageName)
             val confidence = when (signature.kind) {
                 VpnAppKind.TARGETED_BYPASS -> EvidenceConfidence.MEDIUM
                 VpnAppKind.GENERIC_VPN -> EvidenceConfidence.LOW
@@ -68,7 +69,7 @@ object InstalledVpnAppDetector {
                 R.string.checker_vpn_installed_app,
                 signature.appName,
                 signature.packageName,
-            )
+            ) + VpnAppMetadataScanner.formatMetadataSuffix(metadata)
 
             findings.add(
                 Finding(
@@ -101,6 +102,7 @@ object InstalledVpnAppDetector {
                     source = EvidenceSource.INSTALLED_APP,
                     active = false,
                     confidence = confidence,
+                    technicalMetadata = metadata,
                 ),
             )
         }
@@ -115,6 +117,11 @@ object InstalledVpnAppDetector {
     ) {
         for ((packageName, serviceNames) in queryVpnServiceProviders(pm)) {
             val signature = VpnAppCatalog.findByPackageName(packageName)
+            val metadata = VpnAppMetadataScanner.scan(
+                context = context,
+                packageName = packageName,
+                serviceNames = serviceNames,
+            )
             val appName = signature?.appName ?: resolveAppName(pm, packageName)
             val family = signature?.family
             val kind = signature?.kind ?: VpnAppKind.GENERIC_VPN
@@ -135,6 +142,7 @@ object InstalledVpnAppDetector {
                     append(" -> ")
                     append(serviceSuffix)
                 }
+                append(VpnAppMetadataScanner.formatMetadataSuffix(metadata))
             }
 
             findings.add(
@@ -167,6 +175,7 @@ object InstalledVpnAppDetector {
                 source = EvidenceSource.VPN_SERVICE_DECLARATION,
                 active = false,
                 confidence = confidence,
+                technicalMetadata = metadata,
             )
         }
     }
@@ -197,12 +206,17 @@ object InstalledVpnAppDetector {
             val normalizedAppName = appName.uppercase(Locale.ROOT)
             if (!normalizedAppName.contains("VPN")) continue
 
+            val metadata = VpnAppMetadataScanner.scan(
+                context = context,
+                packageName = packageName,
+                matchedByNameHeuristic = true,
+            )
             val confidence = EvidenceConfidence.LOW
             val description = context.getString(
                 R.string.checker_vpn_installed_app_by_name,
                 appName,
                 packageName,
-            )
+            ) + VpnAppMetadataScanner.formatMetadataSuffix(metadata)
 
             findings.add(
                 Finding(
@@ -233,6 +247,7 @@ object InstalledVpnAppDetector {
                     source = EvidenceSource.INSTALLED_APP,
                     active = false,
                     confidence = confidence,
+                    technicalMetadata = metadata,
                 ),
             )
         }
@@ -281,9 +296,13 @@ object InstalledVpnAppDetector {
         }
 
         return resolveInfos
+            .asSequence()
             .mapNotNull { resolveInfo ->
                 val serviceInfo = resolveInfo.serviceInfo ?: return@mapNotNull null
-                serviceInfo.packageName to serviceInfo.name
+                if (serviceInfo.permission != Manifest.permission.BIND_VPN_SERVICE) return@mapNotNull null
+                val packageName = serviceInfo.packageName?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val serviceName = serviceInfo.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                packageName to serviceName
             }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
     }

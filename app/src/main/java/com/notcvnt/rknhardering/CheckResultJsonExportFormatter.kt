@@ -16,6 +16,7 @@ import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.LocalProxyCheckResult
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.MatchedVpnApp
+import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayOutboundSummary
@@ -192,6 +193,7 @@ internal object CheckResultJsonExportFormatter {
             put("source", app.source.name)
             put("active", app.active)
             put("confidence", app.confidence.name)
+            app.technicalMetadata?.let { put("technicalMetadata", technicalMetadataToJson(it)) }
         }
     }
 
@@ -203,6 +205,20 @@ internal object CheckResultJsonExportFormatter {
             put("kind", app.kind?.name)
             put("source", app.source.name)
             put("confidence", app.confidence.name)
+            app.technicalMetadata?.let { put("technicalMetadata", technicalMetadataToJson(it)) }
+        }
+    }
+
+    private fun technicalMetadataToJson(metadata: VpnAppTechnicalMetadata): JSONObject {
+        return JSONObject().apply {
+            put("versionName", metadata.versionName)
+            put("serviceNames", JSONArray().apply { metadata.serviceNames.forEach { put(it) } })
+            put("appType", metadata.appType)
+            put("coreType", metadata.coreType)
+            put("corePath", metadata.corePath)
+            put("goVersion", metadata.goVersion)
+            put("systemApp", metadata.systemApp)
+            put("matchedByNameHeuristic", metadata.matchedByNameHeuristic)
         }
     }
 
