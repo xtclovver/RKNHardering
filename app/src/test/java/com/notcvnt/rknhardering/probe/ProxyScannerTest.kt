@@ -62,8 +62,8 @@ class ProxyScannerTest {
             probePort = { _, port, _, _ ->
                 probedPorts += port
                 when (port) {
-                    8080 -> ProxyType.HTTP
-                    1080 -> ProxyType.SOCKS5
+                    8080 -> ProxyProber.ProbeResult(ProxyType.HTTP, authRequired = false)
+                    1080 -> ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = false)
                     else -> null
                 }
             },
@@ -89,9 +89,9 @@ class ProxyScannerTest {
             progressUpdateEvery = 1,
             probePort = { _, port, _, _ ->
                 when (port) {
-                    1080 -> ProxyType.SOCKS5
-                    2080 -> ProxyType.HTTP
-                    2082 -> ProxyType.SOCKS5
+                    1080 -> ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = false)
+                    2080 -> ProxyProber.ProbeResult(ProxyType.HTTP, authRequired = false)
+                    2082 -> ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = false)
                     else -> null
                 }
             },
@@ -123,8 +123,8 @@ class ProxyScannerTest {
             progressUpdateEvery = 1,
             probePort = { host, port, _, _ ->
                 when {
-                    port == 1080 -> ProxyType.SOCKS5
-                    port == 1082 && host == "::1" -> ProxyType.HTTP
+                    port == 1080 -> ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = false)
+                    port == 1082 && host == "::1" -> ProxyProber.ProbeResult(ProxyType.HTTP, authRequired = false)
                     else -> null
                 }
             },
@@ -143,5 +143,30 @@ class ProxyScannerTest {
             ),
             result,
         )
+    }
+
+    @Test
+    fun `auth required proxy is returned with authRequired flag set`() = runBlocking {
+        val scanner = ProxyScanner(
+            popularPorts = listOf(10808, 10809),
+            scanRange = 10808..10809,
+            probePort = { _, port, _, _ ->
+                when (port) {
+                    10808 -> ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = true)
+                    10809 -> ProxyProber.ProbeResult(ProxyType.HTTP, authRequired = true)
+                    else -> null
+                }
+            },
+        )
+
+        val result = scanner.findOpenProxyEndpoints(
+            mode = ScanMode.POPULAR_ONLY,
+            manualPort = null,
+            onProgress = {},
+        )
+
+        assertEquals(2, result.size)
+        assertEquals(ProxyEndpoint("127.0.0.1", 10808, ProxyType.SOCKS5, authRequired = true), result[0])
+        assertEquals(ProxyEndpoint("127.0.0.1", 10809, ProxyType.HTTP, authRequired = true), result[1])
     }
 }

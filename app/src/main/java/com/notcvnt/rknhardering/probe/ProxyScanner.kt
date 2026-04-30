@@ -21,9 +21,9 @@ class ProxyScanner(
     private val readTimeoutMs: Int = 120,
     private val maxConcurrency: Int = 200,
     private val progressUpdateEvery: Int = 256,
-    private val probePort: suspend (String, Int, Int, Int) -> ProxyType? =
+    private val probePort: suspend (String, Int, Int, Int) -> ProxyProber.ProbeResult? =
         { host, port, connectTimeout, readTimeout ->
-            ProxyProber.probeNoAuthProxyType(
+            ProxyProber.probeProxyType(
                 host = host,
                 port = port,
                 connectTimeoutMs = connectTimeout,
@@ -158,10 +158,10 @@ class ProxyScanner(
 
     private suspend fun tryPort(port: Int, preferredType: ProxyType?): ProxyEndpoint? = withContext(Dispatchers.IO) {
         for (host in loopbackHosts) {
-            val type = probePort(host, port, connectTimeoutMs, readTimeoutMs) ?: continue
-            if (preferredType != null && type != preferredType) continue
+            val result = probePort(host, port, connectTimeoutMs, readTimeoutMs) ?: continue
+            if (preferredType != null && result.type != preferredType) continue
 
-            return@withContext ProxyEndpoint(host, port, type)
+            return@withContext ProxyEndpoint(host, port, result.type, result.authRequired)
         }
         null
     }

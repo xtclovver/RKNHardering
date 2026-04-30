@@ -201,6 +201,7 @@ enum class LocalProxyCheckStatus {
     SAME_IP,
     PROXY_IP_UNAVAILABLE,
     DIRECT_IP_UNAVAILABLE,
+    AUTH_REQUIRED,
 }
 
 enum class LocalProxySummaryReason {

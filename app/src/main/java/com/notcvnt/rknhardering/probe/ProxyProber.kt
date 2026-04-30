@@ -15,24 +15,42 @@ object ProxyProber {
         CLOSED,
         UNKNOWN_TCP_SERVICE,
         SOCKS5_NO_AUTH,
+        SOCKS5_AUTH_REQUIRED,
         HTTP_CONNECT_PROXY,
+        HTTP_CONNECT_AUTH_REQUIRED,
     }
 
+    data class ProbeResult(
+        val type: ProxyType,
+        val authRequired: Boolean,
+    )
+
+    fun probeProxyType(
+        host: String,
+        port: Int,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): ProbeResult? {
+        return when (probePort(host, port, connectTimeoutMs, readTimeoutMs, executionContext)) {
+            PortProbeResult.SOCKS5_NO_AUTH -> ProbeResult(ProxyType.SOCKS5, authRequired = false)
+            PortProbeResult.SOCKS5_AUTH_REQUIRED -> ProbeResult(ProxyType.SOCKS5, authRequired = true)
+            PortProbeResult.HTTP_CONNECT_PROXY -> ProbeResult(ProxyType.HTTP, authRequired = false)
+            PortProbeResult.HTTP_CONNECT_AUTH_REQUIRED -> ProbeResult(ProxyType.HTTP, authRequired = true)
+            PortProbeResult.CLOSED,
+            PortProbeResult.UNKNOWN_TCP_SERVICE,
+            -> null
+        }
+    }
+
+    @Deprecated("Use probeProxyType", ReplaceWith("probeProxyType(host, port, connectTimeoutMs, readTimeoutMs, executionContext)?.type"))
     fun probeNoAuthProxyType(
         host: String,
         port: Int,
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
-    ): ProxyType? {
-        return when (probePort(host, port, connectTimeoutMs, readTimeoutMs, executionContext)) {
-            PortProbeResult.SOCKS5_NO_AUTH -> ProxyType.SOCKS5
-            PortProbeResult.HTTP_CONNECT_PROXY -> ProxyType.HTTP
-            PortProbeResult.CLOSED,
-            PortProbeResult.UNKNOWN_TCP_SERVICE,
-            -> null
-        }
-    }
+    ): ProxyType? = probeProxyType(host, port, connectTimeoutMs, readTimeoutMs, executionContext)?.type
 
     internal fun probePort(
         host: String,
@@ -44,10 +62,13 @@ object ProxyProber {
         val socksResult = probeSocks5NoAuth(host, port, connectTimeoutMs, readTimeoutMs, executionContext)
         return when (socksResult) {
             PortProbeResult.SOCKS5_NO_AUTH,
+            PortProbeResult.SOCKS5_AUTH_REQUIRED,
             PortProbeResult.CLOSED,
             -> socksResult
             PortProbeResult.UNKNOWN_TCP_SERVICE -> probeHttpConnect(host, port, connectTimeoutMs, readTimeoutMs, executionContext)
-            PortProbeResult.HTTP_CONNECT_PROXY -> PortProbeResult.HTTP_CONNECT_PROXY
+            PortProbeResult.HTTP_CONNECT_PROXY,
+            PortProbeResult.HTTP_CONNECT_AUTH_REQUIRED,
+            -> socksResult
         }
     }
 
@@ -81,10 +102,11 @@ object ProxyProber {
                     ?: return PortProbeResult.UNKNOWN_TCP_SERVICE
                 val version = response[0].toInt() and 0xFF
                 val method = response[1].toInt() and 0xFF
-                if (version == 0x05 && method == 0x00) {
-                    PortProbeResult.SOCKS5_NO_AUTH
-                } else {
-                    PortProbeResult.UNKNOWN_TCP_SERVICE
+                when {
+                    version == 0x05 && method == 0x00 -> PortProbeResult.SOCKS5_NO_AUTH
+                    // 0xFF = no acceptable methods, 0x02 = username/password — both are valid SOCKS5 responses
+                    version == 0x05 -> PortProbeResult.SOCKS5_AUTH_REQUIRED
+                    else -> PortProbeResult.UNKNOWN_TCP_SERVICE
                 }
             } catch (error: SocketTimeoutException) {
                 rethrowIfCancellation(error, executionContext)
@@ -132,10 +154,11 @@ object ProxyProber {
                     ?.toIntOrNull()
                     ?: return PortProbeResult.UNKNOWN_TCP_SERVICE
 
-                if (code == 200) {
-                    PortProbeResult.HTTP_CONNECT_PROXY
-                } else {
-                    PortProbeResult.UNKNOWN_TCP_SERVICE
+                when (code) {
+                    200 -> PortProbeResult.HTTP_CONNECT_PROXY
+                    // 407 = Proxy Authentication Required — unambiguous HTTP proxy signal
+                    407 -> PortProbeResult.HTTP_CONNECT_AUTH_REQUIRED
+                    else -> PortProbeResult.UNKNOWN_TCP_SERVICE
                 }
             } catch (error: SocketTimeoutException) {
                 rethrowIfCancellation(error, executionContext)

@@ -448,6 +448,7 @@
     <string name="checker_bypass_proxy_ip">经代理的 IP：%1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass：已确认（IP 不同）</string>
     <string name="checker_bypass_split_disabled">Per-app split 已关闭：IP 相同</string>
+    <string name="checker_bypass_auth_required">代理需要身份验证：绕过状态未确认</string>
     <string name="checker_bypass_mtproto_reachable">MTProto 代理：Telegram DC 可通过 %1$s -&gt; %2$s 访问</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe：Telegram DC 无法通过代理访问</string>
     <string name="checker_bypass_no_open_proxy">localhost 上的开放代理：未发现</string>

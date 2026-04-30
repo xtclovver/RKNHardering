@@ -52,6 +52,82 @@ class ProxyProberTest {
     }
 
     @Test
+    fun `detects socks5 proxy with auth required (0x05 0xFF no acceptable methods)`() {
+        val result = withScriptedServer(
+            listOf(
+                { socket ->
+                    socket.getInputStream().readNBytes(3)
+                    socket.getOutputStream().write(byteArrayOf(0x05, 0xFF.toByte()))
+                    socket.getOutputStream().flush()
+                },
+            ),
+        )
+
+        assertEquals(ProxyProber.PortProbeResult.SOCKS5_AUTH_REQUIRED, result)
+    }
+
+    @Test
+    fun `detects socks5 proxy with auth required (0x05 0x02 username-password method)`() {
+        val result = withScriptedServer(
+            listOf(
+                { socket ->
+                    socket.getInputStream().readNBytes(3)
+                    socket.getOutputStream().write(byteArrayOf(0x05, 0x02))
+                    socket.getOutputStream().flush()
+                },
+            ),
+        )
+
+        assertEquals(ProxyProber.PortProbeResult.SOCKS5_AUTH_REQUIRED, result)
+    }
+
+    @Test
+    fun `detects http connect proxy with 407 auth required`() {
+        val result = withScriptedServer(
+            listOf(
+                { socket ->
+                    socket.getInputStream().readNBytes(3)
+                    socket.getOutputStream().write("NO".encodeToByteArray())
+                    socket.getOutputStream().flush()
+                },
+                { socket ->
+                    socket.getInputStream().read(ByteArray(128))
+                    socket.getOutputStream().write(
+                        "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"proxy\"\r\n\r\n"
+                            .encodeToByteArray(),
+                    )
+                    socket.getOutputStream().flush()
+                },
+            ),
+        )
+
+        assertEquals(ProxyProber.PortProbeResult.HTTP_CONNECT_AUTH_REQUIRED, result)
+    }
+
+    @Test
+    fun `probeProxyType returns auth required for socks5 with password`() {
+        val server = java.net.ServerSocket(0)
+        val worker = thread(start = true) {
+            server.accept().use { socket ->
+                socket.getInputStream().readNBytes(3)
+                socket.getOutputStream().write(byteArrayOf(0x05, 0xFF.toByte()))
+                socket.getOutputStream().flush()
+            }
+        }
+        val result = ProxyProber.probeProxyType(
+            host = "127.0.0.1",
+            port = server.localPort,
+            connectTimeoutMs = 500,
+            readTimeoutMs = 500,
+        )
+        worker.join(1000)
+        server.close()
+
+        assertEquals(ProxyType.SOCKS5, result?.type)
+        assertEquals(true, result?.authRequired)
+    }
+
+    @Test
     fun `keeps unknown tcp listener out of proxy results`() {
         val result = withScriptedServer(
             listOf(

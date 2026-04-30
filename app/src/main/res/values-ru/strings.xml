@@ -452,6 +452,7 @@
     <string name="checker_bypass_proxy_ip">IP через прокси: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: подтвержден (IP отличаются)</string>
     <string name="checker_bypass_split_disabled">Per-app split отключен: IP совпадают</string>
+    <string name="checker_bypass_auth_required">Прокси требует аутентификацию: обход не подтверждён</string>
     <string name="checker_bypass_mtproto_reachable">MTProto-прокси: Telegram DC доступен через %1$s -> %2$s</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe: Telegram DC недоступен через прокси</string>
     <string name="checker_bypass_no_open_proxy">Открытые прокси на localhost: не обнаружены</string>

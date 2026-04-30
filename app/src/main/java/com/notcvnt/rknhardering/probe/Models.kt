@@ -20,6 +20,7 @@ data class ProxyEndpoint(
     val host: String,
     val port: Int,
     val type: ProxyType,
+    val authRequired: Boolean = false,
 )
 
 data class ScanProgress(

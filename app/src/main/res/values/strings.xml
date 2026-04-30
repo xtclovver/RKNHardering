@@ -450,6 +450,7 @@
     <string name="checker_bypass_proxy_ip">IP via proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: confirmed (IPs differ)</string>
     <string name="checker_bypass_split_disabled">Per-app split is disabled: IPs match</string>
+    <string name="checker_bypass_auth_required">Proxy requires authentication: bypass status unconfirmed</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC is reachable via %1$s -&gt; %2$s</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe: Telegram DC is unreachable via proxy</string>
     <string name="checker_bypass_no_open_proxy">Open proxies on localhost: none detected</string>

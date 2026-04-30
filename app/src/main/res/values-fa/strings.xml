@@ -449,6 +449,7 @@
     <string name="checker_bypass_proxy_ip">IP از طریق proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: تأیید شد (IPها متفاوت‌اند)</string>
     <string name="checker_bypass_split_disabled">Per-app split غیرفعال است: IPها یکسان‌اند</string>
+    <string name="checker_bypass_auth_required">پروکسی نیاز به احراز هویت دارد: دور زدن تأیید نشده</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC از طریق %1$s -&gt; %2$s در دسترس است</string>
     <string name="checker_bypass_mtproto_unreachable">MTProto probe: Telegram DC از طریق proxy در دسترس نیست</string>
     <string name="checker_bypass_no_open_proxy">proxy باز روی localhost: موردی پیدا نشد</string>
