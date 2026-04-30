@@ -21,6 +21,8 @@
     <string name="settings_cat_privacy_desc">Маскировка IP</string>
     <string name="settings_cat_appearance">Оформление</string>
     <string name="settings_cat_appearance_desc">Тема и язык</string>
+    <string name="settings_cat_accessibility">Специальные возможности</string>
+    <string name="settings_cat_accessibility_desc">Цветовое зрение</string>
     <string name="settings_cat_about">О приложении</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">Отладка</string>
@@ -91,6 +93,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">Режим цветового зрения</string>
+    <string name="settings_color_vision_preview">Превью статусов</string>
+    <string name="settings_color_vision_off">Выкл</string>
+    <string name="settings_color_vision_red_green">Красно-зелёный</string>
+    <string name="settings_color_vision_blue_yellow">Сине-жёлтый</string>
+    <string name="settings_color_vision_achromatopsia">Ахроматопсия</string>
+    <string name="settings_accessibility_status_preview_content">Статус: %1$s</string>
     <string name="settings_permissions">Разрешения</string>
     <string name="settings_permissions_desc">Управление разрешениями приложения</string>
     <string name="settings_github">GitHub</string>
@@ -524,6 +533,7 @@
     <string name="tile_hint_detected_count">%1$d из %2$d выявлено</string>
     <string name="tile_hint_review">Требует проверки</string>
     <string name="tile_hint_error">Ошибка</string>
+    <string name="settings_status_no_data">Нет данных</string>
     <string name="settings_value_on">Вкл</string>
     <string name="settings_value_off">Выкл</string>
     <string name="settings_value_network_all">Все запросы</string>

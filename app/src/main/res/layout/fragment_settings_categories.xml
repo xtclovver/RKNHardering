@@ -66,6 +66,12 @@
                 <include
                     android:id="@+id/rowAppearance"
                     layout="@layout/view_settings_row" />
+
+                <View style="@style/SettingsRowDivider" />
+
+                <include
+                    android:id="@+id/rowAccessibility"
+                    layout="@layout/view_settings_row" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

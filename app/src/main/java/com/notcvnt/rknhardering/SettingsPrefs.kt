@@ -23,4 +23,5 @@ internal object SettingsPrefs {
     const val PREF_PRIVACY_MODE = "pref_privacy_mode"
     const val PREF_THEME = "pref_theme"
     const val PREF_LANGUAGE = "pref_language"
+    const val PREF_COLOR_VISION_MODE = "pref_color_vision_mode"
 }

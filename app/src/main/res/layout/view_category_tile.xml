@@ -41,7 +41,7 @@
                 android:id="@+id/tileStatusDot"
                 android:layout_width="8dp"
                 android:layout_height="8dp"
-                android:background="@drawable/dot_status_neutral" />
+                android:background="@drawable/indicator_status_neutral" />
         </LinearLayout>
 
         <TextView

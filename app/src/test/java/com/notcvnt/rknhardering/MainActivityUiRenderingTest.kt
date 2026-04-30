@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering
 
+import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -20,6 +21,7 @@ import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.TargetGroup
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,6 +32,13 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class MainActivityUiRenderingTest {
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Before
+    fun setUp() {
+        AppUiSettings.prefs(context).edit().clear().commit()
+    }
 
     @Test
     fun `ip comparison response view hides raw error details`() {
@@ -315,6 +324,53 @@ class MainActivityUiRenderingTest {
         invokePrivate<Unit>(activity, "updateTileFromBypass", detectedResult)
         assertEquals(View.VISIBLE, bypassBody.visibility)
         assertTrue(getPrivateField<Set<String>>(activity, "expandedCategoryIds").contains("byp"))
+    }
+
+    @Test
+    fun `tile status uses semantic shape in color vision mode`() {
+        AppUiSettings.prefs(context).edit()
+            .putString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.RED_GREEN.prefValue)
+            .commit()
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+
+        invokePrivate<Unit>(activity, "setTileStatus", "geo", 3, activity.getString(R.string.tile_hint_review))
+
+        val tiles = getPrivateField<Map<String, Any>>(activity, "tiles")
+        val geoTile = tiles.getValue("geo")
+        val statusDot = getPrivateField<View>(geoTile, "statusDot")
+        val header = getPrivateField<View>(geoTile, "header")
+
+        assertTrue(statusDot.background is StatusShapeDrawable)
+        assertEquals(
+            StatusIndicatorShape.DIAMOND,
+            (statusDot.background as StatusShapeDrawable).indicatorShape,
+        )
+        assertTrueContains(
+            header.contentDescription.toString(),
+            activity.getString(R.string.main_card_status_detected),
+        )
+    }
+
+    @Test
+    fun `finding row exposes text status and semantic indicator`() {
+        AppUiSettings.prefs(context).edit()
+            .putString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.ACHROMATOPSIA.prefValue)
+            .commit()
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val finding = Finding("Detected signal", detected = true)
+
+        val row = invokePrivate<View>(activity, "createFindingView", finding, false) as ViewGroup
+        val indicator = row.getChildAt(0)
+
+        assertTrue(indicator.background is StatusShapeDrawable)
+        assertEquals(
+            StatusIndicatorShape.DIAMOND,
+            (indicator.background as StatusShapeDrawable).indicatorShape,
+        )
+        assertTrueContains(
+            row.contentDescription.toString(),
+            activity.getString(R.string.main_card_status_detected),
+        )
     }
 
     private fun collectText(view: View): String {

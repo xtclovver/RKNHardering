@@ -11,6 +11,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.test.core.app.ApplicationProvider
+import com.google.android.material.chip.Chip
 import com.google.android.material.materialswitch.MaterialSwitch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,6 +103,7 @@ class SettingsActivityTest {
             putBoolean(SettingsPrefs.PREF_PRIVACY_MODE, true)
             putString(SettingsPrefs.PREF_THEME, "system")
             putString(SettingsPrefs.PREF_LANGUAGE, "ru")
+            putString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.BLUE_YELLOW.prefValue)
         }
 
         val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
@@ -133,7 +135,29 @@ class SettingsActivityTest {
             ),
             rowValue(root, R.id.rowAppearance),
         )
+        assertEquals(
+            activity.getString(R.string.settings_color_vision_blue_yellow),
+            rowValue(root, R.id.rowAccessibility),
+        )
         assertEquals("v${BuildConfig.VERSION_NAME}", rowValue(root, R.id.rowAbout))
+    }
+
+    @Test
+    fun `accessibility fragment saves color vision mode`() {
+        val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
+        activity.supportFragmentManager.beginTransaction()
+            .replace(R.id.settingsFragmentContainer, SettingsAccessibilityFragment())
+            .commitNow()
+        val fragment = activity.supportFragmentManager
+            .findFragmentById(R.id.settingsFragmentContainer) as SettingsAccessibilityFragment
+        val chip = fragment.requireView().findViewById<Chip>(R.id.chipColorVisionRedGreen)
+
+        chip.performClick()
+
+        assertEquals(
+            ColorVisionMode.RED_GREEN.prefValue,
+            AppUiSettings.prefs(activity).getString(SettingsPrefs.PREF_COLOR_VISION_MODE, null),
+        )
     }
 
     @Test

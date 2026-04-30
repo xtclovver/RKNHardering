@@ -106,7 +106,7 @@
                                 android:id="@+id/headerDotGeoIp"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconGeoIp"
@@ -252,7 +252,7 @@
                                 android:id="@+id/headerDotIpComparison"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconIpComparison"
@@ -391,7 +391,7 @@
                                 android:id="@+id/headerDotCdnPulling"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconCdnPulling"
@@ -530,7 +530,7 @@
                                 android:id="@+id/headerDotDirect"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconDirect"
@@ -676,7 +676,7 @@
                                 android:id="@+id/headerDotIndirect"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconIndirect"
@@ -807,7 +807,7 @@
                                 android:id="@+id/headerDotNativeSigns"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconNativeSigns"
@@ -949,7 +949,7 @@
                                 android:id="@+id/headerDotCallTransport"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconCallTransport"
@@ -1106,7 +1106,7 @@
                                 android:id="@+id/headerDotIcmpSpoofing"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconIcmpSpoofing"
@@ -1239,7 +1239,7 @@
                                 android:id="@+id/headerDotLocation"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconLocation"
@@ -1384,7 +1384,7 @@
                                 android:id="@+id/headerDotBypass"
                                 android:layout_width="8dp"
                                 android:layout_height="8dp"
-                                android:background="@drawable/dot_status_neutral" />
+                                android:background="@drawable/indicator_status_neutral" />
 
                             <ImageView
                                 android:id="@+id/headerIconBypass"

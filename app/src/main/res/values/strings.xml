@@ -21,6 +21,8 @@
     <string name="settings_cat_privacy_desc">IP masking</string>
     <string name="settings_cat_appearance">Appearance</string>
     <string name="settings_cat_appearance_desc">Theme &amp; language</string>
+    <string name="settings_cat_accessibility">Accessibility</string>
+    <string name="settings_cat_accessibility_desc">Color vision</string>
     <string name="settings_cat_about">About</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">Debug</string>
@@ -91,6 +93,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">Color vision mode</string>
+    <string name="settings_color_vision_preview">Status preview</string>
+    <string name="settings_color_vision_off">Off</string>
+    <string name="settings_color_vision_red_green">Red-green</string>
+    <string name="settings_color_vision_blue_yellow">Blue-yellow</string>
+    <string name="settings_color_vision_achromatopsia">Achromatopsia</string>
+    <string name="settings_accessibility_status_preview_content">%1$s status</string>
     <string name="settings_permissions">Permissions</string>
     <string name="settings_permissions_desc">Manage app permissions</string>
     <string name="settings_github">GitHub</string>
@@ -520,6 +529,7 @@
     <string name="tile_hint_detected_count">%1$d of %2$d detected</string>
     <string name="tile_hint_review">Needs review</string>
     <string name="tile_hint_error">Error</string>
+    <string name="settings_status_no_data">No data</string>
     <string name="settings_value_on">On</string>
     <string name="settings_value_off">Off</string>
     <string name="settings_value_network_all">All requests</string>

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_color_vision_mode"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupColorVision"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipColorVisionOff"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_color_vision_off"
+                        app:checkedIconVisible="false" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipColorVisionRedGreen"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_color_vision_red_green"
+                        app:checkedIconVisible="false" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipColorVisionBlueYellow"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_color_vision_blue_yellow"
+                        app:checkedIconVisible="false" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipColorVisionAchromatopsia"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_color_vision_achromatopsia"
+                        app:checkedIconVisible="false" />
+                </com.google.android.material.chip.ChipGroup>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:id="@+id/statusPreviewContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_color_vision_preview"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/previewStatusCleanRow"
+                    style="@style/StatusPreviewRow">
+
+                    <View
+                        android:id="@+id/previewStatusCleanIndicator"
+                        style="@style/StatusPreviewIndicator" />
+
+                    <TextView
+                        android:id="@+id/previewStatusCleanText"
+                        style="@style/StatusPreviewText" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/previewStatusReviewRow"
+                    style="@style/StatusPreviewRow">
+
+                    <View
+                        android:id="@+id/previewStatusReviewIndicator"
+                        style="@style/StatusPreviewIndicator" />
+
+                    <TextView
+                        android:id="@+id/previewStatusReviewText"
+                        style="@style/StatusPreviewText" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/previewStatusDetectedRow"
+                    style="@style/StatusPreviewRow">
+
+                    <View
+                        android:id="@+id/previewStatusDetectedIndicator"
+                        style="@style/StatusPreviewIndicator" />
+
+                    <TextView
+                        android:id="@+id/previewStatusDetectedText"
+                        style="@style/StatusPreviewText" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/previewStatusErrorRow"
+                    style="@style/StatusPreviewRow">
+
+                    <View
+                        android:id="@+id/previewStatusErrorIndicator"
+                        style="@style/StatusPreviewIndicator" />
+
+                    <TextView
+                        android:id="@+id/previewStatusErrorText"
+                        style="@style/StatusPreviewText" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/previewStatusNeutralRow"
+                    style="@style/StatusPreviewRow">
+
+                    <View
+                        android:id="@+id/previewStatusNeutralIndicator"
+                        style="@style/StatusPreviewIndicator" />
+
+                    <TextView
+                        android:id="@+id/previewStatusNeutralText"
+                        style="@style/StatusPreviewText" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

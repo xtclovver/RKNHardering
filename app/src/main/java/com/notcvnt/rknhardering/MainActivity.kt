@@ -569,6 +569,7 @@ class MainActivity : AppCompatActivity() {
             holder.header.setBackgroundResource(R.drawable.bg_category_header_collapsed)
             holder.header.setOnClickListener { onTileClicked(id) }
             tiles[id] = holder
+            setTileStatus(id, TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_placeholder))
         }
     }
 
@@ -1189,7 +1190,7 @@ class MainActivity : AppCompatActivity() {
                 activeCheckSettings = null
                 resetBypassProgress()
                 statusBypass.text = getString(R.string.main_status_cancelled)
-                statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+                statusBypass.setTextColor(statusColor(StatusSemantic.REVIEW))
                 stopLoadingStatusAnimation()
                 updateCheckStatus(getString(R.string.main_check_stopped))
                 markLoadingStagesCancelled()
@@ -1616,9 +1617,11 @@ class MainActivity : AppCompatActivity() {
         infoSection: LinearLayout? = null,
         infoDivider: View? = null,
     ) {
-        icon.setImageResource(R.drawable.ic_help)
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        icon.setImageResource(visual.iconRes)
+        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
         status.text = getString(R.string.main_status_stopped)
-        status.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+        status.setTextColor(visual.accentColor)
         infoSection?.apply {
             removeAllViews()
             visibility = View.GONE
@@ -1631,9 +1634,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showIpComparisonStopped(stage: RunningStage) {
-        iconIpComparison.setImageResource(R.drawable.ic_help)
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        iconIpComparison.setImageResource(visual.iconRes)
+        iconIpComparison.imageTintList = ColorStateList.valueOf(visual.accentColor)
         statusIpComparison.text = getString(R.string.main_status_stopped)
-        statusIpComparison.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+        statusIpComparison.setTextColor(visual.accentColor)
         textIpComparisonSummary.text = stageStoppedMessage(stage)
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.GONE
@@ -1641,9 +1646,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCdnPullingStopped(stage: RunningStage) {
-        iconCdnPulling.setImageResource(R.drawable.ic_help)
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        iconCdnPulling.setImageResource(visual.iconRes)
+        iconCdnPulling.imageTintList = ColorStateList.valueOf(visual.accentColor)
         statusCdnPulling.text = getString(R.string.main_status_stopped)
-        statusCdnPulling.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+        statusCdnPulling.setTextColor(visual.accentColor)
         textCdnPullingSummary.text = stageStoppedMessage(stage)
         cdnPullingResponses.removeAllViews()
         cdnPullingResponses.visibility = View.GONE
@@ -1651,9 +1658,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showBypassStopped(stage: RunningStage) {
-        iconBypass.setImageResource(R.drawable.ic_help)
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        iconBypass.setImageResource(visual.iconRes)
+        iconBypass.imageTintList = ColorStateList.valueOf(visual.accentColor)
         statusBypass.text = getString(R.string.main_status_stopped)
-        statusBypass.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
+        statusBypass.setTextColor(visual.accentColor)
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
         textBypassProgress.text = stageStoppedMessage(stage)
@@ -1662,9 +1671,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindCardLoadingState(stage: RunningStage, icon: ImageView, status: TextView) {
-        icon.setImageResource(R.drawable.ic_help)
+        val visual = statusVisual(StatusSemantic.NEUTRAL)
+        icon.setImageResource(visual.iconRes)
+        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
         status.text = stageLoadingStatusBase(stage)
-        status.setTextColor(onSurfaceVariantColor())
+        status.setTextColor(visual.accentColor)
     }
 
     private fun syncLoadingStatusAnimation() {
@@ -2000,33 +2011,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
+        val semantic = statusSemantic(finding.detected, finding.needsReview, finding.isError)
+        val visual = statusVisual(semantic)
+        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
         val row = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.TOP
             setPadding(0, 3.dp, 0, 3.dp)
+            contentDescription = "${getString(visual.labelRes)}. $descriptionText"
         }
 
         val indicator = View(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(6.dp, 6.dp).apply {
+            layoutParams = LinearLayout.LayoutParams(8.dp, 8.dp).apply {
                 topMargin = 6.dp
                 marginEnd = 8.dp
             }
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(
-                    ContextCompat.getColor(
-                        themedContext(),
-                        when {
-                            finding.detected -> R.color.status_red
-                            finding.needsReview -> R.color.status_amber
-                            else -> R.color.status_green
-                        },
-                    ),
-                )
-            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            background = StatusVisualResolver.indicatorDrawable(themedContext(), semantic, colorVisionMode())
         }
 
-        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
         val description = TextView(themedContext()).apply {
             text = wrapForDisplay(descriptionText)
             textSize = 13f
@@ -2167,7 +2170,7 @@ class MainActivity : AppCompatActivity() {
             text = group.statusLabel
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(themedContext(), statusColorRes(group.detected, group.needsReview)))
+            setTextColor(statusColor(statusSemantic(group.detected, group.needsReview)))
         }
 
         val toggle = TextView(themedContext()).apply {
@@ -2236,12 +2239,7 @@ class MainActivity : AppCompatActivity() {
             text = displayIp ?: getString(R.string.main_card_status_error)
             textSize = 13f
             typeface = Typeface.MONOSPACE
-            setTextColor(
-                ContextCompat.getColor(
-                    themedContext(),
-                    if (response.ip != null) R.color.status_green else R.color.status_amber,
-                ),
-            )
+            setTextColor(statusColor(if (response.ip != null) StatusSemantic.CLEAN else StatusSemantic.ERROR))
         }
 
         val url = TextView(themedContext()).apply {
@@ -2295,12 +2293,11 @@ class MainActivity : AppCompatActivity() {
             textSize = 13f
             typeface = Typeface.MONOSPACE
             setTextColor(
-                ContextCompat.getColor(
-                    themedContext(),
+                statusColor(
                     when {
-                        primaryDisplayIp != null -> R.color.status_red
-                        response.error != null -> R.color.status_amber
-                        else -> R.color.status_green
+                        primaryDisplayIp != null -> StatusSemantic.DETECTED
+                        response.error != null -> StatusSemantic.ERROR
+                        else -> StatusSemantic.CLEAN
                     },
                 ),
             )
@@ -2324,7 +2321,7 @@ class MainActivity : AppCompatActivity() {
                     textSize = 13f
                     typeface = Typeface.MONOSPACE
                     setPadding(0, 2.dp, 0, 0)
-                    setTextColor(ContextCompat.getColor(themedContext(), R.color.status_red))
+                    setTextColor(statusColor(StatusSemantic.DETECTED))
                 },
             )
         } else if (response.ipv4Unavailable && response.ipv6 != null) {
@@ -2391,7 +2388,7 @@ class MainActivity : AppCompatActivity() {
                 ).apply { topMargin = 8.dp }
             }
 
-            val warningColor = ContextCompat.getColor(themedContext(), R.color.finding_detected)
+            val warningColor = statusColor(StatusSemantic.DETECTED)
             val warningBackground = TextView(themedContext()).apply {
                 text = buildIpConsensusWarningText(consensus)
                 textSize = 12f
@@ -2431,7 +2428,7 @@ class MainActivity : AppCompatActivity() {
                 typeface = Typeface.DEFAULT_BOLD
                 val padding = 6.dp
                 setPadding(padding, padding / 2, padding, padding / 2)
-                setBackgroundColor(ContextCompat.getColor(themedContext(), R.color.verdict_yellow))
+                setBackgroundColor(statusContainerColor(StatusSemantic.REVIEW))
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
                     .apply { marginEnd = 8.dp }
             }
@@ -2659,12 +2656,7 @@ class MainActivity : AppCompatActivity() {
             text = statusLabel
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(
-                ContextCompat.getColor(
-                    themedContext(),
-                    if (respondedCount > 0) R.color.status_green else R.color.status_amber,
-                ),
-            )
+            setTextColor(statusColor(if (respondedCount > 0) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
         }
 
         val expanded = respondedCount > 0
@@ -2733,12 +2725,7 @@ class MainActivity : AppCompatActivity() {
             }
             textSize = 12f
             typeface = Typeface.MONOSPACE
-            setTextColor(
-                ContextCompat.getColor(
-                    themedContext(),
-                    if (hasAnyResponse) R.color.status_green else R.color.status_amber,
-                ),
-            )
+            setTextColor(statusColor(if (hasAnyResponse) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
         }
 
         hostRow.addView(hostLabel)
@@ -2791,11 +2778,11 @@ class MainActivity : AppCompatActivity() {
             CallTransportService.WHATSAPP -> "WhatsApp"
         }
         val statusColor = when (leak.status) {
-            CallTransportStatus.BASELINE -> ContextCompat.getColor(themedContext(), R.color.status_green)
-            CallTransportStatus.NEEDS_REVIEW -> ContextCompat.getColor(themedContext(), R.color.status_amber)
-            CallTransportStatus.ERROR -> ContextCompat.getColor(themedContext(), R.color.status_amber)
-            CallTransportStatus.NO_SIGNAL -> onSurfaceVariantColor()
-            CallTransportStatus.UNSUPPORTED -> onSurfaceVariantColor()
+            CallTransportStatus.BASELINE -> statusColor(StatusSemantic.CLEAN)
+            CallTransportStatus.NEEDS_REVIEW -> statusColor(StatusSemantic.REVIEW)
+            CallTransportStatus.ERROR -> statusColor(StatusSemantic.ERROR)
+            CallTransportStatus.NO_SIGNAL -> statusColor(StatusSemantic.NEUTRAL)
+            CallTransportStatus.UNSUPPORTED -> statusColor(StatusSemantic.NEUTRAL)
         }
 
         val headerRow = LinearLayout(themedContext()).apply {
@@ -2832,7 +2819,7 @@ class MainActivity : AppCompatActivity() {
 
         formatCallTransportReason(this, leak, privacyMode)?.let { reason ->
             val reasonColor = if (leak.status == CallTransportStatus.ERROR) {
-                ContextCompat.getColor(themedContext(), R.color.status_amber)
+                statusColor(StatusSemantic.ERROR)
             } else {
                 onSurfaceVariantColor()
             }
@@ -2899,34 +2886,40 @@ class MainActivity : AppCompatActivity() {
         status: TextView,
         hasError: Boolean = false,
     ) {
-        when {
-            detected -> {
-                icon.setImageResource(R.drawable.ic_warning)
-                status.text = getString(R.string.main_card_status_detected)
-            }
-            hasError -> {
-                icon.setImageResource(R.drawable.ic_error)
-                status.text = getString(R.string.main_card_status_error)
-            }
-            needsReview -> {
-                icon.setImageResource(R.drawable.ic_help)
-                status.text = getString(R.string.main_card_status_needs_review)
-            }
-            else -> {
-                icon.setImageResource(R.drawable.ic_check_circle)
-                status.text = getString(R.string.main_card_status_clean)
-            }
-        }
-        status.setTextColor(ContextCompat.getColor(this, statusColorRes(detected, needsReview, hasError)))
+        val visual = statusVisual(statusSemantic(detected, needsReview, hasError))
+        icon.setImageResource(visual.iconRes)
+        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
+        status.setText(visual.labelRes)
+        status.setTextColor(visual.accentColor)
     }
 
-    private fun statusColorRes(detected: Boolean, needsReview: Boolean, hasError: Boolean = false): Int {
+    private fun statusSemantic(
+        detected: Boolean,
+        needsReview: Boolean,
+        hasError: Boolean = false,
+    ): StatusSemantic {
         return when {
-            detected -> R.color.status_red
-            hasError -> R.color.status_amber
-            needsReview -> R.color.status_amber
-            else -> R.color.status_green
+            detected -> StatusSemantic.DETECTED
+            hasError -> StatusSemantic.ERROR
+            needsReview -> StatusSemantic.REVIEW
+            else -> StatusSemantic.CLEAN
         }
+    }
+
+    private fun statusVisual(status: StatusSemantic): StatusVisual {
+        return StatusVisualResolver.resolve(this, status, colorVisionMode())
+    }
+
+    private fun statusColor(status: StatusSemantic): Int = statusVisual(status).accentColor
+
+    private fun statusContainerColor(status: StatusSemantic): Int = statusVisual(status).containerColor
+
+    private fun statusLabel(status: StatusSemantic): String = getString(statusVisual(status).labelRes)
+
+    private fun colorVisionMode(): ColorVisionMode {
+        return ColorVisionMode.fromPref(
+            prefs.getString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.OFF.prefValue),
+        )
     }
 
     private fun displayVerdict(result: CheckResult, privacyMode: Boolean) {
@@ -2935,28 +2928,28 @@ class MainActivity : AppCompatActivity() {
 
         when (result.verdict) {
             Verdict.NOT_DETECTED -> {
-                iconVerdict.setImageResource(R.drawable.ic_check_circle)
+                val visual = statusVisual(StatusSemantic.CLEAN)
+                iconVerdict.setImageResource(visual.iconRes)
+                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
                 textVerdict.text = getString(R.string.main_verdict_not_detected)
-                textVerdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_green))
-                cardVerdict.setCardBackgroundColor(
-                    ContextCompat.getColor(this, R.color.verdict_green_bg),
-                )
+                textVerdict.setTextColor(visual.accentColor)
+                cardVerdict.setCardBackgroundColor(visual.containerColor)
             }
             Verdict.NEEDS_REVIEW -> {
-                iconVerdict.setImageResource(R.drawable.ic_help)
+                val visual = statusVisual(StatusSemantic.REVIEW)
+                iconVerdict.setImageResource(visual.iconRes)
+                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
                 textVerdict.text = getString(R.string.main_verdict_needs_review)
-                textVerdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_yellow))
-                cardVerdict.setCardBackgroundColor(
-                    ContextCompat.getColor(this, R.color.verdict_yellow_bg),
-                )
+                textVerdict.setTextColor(visual.accentColor)
+                cardVerdict.setCardBackgroundColor(visual.containerColor)
             }
             Verdict.DETECTED -> {
-                iconVerdict.setImageResource(R.drawable.ic_error)
+                val visual = statusVisual(StatusSemantic.DETECTED)
+                iconVerdict.setImageResource(visual.iconRes)
+                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
                 textVerdict.text = getString(R.string.main_verdict_detected)
-                textVerdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_red))
-                cardVerdict.setCardBackgroundColor(
-                    ContextCompat.getColor(this, R.color.verdict_red_bg),
-                )
+                textVerdict.setTextColor(visual.accentColor)
+                cardVerdict.setCardBackgroundColor(visual.containerColor)
             }
         }
 
@@ -3169,22 +3162,36 @@ class MainActivity : AppCompatActivity() {
     private fun setTileStatus(id: String, status: Int, hint: String?) {
         val holder = tiles[id] ?: return
         val previousStatus = holder.statusDot.tag as? Int
-        val dotRes = when (status) {
-            TILE_STATUS_CLEAN -> R.drawable.dot_status_green
-            TILE_STATUS_REVIEW -> R.drawable.dot_status_amber
-            TILE_STATUS_DETECTED -> R.drawable.dot_status_red
-            else -> R.drawable.dot_status_neutral
-        }
-        holder.statusDot.setBackgroundResource(dotRes)
+        val semantic = semanticForTileStatus(status)
+        holder.statusDot.background = StatusVisualResolver.indicatorDrawable(this, semantic, colorVisionMode())
         holder.statusDot.tag = status
         if (hint != null) {
             holder.hint.text = hint
+        }
+        holder.statusDot.contentDescription = statusLabel(semantic)
+        holder.header.contentDescription = buildString {
+            append(holder.title.text)
+            append(". ")
+            append(statusLabel(semantic))
+            holder.hint.text?.takeIf { it.isNotBlank() }?.let { currentHint ->
+                append(". ")
+                append(currentHint)
+            }
         }
         if (
             (status == TILE_STATUS_REVIEW || status == TILE_STATUS_DETECTED) &&
             previousStatus != status
         ) {
             expandCategory(id)
+        }
+    }
+
+    private fun semanticForTileStatus(status: Int): StatusSemantic {
+        return when (status) {
+            TILE_STATUS_CLEAN -> StatusSemantic.CLEAN
+            TILE_STATUS_REVIEW -> StatusSemantic.REVIEW
+            TILE_STATUS_DETECTED -> StatusSemantic.DETECTED
+            else -> StatusSemantic.NEUTRAL
         }
     }
 
@@ -3393,65 +3400,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindVerdictHeroIdle() {
-        applyVerdictHeroColors(R.color.status_neutral_container, R.color.status_neutral)
-        verdictAvatarIcon.setImageResource(R.drawable.ic_minus)
+        val visual = statusVisual(StatusSemantic.NEUTRAL)
+        applyVerdictHeroColors(visual)
+        verdictAvatarIcon.setImageResource(visual.iconRes)
         verdictLabel.text = getString(R.string.verdict_label)
         verdictTitle.text = getString(R.string.verdict_title_idle)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_idle)
     }
 
     private fun bindVerdictHeroRunning() {
-        applyVerdictHeroColors(R.color.status_neutral_container, R.color.status_neutral)
-        verdictAvatarIcon.setImageResource(R.drawable.ic_minus)
+        val visual = statusVisual(StatusSemantic.NEUTRAL)
+        applyVerdictHeroColors(visual)
+        verdictAvatarIcon.setImageResource(visual.iconRes)
         verdictLabel.text = getString(R.string.verdict_label)
         verdictTitle.text = getString(R.string.verdict_title_idle)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_running)
     }
 
     private fun bindVerdictHero(result: CheckResult) {
-        val (containerRes, accentRes, iconRes, titleRes) = when (result.verdict) {
-            Verdict.NOT_DETECTED -> VerdictStyle(
-                R.color.status_green_container,
-                R.color.status_green,
-                R.drawable.ic_check_circle,
-                R.string.verdict_title_clean,
-            )
-            Verdict.NEEDS_REVIEW -> VerdictStyle(
-                R.color.status_amber_container,
-                R.color.status_amber,
-                R.drawable.ic_help,
-                R.string.verdict_title_review,
-            )
-            Verdict.DETECTED -> VerdictStyle(
-                R.color.status_red_container,
-                R.color.status_red,
-                R.drawable.ic_error,
-                R.string.verdict_title_detected,
-            )
+        val (semantic, titleRes) = when (result.verdict) {
+            Verdict.NOT_DETECTED -> StatusSemantic.CLEAN to R.string.verdict_title_clean
+            Verdict.NEEDS_REVIEW -> StatusSemantic.REVIEW to R.string.verdict_title_review
+            Verdict.DETECTED -> StatusSemantic.DETECTED to R.string.verdict_title_detected
         }
-        applyVerdictHeroColors(containerRes, accentRes)
-        verdictAvatarIcon.setImageResource(iconRes)
+        val visual = statusVisual(semantic)
+        applyVerdictHeroColors(visual)
+        verdictAvatarIcon.setImageResource(visual.iconRes)
         verdictLabel.text = getString(R.string.verdict_label)
         verdictTitle.text = getString(titleRes)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_done, tiles.size)
     }
 
-    private data class VerdictStyle(
-        @ColorRes val containerRes: Int,
-        @ColorRes val accentRes: Int,
-        val iconRes: Int,
-        val titleRes: Int,
-    )
-
-    private fun applyVerdictHeroColors(@ColorRes containerRes: Int, @ColorRes accentRes: Int) {
-        val container = ContextCompat.getColor(this, containerRes)
-        val accent = ContextCompat.getColor(this, accentRes)
-        verdictHero.setCardBackgroundColor(container)
-        verdictTitle.setTextColor(accent)
-        verdictLabel.setTextColor(accent)
+    private fun applyVerdictHeroColors(visual: StatusVisual) {
+        verdictHero.setCardBackgroundColor(visual.containerColor)
+        verdictTitle.setTextColor(visual.accentColor)
+        verdictLabel.setTextColor(visual.accentColor)
         val avatarBg = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(accent)
+            setColor(visual.accentColor)
         }
         verdictAvatar.background = avatarBg
     }

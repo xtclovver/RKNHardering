@@ -50,6 +50,12 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         ) { activity.navigateTo(SettingsAppearanceFragment(), R.string.settings_cat_appearance) }
 
         bindRow(
+            view, R.id.rowAccessibility,
+            iconRes = R.drawable.ic_accessibility,
+            title = getString(R.string.settings_cat_accessibility),
+        ) { activity.navigateTo(SettingsAccessibilityFragment(), R.string.settings_cat_accessibility) }
+
+        bindRow(
             view, R.id.rowAbout,
             iconRes = R.drawable.ic_help,
             title = getString(R.string.settings_cat_about),
@@ -88,6 +94,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         setRowValue(root, R.id.rowDns, dnsValue())
         setRowValue(root, R.id.rowPrivacy, if (privacyModeEnabled()) R.string.settings_value_privacy_masking else R.string.settings_value_off)
         setRowValue(root, R.id.rowAppearance, appearanceValue())
+        setRowValue(root, R.id.rowAccessibility, colorVisionValue())
         setRowValue(root, R.id.rowAbout, versionValue())
         setRowValue(root, R.id.rowDebug, R.string.settings_cat_debug_desc)
     }
@@ -139,6 +146,13 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
             else -> currentLocaleCode()
         }
         return getString(R.string.settings_value_appearance_format, theme, language)
+    }
+
+    private fun colorVisionValue(): String {
+        val mode = ColorVisionMode.fromPref(
+            prefs.getString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.OFF.prefValue),
+        )
+        return getString(mode.titleRes)
     }
 
     private fun versionValue(): String {

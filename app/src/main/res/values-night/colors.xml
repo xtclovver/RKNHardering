@@ -23,6 +23,31 @@
     <color name="status_neutral">#FFB5B3BC</color>
     <color name="status_neutral_container">#FF2E2C35</color>
 
+    <color name="status_cvd_clean">#FF8CCBFF</color>
+    <color name="status_cvd_clean_container">#FF123650</color>
+    <color name="status_cvd_review">#FFFFCC73</color>
+    <color name="status_cvd_review_container">#FF4D3400</color>
+    <color name="status_cvd_detected">#FFFFB0D3</color>
+    <color name="status_cvd_detected_container">#FF542842</color>
+    <color name="status_cvd_error">#FFD6D6DE</color>
+    <color name="status_cvd_error_container">#FF33333A</color>
+
+    <color name="status_tritan_clean">#FF78DCC0</color>
+    <color name="status_tritan_clean_container">#FF143D34</color>
+    <color name="status_tritan_review">#FFD4BBFF</color>
+    <color name="status_tritan_review_container">#FF3B285F</color>
+    <color name="status_tritan_detected">#FFFFB16F</color>
+    <color name="status_tritan_detected_container">#FF5A2600</color>
+
+    <color name="status_achromatopsia_clean">#FFD0D0D4</color>
+    <color name="status_achromatopsia_clean_container">#FF303034</color>
+    <color name="status_achromatopsia_review">#FFE3E3E8</color>
+    <color name="status_achromatopsia_review_container">#FF3A3A40</color>
+    <color name="status_achromatopsia_detected">#FFFFFFFF</color>
+    <color name="status_achromatopsia_detected_container">#FF4A4A50</color>
+    <color name="status_achromatopsia_error">#FFFFFFFF</color>
+    <color name="status_achromatopsia_error_container">#FF55555B</color>
+
     <color name="verdict_green">@color/status_green</color>
     <color name="verdict_green_bg">@color/status_green_container</color>
     <color name="verdict_yellow">@color/status_amber</color>

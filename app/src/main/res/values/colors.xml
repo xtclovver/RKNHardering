@@ -27,6 +27,32 @@
     <color name="status_neutral">#FF5F6368</color>
     <color name="status_neutral_container">#FFE5E5EA</color>
 
+    <!-- Color-vision accessibility palettes. Shape remains the primary cue. -->
+    <color name="status_cvd_clean">#FF005EA8</color>
+    <color name="status_cvd_clean_container">#FFD8EAFF</color>
+    <color name="status_cvd_review">#FF8A5A00</color>
+    <color name="status_cvd_review_container">#FFFFE7B3</color>
+    <color name="status_cvd_detected">#FF8F3D6B</color>
+    <color name="status_cvd_detected_container">#FFFFD8EA</color>
+    <color name="status_cvd_error">#FF3F3F46</color>
+    <color name="status_cvd_error_container">#FFE8E8EE</color>
+
+    <color name="status_tritan_clean">#FF006B54</color>
+    <color name="status_tritan_clean_container">#FFCCF1E6</color>
+    <color name="status_tritan_review">#FF6E4BA8</color>
+    <color name="status_tritan_review_container">#FFEBDDFF</color>
+    <color name="status_tritan_detected">#FFB24A00</color>
+    <color name="status_tritan_detected_container">#FFFFDEC2</color>
+
+    <color name="status_achromatopsia_clean">#FF5F6368</color>
+    <color name="status_achromatopsia_clean_container">#FFE5E5EA</color>
+    <color name="status_achromatopsia_review">#FF44474E</color>
+    <color name="status_achromatopsia_review_container">#FFDADCE2</color>
+    <color name="status_achromatopsia_detected">#FF202124</color>
+    <color name="status_achromatopsia_detected_container">#FFC7C7CC</color>
+    <color name="status_achromatopsia_error">#FF000000</color>
+    <color name="status_achromatopsia_error_container">#FFBFC0C4</color>
+
     <!-- Legacy aliases — keep for existing code that references these -->
     <color name="verdict_green">@color/status_green</color>
     <color name="verdict_green_bg">@color/status_green_container</color>

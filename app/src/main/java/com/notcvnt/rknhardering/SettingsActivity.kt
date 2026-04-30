@@ -103,6 +103,7 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_PRIVACY_MODE = SettingsPrefs.PREF_PRIVACY_MODE
         const val PREF_THEME = SettingsPrefs.PREF_THEME
         const val PREF_LANGUAGE = SettingsPrefs.PREF_LANGUAGE
+        const val PREF_COLOR_VISION_MODE = SettingsPrefs.PREF_COLOR_VISION_MODE
         const val EXTRA_REQUEST_PERMISSIONS = "extra_request_permissions"
 
         fun applyTheme(theme: String) {

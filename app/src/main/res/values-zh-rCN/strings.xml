@@ -21,6 +21,8 @@
     <string name="settings_cat_privacy_desc">IP 遮蔽</string>
     <string name="settings_cat_appearance">外观</string>
     <string name="settings_cat_appearance_desc">主题与语言</string>
+    <string name="settings_cat_accessibility">无障碍</string>
+    <string name="settings_cat_accessibility_desc">色觉</string>
     <string name="settings_cat_about">关于</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">调试</string>
@@ -91,6 +93,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">色觉模式</string>
+    <string name="settings_color_vision_preview">状态预览</string>
+    <string name="settings_color_vision_off">关闭</string>
+    <string name="settings_color_vision_red_green">红绿色</string>
+    <string name="settings_color_vision_blue_yellow">蓝黄色</string>
+    <string name="settings_color_vision_achromatopsia">Achromatopsia</string>
+    <string name="settings_accessibility_status_preview_content">状态：%1$s</string>
     <string name="settings_permissions">权限</string>
     <string name="settings_permissions_desc">管理应用权限</string>
     <string name="settings_github">GitHub</string>
@@ -516,6 +525,7 @@
     <string name="tile_hint_detected_count">%1$d / %2$d 已检测</string>
     <string name="tile_hint_review">需要核查</string>
     <string name="tile_hint_error">错误</string>
+    <string name="settings_status_no_data">无数据</string>
     <string name="settings_value_on">开启</string>
     <string name="settings_value_off">关闭</string>
     <string name="settings_value_network_all">所有请求</string>

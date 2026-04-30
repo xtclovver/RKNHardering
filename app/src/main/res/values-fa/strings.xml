@@ -21,6 +21,8 @@
     <string name="settings_cat_privacy_desc">پنهان‌سازی IP</string>
     <string name="settings_cat_appearance">ظاهر</string>
     <string name="settings_cat_appearance_desc">پوسته و زبان</string>
+    <string name="settings_cat_accessibility">دسترسی‌پذیری</string>
+    <string name="settings_cat_accessibility_desc">دید رنگ</string>
     <string name="settings_cat_about">درباره</string>
     <string name="settings_cat_about_desc">GitHub</string>
     <string name="settings_cat_debug">Debug</string>
@@ -91,6 +93,13 @@
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_fa">فارسی</string>
     <string name="settings_language_zh">中文</string>
+    <string name="settings_color_vision_mode">حالت دید رنگ</string>
+    <string name="settings_color_vision_preview">پیش‌نمایش وضعیت‌ها</string>
+    <string name="settings_color_vision_off">خاموش</string>
+    <string name="settings_color_vision_red_green">قرمز-سبز</string>
+    <string name="settings_color_vision_blue_yellow">آبی-زرد</string>
+    <string name="settings_color_vision_achromatopsia">Achromatopsia</string>
+    <string name="settings_accessibility_status_preview_content">وضعیت: %1$s</string>
     <string name="settings_permissions">مجوزها</string>
     <string name="settings_permissions_desc">مدیریت مجوزهای برنامه</string>
     <string name="settings_github">GitHub</string>
@@ -518,6 +527,7 @@
     <string name="tile_hint_detected_count">%1$d از %2$d شناسایی شد</string>
     <string name="tile_hint_review">نیاز به بررسی</string>
     <string name="tile_hint_error">خطا</string>
+    <string name="settings_status_no_data">داده‌ای نیست</string>
     <string name="settings_value_on">روشن</string>
     <string name="settings_value_off">خاموش</string>
     <string name="settings_value_network_all">همه درخواست‌ها</string>
