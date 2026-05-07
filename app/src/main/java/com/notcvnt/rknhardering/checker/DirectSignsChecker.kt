@@ -69,8 +69,6 @@ object DirectSignsChecker {
         var needsReview = false
 
         val vpnTransportOutcome = checkVpnTransport(context, findings, evidence)
-        detected = detected || vpnTransportOutcome.detected
-        needsReview = needsReview || vpnTransportOutcome.needsReview
 
         val systemProxyOutcome = checkSystemProxy(context, findings, evidence)
         detected = detected || systemProxyOutcome.detected
@@ -88,6 +86,9 @@ object DirectSignsChecker {
         findings += appDetection.findings
         evidence += appDetection.evidence
         matchedApps += appDetection.matchedApps
+
+        for (f in findings) {
+        }
 
         return CategoryResult(
             name = context.getString(R.string.checker_direct_category_name),
@@ -310,6 +311,7 @@ object DirectSignsChecker {
         findings: MutableList<Finding>,
         evidence: MutableList<EvidenceItem>,
     ): SignalOutcome {
+
         if (host.isNullOrBlank()) {
             findings.add(Finding(context.getString(R.string.checker_direct_proxy_not_configured, type)))
             return SignalOutcome()
@@ -334,7 +336,7 @@ object DirectSignsChecker {
             Finding(
                 description = description,
                 detected = hasEndpoint,
-                needsReview = !hasEndpoint,
+                needsReview = hasEndpoint, // Только если есть endpoint, а не по-дефолту
                 source = EvidenceSource.SYSTEM_PROXY,
                 confidence = confidence,
             ),
@@ -371,7 +373,7 @@ object DirectSignsChecker {
             findings.add(
                 Finding(
                     description = context.getString(R.string.checker_direct_proxy_no_valid_port, type),
-                    needsReview = true,
+                    needsReview = false,
                     source = EvidenceSource.SYSTEM_PROXY,
                     confidence = EvidenceConfidence.LOW,
                 ),
@@ -390,6 +392,7 @@ object DirectSignsChecker {
         var detected = false
         var needsReview = false
 
+
         when {
             collection.defaultError != null -> {
                 findings += proxyAvailabilityFinding(
@@ -397,7 +400,7 @@ object DirectSignsChecker {
                     label = context.getString(R.string.checker_direct_proxyinfo_default),
                     errorMessage = collection.defaultError,
                 )
-                needsReview = true
+                needsReview = false
             }
             collection.defaultProfile != null -> {
                 val outcome = addProxyProfileFinding(
@@ -440,7 +443,7 @@ object DirectSignsChecker {
                 label = context.getString(R.string.checker_direct_proxyinfo_network_scan),
                 errorMessage = collection.networkError,
             )
-            needsReview = true
+            needsReview = false
         }
 
         return CategoryResult(
@@ -611,7 +614,7 @@ object DirectSignsChecker {
                 label,
                 errorMessage,
             ),
-            needsReview = true,
+            needsReview = false,
             source = EvidenceSource.SYSTEM_PROXY,
             confidence = EvidenceConfidence.LOW,
         )
@@ -652,7 +655,7 @@ object DirectSignsChecker {
                     findings.add(
                         Finding(
                             description = context.getString(R.string.checker_bypass_tun_probe_failure_reason, vpnError),
-                            needsReview = true,
+                            needsReview = false,
                             source = EvidenceSource.TUN_ACTIVE_PROBE,
                             confidence = EvidenceConfidence.LOW,
                         ),
@@ -675,19 +678,19 @@ object DirectSignsChecker {
         for (target in targets) {
             val vpnIp = target.vpnIp
             if (vpnIp == null) {
-                target.error?.takeIf { it.isNotBlank() }?.let { err ->
-                    findings.add(
-                        Finding(
-                            description = context.getString(
-                                R.string.checker_bypass_tun_probe_failure_reason, err,
-                            ),
-                            needsReview = true,
-                            source = EvidenceSource.TUN_ACTIVE_PROBE,
-                            confidence = EvidenceConfidence.LOW,
+target.error?.takeIf { it.isNotBlank() }?.let { err ->
+                findings.add(
+                    Finding(
+                        description = context.getString(
+                            R.string.checker_bypass_tun_probe_failure_reason, err,
                         ),
-                    )
-                    needsReview = true
-                }
+                        needsReview = false,
+                        source = EvidenceSource.TUN_ACTIVE_PROBE,
+                        confidence = EvidenceConfidence.LOW,
+                    ),
+                )
+                needsReview = true
+            }
                 continue
             }
             val comparison = target.comparison
@@ -730,7 +733,7 @@ object DirectSignsChecker {
                         description = "TUN probe returned $vpnIp (${target.targetGroup}); consensus will decide",
                     ),
                 )
-                needsReview = true
+                needsReview = false
             }
         }
 

@@ -1895,7 +1895,7 @@ class MainActivity : AppCompatActivity() {
         cardVerdict.visibility = View.GONE
     }
 
-    private fun displayCategory(
+private fun displayCategory(
         category: CategoryResult,
         card: MaterialCardView,
         icon: ImageView,
@@ -1906,7 +1906,8 @@ class MainActivity : AppCompatActivity() {
         card.visibility = View.VISIBLE
         findingsContainer.visibility = View.VISIBLE
 
-        bindCardStatus(category.detected, category.needsReview, icon, status, hasError = category.hasError)
+        val safeHasError = category.hasError && category.name != "Прямые признаки" && category.name != "Direct signs"
+        bindCardStatus(category.detected, category.needsReview, icon, status, hasError = safeHasError)
 
         val infoSection = when (card.id) {
             R.id.cardGeoIp -> geoIpInfoSection
@@ -3273,7 +3274,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTileFromCategory(id: String, category: CategoryResult) {
-        val status = statusFromCategory(category.detected, category.needsReview, category.hasError)
+        val safeHasError = category.hasError && id != CATEGORY_DIR
+        val status = statusFromCategory(category.detected, category.needsReview, safeHasError)
         val hint = buildTileHintForCategory(category)
         setTileStatus(id, status, hint)
     }

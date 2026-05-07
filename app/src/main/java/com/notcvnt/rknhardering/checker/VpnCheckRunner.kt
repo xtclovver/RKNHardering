@@ -207,12 +207,14 @@ object VpnCheckRunner {
                 ),
             ),
         )
-        fun direct(context: Context, error: Throwable): CategoryResult = CategoryResult(
-            name = context.getString(R.string.checker_direct_category_name),
-            detected = false,
-            needsReview = true,
-            findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
-        )
+        fun direct(context: Context, error: Throwable): CategoryResult {
+            return CategoryResult(
+                name = context.getString(R.string.checker_direct_category_name),
+                detected = false,
+                needsReview = false,
+                findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
+            )
+        }
         fun indirect(context: Context, error: Throwable): CategoryResult = CategoryResult(
             name = "Indirect",
             detected = false,
