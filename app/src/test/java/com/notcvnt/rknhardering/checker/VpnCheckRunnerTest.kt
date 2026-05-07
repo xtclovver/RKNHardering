@@ -208,6 +208,111 @@ class VpnCheckRunnerTest {
     }
 
     @Test
+    fun `disabled network checks do not downgrade strong local verdict`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> error("GeoIP should not run when network checks are disabled") },
+            ipComparisonCheck = { _, _ -> error("IP comparison should not run when network checks are disabled") },
+            directCheck = { _, _ ->
+                category(
+                    name = "direct",
+                    evidence = listOf(
+                        EvidenceItem(
+                            source = EvidenceSource.DIRECT_NETWORK_CAPABILITIES,
+                            detected = true,
+                            confidence = EvidenceConfidence.HIGH,
+                            description = "Active network exposes VPN transport",
+                        ),
+                    ),
+                )
+            },
+            indirectCheck = { _, networkRequestsEnabled, _, _ ->
+                assertFalse(networkRequestsEnabled)
+                category(
+                    name = "indirect",
+                    evidence = listOf(
+                        EvidenceItem(
+                            source = EvidenceSource.ACTIVE_VPN,
+                            detected = true,
+                            confidence = EvidenceConfidence.MEDIUM,
+                            description = "Active VPN package present",
+                        ),
+                    ),
+                )
+            },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context = context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = false,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertEquals(Verdict.DETECTED, result.verdict)
+    }
+
+    @Test
+    fun `direct checker failure promotes final verdict to needs review`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            directCheck = { _, _ -> throw java.io.IOException("direct failed") },
+            indirectCheck = { _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context = context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = true,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(result.directSigns.needsReview)
+        assertEquals(Verdict.NEEDS_REVIEW, result.verdict)
+    }
+
+    @Test
+    fun `indirect checker failure promotes final verdict to needs review`() = runBlocking {
+        VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
+            geoIpCheck = { _, _ -> category("geo") },
+            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            directCheck = { _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
+            locationCheck = { _, _, _ -> category("location") },
+            nativeCheck = { _ -> category("native") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+                error("BypassChecker should not run when split tunnel is disabled")
+            },
+        )
+
+        val result = VpnCheckRunner.run(
+            context = context,
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = true,
+                resolverConfig = DnsResolverConfig.system(),
+            ),
+        )
+
+        assertTrue(result.indirectSigns.needsReview)
+        assertEquals(Verdict.NEEDS_REVIEW, result.verdict)
+    }
+
+    @Test
     fun `shared underlying probe reaches direct and bypass checks`() = runBlocking {
         val sharedProbe = UnderlyingNetworkProber.ProbeResult(
             vpnActive = true,

@@ -48,6 +48,7 @@ object VerdictEngine {
         ipConsensus: IpConsensusResult,
         nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        geoCheckAvailable: Boolean = true,
     ): Verdict {
         // R1
         if (bypassResult.evidence.any { it.detected && it.source in HARD_DETECT_BYPASS }) {
@@ -56,13 +57,13 @@ object VerdictEngine {
 
         // R2 check removed (MATRIX_DIRECT_SOURCES moved to R5)
 
-        // R3
-        if (ipConsensus.probeTargetDivergence) {
-            return Verdict.DETECTED
-        }
         val geoAxis = ipConsensus.foreignIps.isNotEmpty() ||
             ipConsensus.geoCountryMismatch ||
             ipConsensus.warpLikeIndicator
+        // R3
+        if (ipConsensus.probeTargetDivergence && geoAxis) {
+            return Verdict.DETECTED
+        }
         if (ipConsensus.probeTargetDirectDivergence && geoAxis) {
             return Verdict.DETECTED
         }
@@ -77,6 +78,7 @@ object VerdictEngine {
                 it.description.contains("location_country_ru:true")
         }
         val geo = geoIp.geoFacts
+        val geoAxisAvailable = geoCheckAvailable && geo?.fetchError != true
         val anyOtherSignal = directSigns.evidence.any { it.detected } ||
             indirectSigns.evidence.any { it.detected } ||
             ipConsensus.crossChannelMismatch ||
@@ -103,7 +105,8 @@ object VerdictEngine {
             !geoHit && directHit && !indirectHit -> Verdict.NOT_DETECTED
             !geoHit && !directHit && indirectHit -> Verdict.NOT_DETECTED
             geoHit && !directHit && !indirectHit -> Verdict.NEEDS_REVIEW
-            !geoHit && directHit && indirectHit -> Verdict.NEEDS_REVIEW
+            !geoHit && directHit && indirectHit ->
+                if (geoAxisAvailable) Verdict.NEEDS_REVIEW else Verdict.DETECTED
             geoHit && directHit && !indirectHit -> Verdict.DETECTED
             geoHit && !directHit && indirectHit -> Verdict.DETECTED
             geoHit && directHit && indirectHit -> Verdict.DETECTED
@@ -122,12 +125,15 @@ object VerdictEngine {
         val locationSignalHit = locationSignals.detected
         if (matrix == Verdict.NOT_DETECTED && (
                 bypassResult.needsReview ||
+                    directSigns.needsReview ||
+                    indirectSigns.needsReview ||
                     locationSignalHit ||
                     hasActionableCallTransportLeak ||
                     icmpSpoofing.needsReview ||
                     nativeReviewHit ||
                     ipConsensus.needsReview ||
                     ipConsensus.channelConflict.isNotEmpty() ||
+                    ipConsensus.probeTargetDivergence ||
                     tunProbeReview
                 )
         ) {

@@ -571,6 +571,38 @@ class BypassCheckerTest {
         assertEquals(LocalProxySummaryReason.FIRST_WITH_PROXY_IP, evaluation.proxyChecks[0].summaryReason)
         assertFalse(evidence.any { it.source == EvidenceSource.SPLIT_TUNNEL_BYPASS && it.detected })
         assertEquals(2, findings.count { it.description == context.getString(R.string.checker_bypass_split_disabled) })
+        assertFalse(BypassChecker.proxyChecksNeedReview(evaluation.proxyChecks))
+    }
+
+    @Test
+    fun `auth required proxy is not confirmed bypass`() = runBlocking {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+
+        val evaluation = BypassChecker.evaluateProxyEndpoints(
+            context = context,
+            resolverConfig = com.notcvnt.rknhardering.network.DnsResolverConfig.system(),
+            proxyEndpoints = listOf(
+                ProxyEndpoint(host = "127.0.0.1", port = 10808, type = ProxyType.SOCKS5, authRequired = true),
+            ),
+            findings = findings,
+            evidence = evidence,
+            fetchDirectIp = { Result.success("109.236.0.10") },
+            fetchProxyIp = { error("auth-required proxy IP must not be fetched") },
+            resolveProxyOwnerMatch = { BypassChecker.ProxyOwnerMatch(status = LocalProxyOwnerStatus.UNRESOLVED) },
+        )
+
+        assertFalse(evaluation.confirmedBypass)
+        assertEquals(LocalProxyCheckStatus.AUTH_REQUIRED, evaluation.proxyChecks.single().status)
+        assertTrue(BypassChecker.proxyChecksNeedReview(evaluation.proxyChecks))
+        assertFalse(evidence.any { it.source == EvidenceSource.SPLIT_TUNNEL_BYPASS && it.detected })
+        assertTrue(
+            findings.any {
+                it.source == EvidenceSource.LOCAL_PROXY &&
+                    it.needsReview &&
+                    !it.detected
+            },
+        )
     }
 
     @Test

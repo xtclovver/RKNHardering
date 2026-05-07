@@ -262,7 +262,7 @@ object BypassChecker {
 
         val detected = proxyEvaluation.confirmedBypass || xrayApiScanResult != null || underlyingEvaluation.detected
         val needsReview = !detected && (
-            proxyEvaluation.proxyChecks.isNotEmpty() ||
+            proxyChecksNeedReview(proxyEvaluation.proxyChecks) ||
                 underlyingEvaluation.needsReview
             )
 
@@ -280,6 +280,13 @@ object BypassChecker {
             needsReview = needsReview,
             evidence = evidence,
         )
+    }
+
+    internal fun proxyChecksNeedReview(proxyChecks: List<LocalProxyCheckResult>): Boolean {
+        return proxyChecks.any {
+            it.status != LocalProxyCheckStatus.SAME_IP &&
+                it.status != LocalProxyCheckStatus.CONFIRMED_BYPASS
+        }
     }
 
     internal suspend fun evaluateProxyEndpoints(
@@ -406,8 +413,7 @@ object BypassChecker {
             summaryProxyIp = summaryCheck?.proxyIp,
             proxyChecks = proxyChecks,
             confirmedBypass = proxyChecks.any {
-                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS ||
-                    it.status == LocalProxyCheckStatus.AUTH_REQUIRED
+                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS
             },
         )
     }
@@ -465,8 +471,7 @@ object BypassChecker {
             }
         }
 
-        val proxyDetected = proxyCheck.status == LocalProxyCheckStatus.CONFIRMED_BYPASS ||
-            proxyCheck.status == LocalProxyCheckStatus.AUTH_REQUIRED
+        val proxyDetected = proxyCheck.status == LocalProxyCheckStatus.CONFIRMED_BYPASS
 
         findings.add(
             Finding(

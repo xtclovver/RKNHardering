@@ -89,7 +89,7 @@ class VerdictEngineTest {
     }
 
     @Test
-    fun `R3a probeTargetDivergence alone yields detected`() {
+    fun `R3a probeTargetDivergence alone yields needs review`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),
             directSigns = category(),
@@ -98,7 +98,7 @@ class VerdictEngineTest {
             bypassResult = bypass(),
             ipConsensus = IpConsensusResult(probeTargetDivergence = true),
         )
-        assertEquals(Verdict.DETECTED, verdict)
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
     }
 
     @Test
@@ -217,6 +217,46 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `R5 direct plus indirect yields review while geo check is available`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = directCategory(true),
+            indirectSigns = indirectCategory(true),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `R5 direct plus indirect yields detected when geo check is disabled`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = directCategory(true),
+            indirectSigns = indirectCategory(true),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            geoCheckAvailable = false,
+        )
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
+    fun `R5 direct plus indirect yields detected when geo check failed`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(geoFacts = GeoIpFacts(fetchError = true)),
+            directSigns = directCategory(true),
+            indirectSigns = indirectCategory(true),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
     fun `R6 channelConflict alone promotes to needs review`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),
@@ -239,6 +279,32 @@ class VerdictEngineTest {
             bypassResult = bypass(),
             ipConsensus = IpConsensusResult.empty(),
             icmpSpoofing = category(needsReview = true),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `R6 direct checker review promotes to needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(needsReview = true),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `R6 indirect checker review promotes to needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(needsReview = true),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
         )
         assertEquals(Verdict.NEEDS_REVIEW, verdict)
     }

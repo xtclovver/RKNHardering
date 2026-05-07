@@ -484,6 +484,7 @@ object VpnCheckRunner {
             ipConsensus = ipConsensus,
             nativeSigns = nativeSigns,
             icmpSpoofing = icmpSpoofing,
+            geoCheckAvailable = settings.networkRequestsEnabled,
         )
         executionContext.throwIfCancelled()
         onUpdate?.invoke(CheckUpdate.VerdictReady(verdict))
