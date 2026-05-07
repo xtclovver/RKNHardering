@@ -1,0 +1,1 @@
+کلاینت‌های VPN جدید به کاتالوگ اضافه شد (Karing، Exclave، v2box، v2RayTun، CatBox، MikuBox، AeroBox، Husi، FireflyVPN، avoVPN و دیگران). بررسی‌های شبکه سریع‌تر شد. رفع مشکلات جزئی UI. رفع خطای 404 در TUN active probe. رفع اشکال root detector در بررسی‌های نیتیو. امکان غیرفعال‌سازی به‌روزرسانی خودکار اضافه شد.

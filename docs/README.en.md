@@ -27,7 +27,7 @@ If you have expertise in these areas, please open an Issue or Pull Request, or r
 
 ## Architecture
 
-Six independent check modules run in parallel. The final verdict is calculated in `VerdictEngine`.
+Independent check modules run in parallel. The final verdict is calculated in `VerdictEngine`.
 
 `IpComparisonChecker` is stored in the result and shown in the UI as a diagnostic block, but in the current version it does not participate in `VerdictEngine`.
 
@@ -41,6 +41,7 @@ VpnCheckRunner
 ├── CdnPullingChecker      — HTTPS requests to CDN/redirector
 ├── LocationSignalsChecker — MCC/SIM/cell/Wi-Fi/BeaconDB
 ├── BypassChecker          — localhost proxy, Xray gRPC API, underlying-network leak
+├── RttTriangulationChecker — SNITCH (β): RTT triangulation against RU/foreign hosts
 └── NativeSignsChecker     — JNI checks (routes, hooks, root)
         └── VerdictEngine  — final verdict logic
 ```
@@ -361,7 +362,25 @@ Sends HTTPS requests to known redirectors and trace endpoints (e.g., Google Vide
 
 Checks UDP/STUN accessibility across global and regional endpoints, and tests TCP MTProto reachability via local proxies. This can reveal mapped public IPs or underlying leaks that bypass conventional tunnels.
 
-### 9. Native Signs (`NativeSignsChecker`)
+### 9. SNITCH — RTT Triangulation (`RttTriangulationChecker`) β
+
+Sends ICMP pings to a set of Russian and foreign hosts and compares median round-trip times.
+
+Russian targets: `yandex.ru`, `mail.ru`, `vk.com`, `sberbank.ru`, `gosuslugi.ru`.
+
+Foreign targets: `facebook.com`, `github.com`, `twitter.com`, `reddit.com`, `instagram.com`.
+
+Logic:
+
+- if the median RTT to RU hosts exceeds the threshold (`80 ms`), the device is likely not located in Russia;
+- high jitter (> 60 ms) reduces confidence in the conclusion;
+- the result upgrades the verdict to `NEEDS_REVIEW` but does not by itself produce `DETECTED`.
+
+The check is optional and disabled by default.
+
+---
+
+### 10. Native Signs (`NativeSignsChecker`)
 
 Performs low-level JNI checks directly from C++:
 - Native interface listing and `getifaddrs()` checks

@@ -1,0 +1,18 @@
+RKNHardering 是一款 Android 应用，用于检测设备上的 VPN 和代理使用情况，实现了俄罗斯联邦通信监管局（RKN）识别翻墙工具的方法论。
+
+九个独立检测模块并行运行，最终裁决由 VerdictEngine 计算：
+
+- GeoIP — 通过 GeoIP 数据库和 hosting/proxy 信号提供商检查公网 IP
+- IP 比较 — 对比俄境内和境外公网 IP 检测器的响应
+- 直接特征 — NetworkCapabilities、系统代理设置、已安装的 VPN 应用
+- 间接特征 — 网络接口、路由表、DNS、dumpsys VPN 输出、localhost 代理监听器
+- 位置信号 — MCC/SIM/基站/Wi-Fi 数据及 BeaconDB 地理位置查询
+- Bypass 检测 — 扫描 localhost 的 SOCKS5/HTTP 代理、Xray gRPC API 端点及底层网络泄漏
+- CDN 拉取 — 向追踪端点发送 HTTPS 请求以确定公网 IP
+- 通话传输 — 检测 STUN 和 MTProto 可用性以识别流量隧道
+- 原生特征 — JNI 级接口、路由、/proc/self/maps hook 标记及 root 指标检查
+
+最终裁决（未检测到 / 需要审查 / 已检测到）基于各模块结果的加权组合计算。
+
+最低 Android 版本：8.0（API 26）。
+源代码：https://github.com/xtclovver/RKNHardering

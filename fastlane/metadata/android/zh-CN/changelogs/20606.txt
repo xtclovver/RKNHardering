@@ -1,0 +1,1 @@
+降低 Gradle 和 AGP 版本以兼容 F-Droid 构建。

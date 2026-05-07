@@ -27,7 +27,7 @@
 
 ## 架构
 
-六个独立的检查模块并行运行。最终结论由 `VerdictEngine` 计算。
+各独立检查模块并行运行。最终结论由 `VerdictEngine` 计算。
 
 `IpComparisonChecker` 会保存在结果中，并在 UI 中作为诊断模块显示，但在当前版本中不参与 `VerdictEngine`。
 
@@ -41,6 +41,7 @@ VpnCheckRunner
 ├── CdnPullingChecker      — 对 CDN/redirector 的 HTTPS 请求
 ├── LocationSignalsChecker — MCC/SIM/cell/Wi-Fi/BeaconDB
 ├── BypassChecker          — localhost 代理、Xray gRPC API、underlying-network leak
+├── RttTriangulationChecker — SNITCH（β）：针对 RU/境外主机的 RTT 三角测量
 └── NativeSignsChecker     — JNI 检查（路由、接口、钩子、root 等）
         └── VerdictEngine  — 最终结论逻辑
 ```
@@ -361,7 +362,25 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
 检查全球与区域端点的 UDP/STUN 可达性，并通过本地代理测试 TCP MTProto 的连通性。该项检查能够揭示重定向的公网 IP 或是绕过常规隧道的底层网络泄漏。
 
-### 9. 原生迹象 (`NativeSignsChecker`)
+### 9. SNITCH — RTT 三角测量 (`RttTriangulationChecker`) β
+
+向一组俄罗斯和境外主机发送 ICMP ping，并比较各自的中位往返时延。
+
+俄罗斯目标：`yandex.ru`、`mail.ru`、`vk.com`、`sberbank.ru`、`gosuslugi.ru`。
+
+境外目标：`facebook.com`、`github.com`、`twitter.com`、`reddit.com`、`instagram.com`。
+
+逻辑：
+
+- 若到俄罗斯主机的中位 RTT 超过阈值（`80 ms`），则设备很可能不在俄罗斯境内；
+- 高抖动（> 60 ms）会降低结论的置信度；
+- 检测结果会将判定升级为 `NEEDS_REVIEW`，但本身不会产生 `DETECTED`。
+
+该检查为可选项，默认关闭。
+
+---
+
+### 10. 原生迹象 (`NativeSignsChecker`)
 
 直接在 C++ 层执行底层 JNI 检查：
 - 枚举原生接口并检查 `getifaddrs()`

@@ -27,7 +27,7 @@
 
 ## معماری
 
-شش ماژول مستقل بررسی به‌صورت موازی اجرا می‌شوند. نتیجه نهایی در `VerdictEngine` محاسبه می‌شود.
+ماژول‌های مستقل بررسی به‌صورت موازی اجرا می‌شوند. نتیجه نهایی در `VerdictEngine` محاسبه می‌شود.
 
 `IpComparisonChecker` در نتیجه ذخیره می‌شود و در رابط کاربری به‌عنوان یک بلوک تشخیصی نمایش داده می‌شود، اما در نسخه فعلی در `VerdictEngine` نقشی ندارد.
 
@@ -41,6 +41,7 @@ VpnCheckRunner
 ├── CdnPullingChecker      — درخواست‌های HTTPS به CDN/redirector
 ├── LocationSignalsChecker — MCC/SIM/cell/Wi-Fi/BeaconDB
 ├── BypassChecker          — localhost proxy، Xray gRPC API، underlying-network leak
+├── RttTriangulationChecker — SNITCH (β): مثلث‌بندی RTT با هاست‌های RU/خارجی
 └── NativeSignsChecker     — بررسی‌های JNI (مسیرها، هوک‌ها، root)
         └── VerdictEngine  — منطق نتیجه نهایی
 ```
@@ -361,7 +362,25 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 
 دسترسی‌پذیری UDP/STUN را در endpointهای جهانی و منطقه‌ای بررسی می‌کند و دسترسی‌پذیری TCP MTProto را از طریق پروکسی‌های محلی آزمایش می‌کند. این می‌تواند IPهای عمومی نگاشت‌شده (mapped) یا نشت‌های شبکه‌های زیرین که تونل‌های معمولی را دور می‌زنند، آشکار کند.
 
-### 9. نشانه‌های بومی/Native (`NativeSignsChecker`)
+### 9. SNITCH — مثلث‌بندی RTT (`RttTriangulationChecker`) β
+
+پینگ ICMP به مجموعه‌ای از هاست‌های روسی و خارجی ارسال می‌کند و میانه‌های زمان رفت‌وبرگشت را مقایسه می‌کند.
+
+اهداف روسی: `yandex.ru`, `mail.ru`, `vk.com`, `sberbank.ru`, `gosuslugi.ru`.
+
+اهداف خارجی: `facebook.com`, `github.com`, `twitter.com`, `reddit.com`, `instagram.com`.
+
+منطق:
+
+- اگر میانه RTT به هاست‌های RU از آستانه (`80 ms`) بیشتر باشد، دستگاه احتمالاً در روسیه نیست؛
+- jitter بالا (> 60 ms) اطمینان به نتیجه را کاهش می‌دهد؛
+- نتیجه verdict را به `NEEDS_REVIEW` ارتقا می‌دهد، اما به‌تنهایی `DETECTED` تولید نمی‌کند.
+
+این بررسی اختیاری است و به‌طور پیش‌فرض غیرفعال است.
+
+---
+
+### 10. نشانه‌های بومی/Native (`NativeSignsChecker`)
 
 بررسی‌های JNI سطح پایین را مستقیماً از C++ انجام می‌دهد:
 - لیست کردن اینترفیس‌های بومی و بررسی‌های `getifaddrs()`

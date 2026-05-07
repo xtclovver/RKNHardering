@@ -1,3 +1,7 @@
 Added SNITCH check (β): detects IP and DNS leak signals via a redirect chain.
 Redesigned app icon; icon now follows the selected color-vision accessibility mode.
 Added classic icon option in Appearance settings.
+Improved cellular network location detection.
+Improved verdict engine logic.
+Fixed direct IP detection under carrier whitelist restrictions: added Yandex endpoint as fallback.
+Expanded GeoIP check providers.

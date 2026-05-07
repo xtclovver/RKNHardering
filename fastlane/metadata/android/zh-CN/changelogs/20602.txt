@@ -1,0 +1,1 @@
+新增 VPN 客户端到目录（Karing、Exclave、v2box、v2RayTun、CatBox、MikuBox、AeroBox、Husi、FireflyVPN、avoVPN 等）。加速网络检测。修复细节 UI 问题。修复 TUN active probe 404 错误。修复原生检测中的 root 检测器问题。新增禁用自动更新选项。

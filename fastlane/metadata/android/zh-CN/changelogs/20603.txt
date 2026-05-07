@@ -1,0 +1,1 @@
+修复 VerdictEngine 中俄罗斯企业 VPN 场景处理问题。新增对名称包含"VPN"的应用的检测。修复 debug 设置回归。

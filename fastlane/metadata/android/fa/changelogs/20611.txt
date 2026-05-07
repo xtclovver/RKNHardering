@@ -1,0 +1,1 @@
+نسخه 2.6.11: حذف بلوک dependency metadata از APK signing block برای سازگاری با ساخت قابل بازتولید F-Droid.

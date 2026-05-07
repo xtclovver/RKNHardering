@@ -1,0 +1,1 @@
+版本 2.6.11：从 APK signing block 中移除 dependency metadata 块以兼容 F-Droid 可重现构建。
