@@ -33,9 +33,16 @@ data class XrayOutboundSummary(
     val proxySettingsType: String?,
 )
 
+data class XrayStatsSummary(
+    val statCount: Int,
+    val sampleNames: List<String> = emptyList(),
+)
+
 data class XrayApiScanResult(
     val endpoint: XrayApiEndpoint,
     val outbounds: List<XrayOutboundSummary>,
+    val stats: XrayStatsSummary? = null,
+    val handlerAvailable: Boolean = true,
 )
 
 data class XrayScanProgress(
@@ -56,6 +63,7 @@ class XrayApiScanner(
     private val progressUpdateEvery: Int = 512,
     private val isTcpPortOpenOverride: ((String, Int) -> Boolean)? = null,
     private val tryListOutboundsOverride: (suspend (String, Int, Long) -> XrayApiScanResult?)? = null,
+    private val tryQueryStatsOverride: (suspend (String, Int, Long) -> XrayStatsSummary?)? = null,
 ) {
     companion object {
         val DEFAULT_POPULAR_PORTS: List<Int> = listOf(8_080, 10_085)
@@ -140,7 +148,7 @@ class XrayApiScanner(
                     }
 
                     if (isTcpPortOpen(host, port)) {
-                        val result = tryListOutbounds(host, port)
+                        val result = tryProbeApi(host, port)
                         if (result != null) {
                             found.compareAndSet(null, result)
                             return@launch
@@ -166,6 +174,18 @@ class XrayApiScanner(
         found.get()
     }
 
+    private suspend fun tryProbeApi(host: String, port: Int): XrayApiScanResult? {
+        tryListOutbounds(host, port)?.let { return it }
+
+        val stats = tryQueryStats(host, port) ?: return null
+        return XrayApiScanResult(
+            endpoint = XrayApiEndpoint(host = host, port = port),
+            outbounds = emptyList(),
+            stats = stats,
+            handlerAvailable = false,
+        )
+    }
+
     private suspend fun tryListOutbounds(host: String, port: Int): XrayApiScanResult? {
         tryListOutboundsOverride?.let { override ->
             override(host, port, grpcDeadlineMs)?.let { return it }
@@ -178,6 +198,20 @@ class XrayApiScanner(
         val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
         executionContext.throwIfCancelled()
         return client.listOutbounds(port, deadlineMs = retryDeadline, executionContext = executionContext).getOrNull()
+    }
+
+    private suspend fun tryQueryStats(host: String, port: Int): XrayStatsSummary? {
+        tryQueryStatsOverride?.let { override ->
+            override(host, port, grpcDeadlineMs)?.let { return it }
+            val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
+            return override(host, port, retryDeadline)
+        }
+        val executionContext = ScanExecutionContext.currentOrDefault()
+        val client = clients.getValue(host)
+        client.queryStats(port, deadlineMs = grpcDeadlineMs, executionContext = executionContext).getOrNull()?.let { return it }
+        val retryDeadline = (grpcDeadlineMs * 3).coerceAtLeast(2000)
+        executionContext.throwIfCancelled()
+        return client.queryStats(port, deadlineMs = retryDeadline, executionContext = executionContext).getOrNull()
     }
 
     private fun isTcpPortOpen(host: String, port: Int): Boolean {

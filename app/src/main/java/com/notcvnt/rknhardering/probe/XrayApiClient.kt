@@ -3,6 +3,8 @@ package com.notcvnt.rknhardering.probe
 import android.util.Base64
 import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.rethrowIfCancellation
+import com.xray.app.stats.command.QueryStatsRequest
+import com.xray.app.stats.command.StatsServiceGrpc
 import com.xray.app.proxyman.command.HandlerServiceGrpc
 import com.xray.app.proxyman.command.ListOutboundsRequest
 import com.xray.app.proxyman.SenderConfig as ProxymanSenderConfig
@@ -71,6 +73,49 @@ class XrayApiClient(
                 XrayApiScanResult(
                     endpoint = XrayApiEndpoint(host = host, port = port),
                     outbounds = outbounds,
+                    handlerAvailable = true,
+                ),
+            )
+        } catch (e: Exception) {
+            rethrowIfCancellation(e, executionContext)
+            Result.failure(e)
+        } finally {
+            registration.dispose()
+            channel.shutdownNow()
+            channel.awaitTermination(100, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    suspend fun queryStats(
+        port: Int,
+        deadlineMs: Long = 600,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): Result<XrayStatsSummary> = withContext(Dispatchers.IO) {
+        val channel = OkHttpChannelBuilder.forAddress(host, port)
+            .usePlaintext()
+            .build()
+        val grpcContext = io.grpc.Context.current().withCancellation()
+        val registration = executionContext.cancellationSignal.register {
+            grpcContext.cancel(kotlinx.coroutines.CancellationException("Scan cancelled"))
+            channel.shutdownNow()
+        }
+
+        try {
+            executionContext.throwIfCancelled()
+            val response = grpcContext.call {
+                val stub = StatsServiceGrpc.newBlockingStub(channel)
+                    .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+
+                stub.queryStats(QueryStatsRequest.getDefaultInstance())
+            }
+            Result.success(
+                XrayStatsSummary(
+                    statCount = response.statCount,
+                    sampleNames = response.statList
+                        .asSequence()
+                        .mapNotNull { stat -> stat.name.takeIf { it.isNotBlank() } }
+                        .take(8)
+                        .toList(),
                 ),
             )
         } catch (e: Exception) {

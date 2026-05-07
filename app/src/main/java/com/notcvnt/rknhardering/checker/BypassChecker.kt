@@ -561,10 +561,12 @@ object BypassChecker {
         }
 
         val ep = xrayApiScanResult.endpoint
+        val stats = xrayApiScanResult.stats
+        val statsOnly = stats != null && !xrayApiScanResult.handlerAvailable
         findings.add(
             Finding(
                 description = context.getString(
-                    R.string.checker_bypass_xray_api,
+                    if (statsOnly) R.string.checker_bypass_xray_api_stats_only else R.string.checker_bypass_xray_api,
                     formatHostPort(ep.host, ep.port),
                 ),
                 detected = true,
@@ -578,10 +580,34 @@ object BypassChecker {
                 source = EvidenceSource.XRAY_API,
                 detected = true,
                 confidence = EvidenceConfidence.HIGH,
-                description = "Detected Xray gRPC API at ${formatHostPort(ep.host, ep.port)}",
+                description = if (statsOnly) {
+                    "Detected Xray gRPC StatsService at ${formatHostPort(ep.host, ep.port)}"
+                } else {
+                    "Detected Xray gRPC API at ${formatHostPort(ep.host, ep.port)}"
+                },
                 family = VpnAppCatalog.FAMILY_XRAY,
             ),
         )
+
+        if (statsOnly) {
+            val statsSummary = stats ?: return
+            findings += Finding(
+                description = context.getString(R.string.checker_bypass_xray_handler_unavailable),
+                isInformational = true,
+                source = EvidenceSource.XRAY_API,
+                family = VpnAppCatalog.FAMILY_XRAY,
+            )
+            val sample = statsSummary.sampleNames
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString()
+                ?: statsSummary.statCount.toString()
+            findings += Finding(
+                description = context.getString(R.string.checker_bypass_xray_stats_sample, sample),
+                isInformational = true,
+                source = EvidenceSource.XRAY_API,
+                family = VpnAppCatalog.FAMILY_XRAY,
+            )
+        }
 
         for (outbound in xrayApiScanResult.outbounds.take(10)) {
             val detail = buildString {
