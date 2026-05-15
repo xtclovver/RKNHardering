@@ -41,6 +41,7 @@ data class VerdictNarrative(
     val discoveredRows: List<NarrativeRow>,
     val reasonRows: List<String>,
     val homeRoutedRoamingNote: String? = null,
+    val whitelistNote: String? = null,
 )
 
 object VerdictNarrativeBuilder {
@@ -59,7 +60,13 @@ object VerdictNarrativeBuilder {
             discoveredRows = buildDiscoveredRows(context, snapshot, exposureStatus, privacyMode),
             reasonRows = buildReasonRows(context, result),
             homeRoutedRoamingNote = buildHomeRoutedRoamingNote(context, result),
+            whitelistNote = buildWhitelistNote(context, result),
         )
+    }
+
+    private fun buildWhitelistNote(context: Context, result: CheckResult): String? {
+        if (result.operatorWhitelistProbe?.whitelistDetected != true) return null
+        return context.getString(R.string.narrative_whitelist_note)
     }
 
     private fun buildHomeRoutedRoamingNote(context: Context, result: CheckResult): String? {

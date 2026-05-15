@@ -70,10 +70,14 @@ class ResolverBindingTest {
             customDohBootstrapHosts = listOf("1.1.1.1"),
         )
 
-        val dns = ResolverNetworkStack.createDns(
+        val wrapped = ResolverNetworkStack.createDns(
             config = config,
             binding = ResolverBinding.OsDeviceBinding("tun0"),
         )
+
+        val delegateField = wrapped.javaClass.getDeclaredField("delegate")
+        delegateField.isAccessible = true
+        val dns = delegateField.get(wrapped) as Dns
 
         val clientField = dns.javaClass.getDeclaredField("client")
         clientField.isAccessible = true

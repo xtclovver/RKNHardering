@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">RKNHardering</string>
     <string name="github_repo_url">https://github.com/xtclovver/RKNHardering</string>
     <string name="matrix_room_url">https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech</string>
@@ -330,6 +330,9 @@
     <string name="narrative_home_routed_roaming_likely_country">A foreign SIM (%1$s) is connected via a Russian visited network. The data session likely exits via the home country, which can look like a bypass.</string>
     <string name="narrative_home_routed_roaming_generic">A foreign SIM is connected via a Russian visited network. The data session may legitimately exit abroad (home-routed roaming).</string>
 
+    <string name="whitelist_warning_banner" tools:ignore="MissingTranslation">You are scanning under operator whitelist mode — result may be distorted</string>
+    <string name="narrative_whitelist_note" tools:ignore="MissingTranslation">Scan performed under operator whitelist mode — results may be incomplete</string>
+
     <!-- Checker strings -->
     <string name="checker_yes">yes</string>
     <string name="checker_no">no</string>
@@ -413,6 +416,7 @@
     <string name="checker_direct_proxyinfo_invalid">%1$s: invalid proxy profile</string>
     <string name="checker_direct_proxyinfo_unavailable">%1$s: ProxyInfo check unavailable (%2$s)</string>
     <string name="checker_direct_proxyinfo_network_none">ProxyInfo on tracked networks: not detected</string>
+    <string name="checker_direct_per_app_vpn_excluded" tools:ignore="MissingTranslation">App is excluded from active per-app VPN (tun0 present but not accessible to this app)</string>
 
     <!-- IndirectSignsChecker -->
     <string name="checker_indirect_category_name">Indirect signs</string>

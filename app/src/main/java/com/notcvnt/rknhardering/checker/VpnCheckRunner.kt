@@ -19,8 +19,12 @@ import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.LocationSignalsFacts
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.network.WhitelistAwareDnsFailureCounter
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbe
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.TunProbeModeOverride
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
+import com.notcvnt.rknhardering.checker.TunInterfaceInfo
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -82,17 +86,33 @@ object VpnCheckRunner {
             DnsResolverConfig,
             Boolean,
             TunProbeModeOverride,
+            Boolean,
+            String?,
+            String?,
         ) -> UnderlyingNetworkProber.ProbeResult =
-            { ctx, resolverConfig, debugEnabled, modeOverride ->
+            { ctx, resolverConfig, debugEnabled, modeOverride, tunInterfacePresent, tunInterfaceName, underlyingInterfaceName ->
                 UnderlyingNetworkProber.probe(
                     context = ctx,
                     resolverConfig = resolverConfig,
                     debugEnabled = debugEnabled,
                     modeOverride = modeOverride,
+                    tunInterfacePresent = tunInterfacePresent,
+                    tunInterfaceName = tunInterfaceName,
+                    underlyingInterfaceName = underlyingInterfaceName,
                 )
             },
-        val directCheck: suspend (Context, UnderlyingNetworkProber.ProbeResult?) -> CategoryResult =
-            { ctx, tunActiveProbeResult -> DirectSignsChecker.check(ctx, tunActiveProbeResult = tunActiveProbeResult) },
+        val directCheck: suspend (Context, UnderlyingNetworkProber.ProbeResult?, Boolean) -> CategoryResult =
+            { ctx, tunActiveProbeResult, tunInterfacePresent ->
+                DirectSignsChecker.check(
+                    ctx,
+                    tunActiveProbeResult = tunActiveProbeResult,
+                    tunInterfacePresent = tunInterfacePresent,
+                )
+            },
+        val tunInterfaceInfoCollector: (Context) -> TunInterfaceInfo =
+            { ctx -> IndirectSignsChecker.collectTunInterfaceInfo(ctx) },
+        val operatorWhitelistProbe: suspend () -> OperatorWhitelistProbeResult =
+            { OperatorWhitelistProbe.probe() },
         val indirectCheck: suspend (Context, Boolean, Boolean, DnsResolverConfig) -> CategoryResult =
             { ctx, networkRequestsEnabled, callTransportProbeEnabled, resolverConfig ->
                 IndirectSignsChecker.check(
@@ -318,6 +338,7 @@ object VpnCheckRunner {
         executionContext: ScanExecutionContext = ScanExecutionContext(),
         onUpdate: (suspend (CheckUpdate) -> Unit)? = null,
     ): CheckResult = withContext(executionContext.asCoroutineContext()) {
+        WhitelistAwareDnsFailureCounter.reset()
         executionContext.throwIfCancelled()
         supervisorScope {
         val dependencies = dependenciesOverride ?: Dependencies()
@@ -352,6 +373,22 @@ object VpnCheckRunner {
             }
         } else null
 
+        val tunInterfaceInfo = runCatching {
+            dependencies.tunInterfaceInfoCollector(context)
+        }.getOrElse {
+            TunInterfaceInfo(
+                tunInterfacePresent = false,
+                tunInterfaceName = null,
+                underlyingInterfaceName = null,
+            )
+        }
+
+        val operatorWhitelistDeferred = if (settings.networkRequestsEnabled) {
+            safeAsync<OperatorWhitelistProbeResult?>(fallback = { null }) {
+                dependencies.operatorWhitelistProbe()
+            }
+        } else null
+
         val tunActiveProbeDeferred = if (settings.splitTunnelEnabled) {
             safeAsync(fallback = { Fallbacks.probe(it) }) {
                 dependencies.underlyingProbe(
@@ -359,6 +396,9 @@ object VpnCheckRunner {
                     settings.resolverConfig,
                     settings.tunProbeDebugEnabled,
                     settings.tunProbeModeOverride,
+                    tunInterfaceInfo.tunInterfacePresent,
+                    tunInterfaceInfo.tunInterfaceName,
+                    tunInterfaceInfo.underlyingInterfaceName,
                 )
             }
         } else null
@@ -367,6 +407,7 @@ object VpnCheckRunner {
             dependencies.directCheck(
                 context,
                 tunActiveProbeDeferred?.await(),
+                tunInterfaceInfo.tunInterfacePresent,
             )
         }
         val indirectDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.indirect(context, it) }) {
@@ -574,6 +615,8 @@ object VpnCheckRunner {
         executionContext.throwIfCancelled()
         onUpdate?.invoke(CheckUpdate.VerdictReady(verdict))
 
+        val operatorWhitelistResult = operatorWhitelistDeferred?.await()
+
         CheckResult(
             geoIp = geoIp,
             ipComparison = ipComparison,
@@ -588,6 +631,7 @@ object VpnCheckRunner {
             icmpSpoofing = icmpSpoofing,
             rttTriangulation = rttTriangulation,
             ipConsensus = ipConsensus,
+            operatorWhitelistProbe = operatorWhitelistResult,
         )
     }
 }

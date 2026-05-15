@@ -372,6 +372,91 @@ class UnderlyingNetworkProberTest {
         )
     }
 
+    @Test
+    fun `vpnNetwork null with tun0 present activates OsDeviceBinding fallback`() = runBlocking {
+        // No Android VPN network (app excluded from per-app VPN), but tun0 is visible.
+        var osDeviceFetcherCalled = false
+        UnderlyingNetworkProber.dependenciesOverride = UnderlyingNetworkProber.Dependencies(
+            initNativeCurl = {},
+            environmentProvider = {
+                // cm.allNetworks returns empty (no VPN network visible to excluded app)
+                UnderlyingNetworkProber.ProbeEnvironment(
+                    activeNetwork = null,
+                    networks = emptyList(),
+                )
+            },
+            comparisonFetcher = { _, _, _, _, _ ->
+                failureComparison("should not be called")
+            },
+            osDeviceComparisonFetcher = { interfaceName, _, _, _, targetUrls ->
+                osDeviceFetcherCalled = true
+                when {
+                    interfaceName == "tun0" && targetUrls?.contains("https://ipv4-internet.yandex.net/api/v0/ip") == true ->
+                        successfulComparison("203.0.113.50")
+                    interfaceName == "tun0" ->
+                        successfulComparison("203.0.113.51")
+                    else ->
+                        failureComparison("unexpected interface: $interfaceName")
+                }
+            },
+        )
+
+        val result = UnderlyingNetworkProber.probe(
+            context = context,
+            resolverConfig = DnsResolverConfig.system(),
+            tunInterfacePresent = true,
+            tunInterfaceName = "tun0",
+            underlyingInterfaceName = null,
+        )
+
+        assertTrue("osDeviceComparisonFetcher must be called", osDeviceFetcherCalled)
+        assertTrue(result.vpnActive)
+        assertFalse(result.underlyingReachable)
+        assertNotNull(result.ruTarget.vpnIp)
+    }
+
+    @Test
+    fun `vpnNetwork null tun0 and underlying differ produce dnsPathMismatch true`() = runBlocking {
+        UnderlyingNetworkProber.dependenciesOverride = UnderlyingNetworkProber.Dependencies(
+            initNativeCurl = {},
+            environmentProvider = {
+                UnderlyingNetworkProber.ProbeEnvironment(
+                    activeNetwork = null,
+                    networks = emptyList(),
+                )
+            },
+            comparisonFetcher = { _, _, _, _, _ ->
+                failureComparison("should not be called")
+            },
+            osDeviceComparisonFetcher = { interfaceName, _, _, _, targetUrls ->
+                val isRu = targetUrls?.contains("https://ipv4-internet.yandex.net/api/v0/ip") == true
+                when (interfaceName) {
+                    // tun0 returns VPN exit IP
+                    "tun0" -> if (isRu) successfulComparison("10.8.0.1") else successfulComparison("10.8.0.2")
+                    // rmnet0 returns real carrier IP (different → mismatch)
+                    "rmnet0" -> if (isRu) successfulComparison("203.0.113.1") else successfulComparison("203.0.113.2")
+                    else -> failureComparison("unexpected: $interfaceName")
+                }
+            },
+        )
+
+        val result = UnderlyingNetworkProber.probe(
+            context = context,
+            resolverConfig = DnsResolverConfig.system(),
+            tunInterfacePresent = true,
+            tunInterfaceName = "tun0",
+            underlyingInterfaceName = "rmnet0",
+        )
+
+        assertTrue(result.vpnActive)
+        assertTrue(result.underlyingReachable)
+        assertTrue("dnsPathMismatch must be true when tun and underlying IPs differ", result.dnsPathMismatch)
+        // VPN IP comes from tun0, underlying from rmnet0
+        assertNotNull(result.ruTarget.vpnIp)
+        assertNotNull(result.ruTarget.directIp)
+        assertTrue(result.ruTarget.vpnIp != result.ruTarget.directIp)
+    }
+
     private fun newNetwork(netId: Int): Network {
         val constructor = Network::class.java.getDeclaredConstructor(Int::class.javaPrimitiveType)
         constructor.isAccessible = true

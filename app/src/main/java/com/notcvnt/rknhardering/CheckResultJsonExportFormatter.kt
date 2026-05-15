@@ -21,6 +21,7 @@ import com.notcvnt.rknhardering.model.MatchedVpnApp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunProbeResult
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.PublicIpTransportDiagnostics
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.TunEndpointAttempt
@@ -76,6 +77,7 @@ internal object CheckResultJsonExportFormatter {
                 )
                 put("reasons", jsonArray(narrative.reasonRows))
                 narrative.homeRoutedRoamingNote?.let { put("homeRoutedRoamingNote", it) }
+                narrative.whitelistNote?.let { put("whitelistNote", it) }
                 val locationFacts = snapshot.result.locationSignals.locationFacts
                 if (locationFacts != null) {
                     put("homeRoutedRoaming", locationFacts.homeRoutedRoaming)
@@ -124,6 +126,9 @@ internal object CheckResultJsonExportFormatter {
         root.put("ipConsensus", buildIpConsensusJson(snapshot.result.ipConsensus, snapshot.privacyMode))
         snapshot.result.tunProbeDiagnostics?.let {
             root.put("tunProbeDiagnostics", tunProbeDiagnosticsToJson(it, snapshot.privacyMode))
+        }
+        snapshot.result.operatorWhitelistProbe?.let {
+            root.put("operator_whitelist", operatorWhitelistProbeToJson(it))
         }
         return root.toString(2)
     }
@@ -602,6 +607,23 @@ internal object CheckResultJsonExportFormatter {
             put("nativeLibraryLoaded", diagnostics.nativeLibraryLoaded)
             put("caBundleVersion", diagnostics.caBundleVersion)
             put("resolvedAddressesUsed", jsonArray(diagnostics.resolvedAddressesUsed.map { maskExportIp(it, privacyMode) ?: it }))
+        }
+    }
+
+    private fun operatorWhitelistProbeToJson(probe: OperatorWhitelistProbeResult): JSONObject {
+        return JSONObject().apply {
+            put("detected", probe.whitelistDetected)
+            put("google_reachable", probe.googleReachable)
+            put("apple_reachable", probe.appleReachable)
+            put("firefox_reachable", probe.firefoxReachable)
+            put("russian_control_reachable", probe.russianControlReachable)
+            put("duration_ms", probe.durationMs)
+            put(
+                "errors",
+                JSONObject().apply {
+                    probe.errors.forEach { (key, value) -> put(key, value) }
+                },
+            )
         }
     }
 

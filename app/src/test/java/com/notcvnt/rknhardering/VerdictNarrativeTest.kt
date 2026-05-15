@@ -21,6 +21,7 @@ import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
 import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.Verdict
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.XrayApiEndpoint
@@ -327,6 +328,54 @@ class VerdictNarrativeTest {
         )
     }
 
+    @Test
+    fun `whitelist note is set when whitelistDetected is true`() {
+        val narrative = VerdictNarrativeBuilder.build(
+            context = context,
+            result = result(
+                operatorWhitelistProbe = OperatorWhitelistProbeResult(
+                    whitelistDetected = true,
+                    googleReachable = false,
+                    appleReachable = false,
+                    firefoxReachable = false,
+                    russianControlReachable = true,
+                    errors = mapOf("google" to "timeout"),
+                    durationMs = 1234L,
+                ),
+            ),
+        )
+
+        assertTrue(narrative.whitelistNote != null)
+        assertTrue(narrative.whitelistNote!!.isNotBlank())
+    }
+
+    @Test
+    fun `whitelist note is null when probe is absent`() {
+        val narrative = VerdictNarrativeBuilder.build(context = context, result = result())
+
+        assertTrue(narrative.whitelistNote == null)
+    }
+
+    @Test
+    fun `whitelist note is null when whitelistDetected is false`() {
+        val narrative = VerdictNarrativeBuilder.build(
+            context = context,
+            result = result(
+                operatorWhitelistProbe = OperatorWhitelistProbeResult(
+                    whitelistDetected = false,
+                    googleReachable = true,
+                    appleReachable = true,
+                    firefoxReachable = true,
+                    russianControlReachable = true,
+                    errors = emptyMap(),
+                    durationMs = 500L,
+                ),
+            ),
+        )
+
+        assertTrue(narrative.whitelistNote == null)
+    }
+
     private fun result(
         verdict: Verdict = Verdict.NOT_DETECTED,
         geoIp: CategoryResult = category(),
@@ -335,6 +384,7 @@ class VerdictNarrativeTest {
         location: CategoryResult = category(),
         ipComparison: IpComparisonResult = ipComparison(),
         bypass: BypassResult = bypass(),
+        operatorWhitelistProbe: OperatorWhitelistProbeResult? = null,
     ): CheckResult = CheckResult(
         geoIp = geoIp,
         ipComparison = ipComparison,
@@ -343,6 +393,7 @@ class VerdictNarrativeTest {
         locationSignals = location,
         bypassResult = bypass,
         verdict = verdict,
+        operatorWhitelistProbe = operatorWhitelistProbe,
     )
 
     private fun category(

@@ -71,7 +71,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, networkRequestsEnabled, callTransportProbeEnabled, _ ->
                 assertTrue(networkRequestsEnabled)
                 assertTrue(callTransportProbeEnabled)
@@ -120,7 +120,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             bypassCheck = { _, _, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, _, _, _, _, _ ->
@@ -175,7 +175,7 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
@@ -214,7 +214,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> error("GeoIP should not run when network checks are disabled") },
             ipComparisonCheck = { _, _ -> error("IP comparison should not run when network checks are disabled") },
-            directCheck = { _, _ ->
+            directCheck = { _, _, _ ->
                 category(
                     name = "direct",
                     evidence = listOf(
@@ -265,7 +265,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _ -> throw java.io.IOException("direct failed") },
+            directCheck = { _, _, _ -> throw java.io.IOException("direct failed") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
@@ -293,7 +293,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
@@ -323,7 +323,7 @@ class VpnCheckRunnerTest {
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
             icmpSpoofingCheck = { _, _ -> throw java.io.IOException("icmp failed") },
             rttTriangulationCheck = { _, _, _ -> throw java.io.IOException("rtt failed") },
-            directCheck = { _, _ -> throw java.io.IOException("direct failed") },
+            directCheck = { _, _, _ -> throw java.io.IOException("direct failed") },
             indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
             locationCheck = { _, _, _ -> throw java.io.IOException("location failed") },
             nativeCheck = { _ -> throw java.io.IOException("native failed") },
@@ -366,11 +366,11 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            underlyingProbe = { _, _, _, _ ->
+            underlyingProbe = { _, _, _, _, _, _, _ ->
                 probeCalls += 1
                 sharedProbe
             },
-            directCheck = { _, tunActiveProbeResult ->
+            directCheck = { _, tunActiveProbeResult, _ ->
                 directProbeResult = tunActiveProbeResult
                 category("direct")
             },
@@ -411,7 +411,7 @@ class VpnCheckRunnerTest {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ ->
                 indirectThread = Thread.currentThread()
                 category("indirect")
@@ -466,7 +466,7 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
@@ -525,7 +525,7 @@ class VpnCheckRunnerTest {
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ -> rawCdn },
             icmpSpoofingCheck = { _, _ -> rawIcmp },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ ->
                 CategoryResult(
@@ -577,7 +577,7 @@ class VpnCheckRunnerTest {
                 cdnCalls += 1
                 error("CDN pulling should not run when disabled")
             },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
@@ -625,7 +625,7 @@ class VpnCheckRunnerTest {
                 awaitRelease()
                 emptyIpComparison()
             },
-            directCheck = { _, _ ->
+            directCheck = { _, _, _ ->
                 awaitRelease()
                 category("direct")
             },
@@ -677,7 +677,7 @@ class VpnCheckRunnerTest {
             geoIpCheck = { _, _ -> throw java.io.IOException("boom") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
             icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
@@ -707,7 +707,7 @@ class VpnCheckRunnerTest {
             geoIpCheck = { _, _ -> category("geo") },
             ipComparisonCheck = { _, _ -> throw java.io.IOException("ip comparison failed") },
             icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
@@ -737,7 +737,7 @@ class VpnCheckRunnerTest {
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ -> throw java.io.IOException("cdn failed") },
             icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
@@ -768,7 +768,7 @@ class VpnCheckRunnerTest {
             geoIpCheck = { _, _ -> throw kotlinx.coroutines.CancellationException("stop") },
             ipComparisonCheck = { _, _ -> emptyIpComparison() },
             icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _ -> category("direct") },
+            directCheck = { _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },

@@ -20,6 +20,7 @@ import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunProbeResult
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.PublicIpTransportDiagnostics
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.XrayOutboundSummary
@@ -61,6 +62,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendCategorySection(builder, context.getString(R.string.main_card_location_signals), result.locationSignals, snapshot.privacyMode)
         appendIpChannelsSection(builder, result.ipConsensus, snapshot.privacyMode)
         appendTunProbeDiagnosticsSection(builder, result.tunProbeDiagnostics, snapshot.privacyMode)
+        appendOperatorWhitelistSection(builder, result.operatorWhitelistProbe)
         appendBypassSection(builder, context, result.bypassResult, snapshot.privacyMode)
         builder.appendLine("## Footer")
         builder.appendLine("- Timestamp: ${formatExportTimestamp(snapshot.finishedAtMillis)}")
@@ -674,6 +676,21 @@ internal object CheckResultMarkdownExportFormatter {
             probeTargetDivergence ||
             probeTargetDirectDivergence ||
             needsReview
+    }
+
+    private fun appendOperatorWhitelistSection(
+        builder: StringBuilder,
+        probe: OperatorWhitelistProbeResult?,
+    ) {
+        probe ?: return
+        builder.appendLine("## Белые списки оператора")
+        builder.appendLine("- Детектировано: ${if (probe.whitelistDetected) "да" else "нет"}")
+        builder.appendLine("- google.com/generate_204: ${if (probe.googleReachable) "доступен" else "недоступен"}")
+        builder.appendLine("- apple captive portal: ${if (probe.appleReachable) "доступен" else "недоступен"}")
+        builder.appendLine("- firefox detectportal: ${if (probe.firefoxReachable) "доступен" else "недоступен"}")
+        builder.appendLine("- yandex.ru (контроль): ${if (probe.russianControlReachable) "доступен" else "недоступен"}")
+        builder.appendLine("- Длительность: ${probe.durationMs} мс")
+        builder.appendLine()
     }
 
     private fun appendTunProbeDiagnosticsSection(

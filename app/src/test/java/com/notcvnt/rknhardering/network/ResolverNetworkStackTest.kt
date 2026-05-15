@@ -10,20 +10,29 @@ import okhttp3.Dns
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import java.io.IOException
+import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class ResolverNetworkStackTest {
 
+    @Before
+    fun setUp() {
+        WhitelistAwareDnsFailureCounter.reset()
+    }
+
     @After
     fun tearDown() {
         ResolverNetworkStack.dnsFactoryOverride = null
         ResolverNetworkStack.resetForTests()
         NativeCurlBridge.resetForTests()
+        WhitelistAwareDnsFailureCounter.reset()
     }
 
     @Test
@@ -158,6 +167,48 @@ class ResolverNetworkStackTest {
         assertEquals(1, okHttpCalls)
         assertEquals(0, nativeCalls)
         assertTrue(error is CancellationException)
+    }
+
+    @Test
+    fun `after 3 dns failures createDns uses yandex doh regardless of config mode`() {
+        // Record 3 failures to exhaust
+        repeat(3) { WhitelistAwareDnsFailureCounter.recordFailure() }
+        assertTrue(WhitelistAwareDnsFailureCounter.dnsExhausted)
+
+        var capturedDns: Dns? = null
+        ResolverNetworkStack.dnsFactoryOverride = { config, binding ->
+            // dnsFactoryOverride is called BEFORE the exhaustion guard in createDns,
+            // so to test the guard we need to test WITHOUT the override.
+            // We'll test by checking the DNS type produced without the override.
+            capturedDns = null
+            object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> = emptyList()
+            }
+        }
+
+        // Reset override so we test the real path
+        ResolverNetworkStack.dnsFactoryOverride = null
+
+        // With SYSTEM mode config but dnsExhausted=true, createDns should not wrap in CountingDns
+        val systemConfig = DnsResolverConfig.system()
+        val dns = ResolverNetworkStack.createDns(systemConfig)
+
+        // The DNS returned must NOT be a CountingDns (which only wraps the normal path).
+        // When exhausted, we get Yandex DoH (DnsOverHttps) or DirectDns as fallback.
+        // Either way it's not CountingDns.
+        assertFalse("DNS must not be CountingDns when exhausted", dns is CountingDns)
+        assertNotNull(dns)
+    }
+
+    @Test
+    fun `createDns wraps with CountingDns when not exhausted`() {
+        assertFalse(WhitelistAwareDnsFailureCounter.dnsExhausted)
+        ResolverNetworkStack.dnsFactoryOverride = null
+
+        val systemConfig = DnsResolverConfig.system()
+        val dns = ResolverNetworkStack.createDns(systemConfig)
+
+        assertTrue("DNS must be CountingDns when not exhausted", dns is CountingDns)
     }
 
     @Test

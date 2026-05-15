@@ -52,6 +52,7 @@ internal data class ResolverHttpRequest(
 object ResolverNetworkStack {
     internal const val OKHTTP_RETRY_COUNT = 1
     internal const val NATIVE_CURL_RETRY_COUNT = 1
+    internal const val YANDEX_DOH_URL = "https://common.dot.dns.yandex.net/dns-query"
 
     private val lock = Any()
     @Volatile
@@ -84,6 +85,7 @@ object ResolverNetworkStack {
         }
         okHttpExecuteOverride = null
         ResolverSocketBinder.resetForTests()
+        WhitelistAwareDnsFailureCounter.reset()
     }
 
     fun execute(
@@ -295,7 +297,12 @@ object ResolverNetworkStack {
         if (binding is ResolverBinding.OsDeviceBinding && binding.dnsMode == ResolverBinding.DnsMode.SYSTEM) {
             return Dns.SYSTEM
         }
-        return when (config.mode) {
+
+        if (WhitelistAwareDnsFailureCounter.dnsExhausted) {
+            return createYandexDohFallback(binding, cancellationSignal)
+        }
+
+        val baseDns = when (config.mode) {
             DnsResolverMode.SYSTEM -> fallbackDns(binding)
             DnsResolverMode.DIRECT -> {
                 val servers = config.effectiveDirectServers()
@@ -333,6 +340,43 @@ object ResolverNetworkStack {
                 val doh = builder.build()
                 if (cancellationSignal != null) CancellableDns(doh, bootstrapClient, cancellationSignal) else doh
             }
+        }
+        return CountingDns(baseDns)
+    }
+
+    private fun createYandexDohFallback(
+        binding: ResolverBinding?,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Dns {
+        val yandexBootstrapIps = listOf("77.88.8.8", "77.88.8.1", "77.88.8.88")
+            .mapNotNull { literalToInetAddress(it) }
+        val bootstrapClient = OkHttpClient.Builder()
+            .apply {
+                when (binding) {
+                    is ResolverBinding.AndroidNetworkBinding -> {
+                        socketFactory(binding.network.socketFactory)
+                        dns(NetworkDns(binding.network))
+                    }
+                    is ResolverBinding.OsDeviceBinding -> {
+                        socketFactory(BindToDeviceSocketFactory(binding.interfaceName))
+                        dns(Dns.SYSTEM)
+                    }
+                    null -> Unit
+                }
+            }
+            .build()
+        return try {
+            val builder = DnsOverHttps.Builder()
+                .client(bootstrapClient)
+                .url(YANDEX_DOH_URL.toHttpUrl())
+            if (yandexBootstrapIps.isNotEmpty()) {
+                builder.bootstrapDnsHosts(yandexBootstrapIps)
+            }
+            val doh = builder.build()
+            if (cancellationSignal != null) CancellableDns(doh, bootstrapClient, cancellationSignal) else doh
+        } catch (e: Exception) {
+            // Yandex DoH itself failed — fall back to direct Yandex servers
+            DirectDns(listOf("77.88.8.8", "77.88.8.1"), binding = binding, cancellationSignal = cancellationSignal)
         }
     }
 
@@ -631,5 +675,23 @@ internal class DirectDns(
 
     private fun readUnsignedShort(data: ByteArray, offset: Int): Int {
         return ((data[offset].toInt() and 0xFF) shl 8) or (data[offset + 1].toInt() and 0xFF)
+    }
+}
+
+internal class CountingDns(
+    private val delegate: Dns,
+) : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        return try {
+            delegate.lookup(hostname)
+        } catch (e: UnknownHostException) {
+            WhitelistAwareDnsFailureCounter.recordFailure()
+            throw e
+        } catch (e: IOException) {
+            if (e.message?.contains("No address associated with hostname") == true) {
+                WhitelistAwareDnsFailureCounter.recordFailure()
+            }
+            throw e
+        }
     }
 }

@@ -24,6 +24,7 @@ import com.notcvnt.rknhardering.model.MatchedVpnApp
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.probe.NativeInterfaceProbe
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayOutboundSummary
 import java.net.NetworkInterface
@@ -70,6 +71,8 @@ object DebugDiagnosticsFormatter {
         appendCategory(builder, "nativeSigns", result.nativeSigns)
         appendNativeSignsRaw(builder, privacyMode)
 
+        appendOperatorWhitelist(builder, result.operatorWhitelistProbe)
+
         builder.appendLine()
         builder.appendLine("[tunProbe]")
         val tunDiagnostics = result.tunProbeDiagnostics
@@ -81,6 +84,33 @@ object DebugDiagnosticsFormatter {
             builder.appendLine()
         }
         return builder.toString().trimEnd()
+    }
+
+    private fun appendOperatorWhitelist(
+        builder: StringBuilder,
+        probe: OperatorWhitelistProbeResult?,
+    ) {
+        builder.appendLine()
+        builder.appendLine("[operatorWhitelist]")
+        if (probe == null) {
+            builder.appendLine("collected: false")
+            return
+        }
+        builder.appendLine("collected: true")
+        builder.appendLine("detected: ${probe.whitelistDetected}")
+        builder.appendLine("googleReachable: ${probe.googleReachable}")
+        builder.appendLine("appleReachable: ${probe.appleReachable}")
+        builder.appendLine("firefoxReachable: ${probe.firefoxReachable}")
+        builder.appendLine("russianControlReachable: ${probe.russianControlReachable}")
+        builder.appendLine("durationMs: ${probe.durationMs}")
+        if (probe.errors.isEmpty()) {
+            builder.appendLine("errors: <none>")
+        } else {
+            builder.appendLine("errors:")
+            probe.errors.forEach { (key, value) ->
+                builder.appendLine("- $key: $value")
+            }
+        }
     }
 
     private fun appendNativeSignsRaw(builder: StringBuilder, privacyMode: Boolean) {

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.UnparsedIp
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -222,5 +223,52 @@ class CheckResultMarkdownExportFormatterTest {
         assertTrue(markdown.contains("Unparsed IP inputs:"))
         assertTrue(markdown.contains("## TUN probe diagnostics"))
         assertTrue(markdown.contains("- Selected IP: 203.0.113.64"))
+    }
+
+    @Test
+    fun `markdown export includes operator whitelist section when probe present`() {
+        val base = exportEmptyCheckResult()
+        val markdown = CheckResultMarkdownExportFormatter.format(
+            context = context,
+            snapshot = createCompletedExportSnapshot(
+                result = base.copy(
+                    operatorWhitelistProbe = OperatorWhitelistProbeResult(
+                        whitelistDetected = true,
+                        googleReachable = false,
+                        appleReachable = false,
+                        firefoxReachable = false,
+                        russianControlReachable = true,
+                        errors = emptyMap(),
+                        durationMs = 3000L,
+                    ),
+                ),
+                privacyMode = false,
+                finishedAtMillis = 0L,
+            ),
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(markdown.contains("## Белые списки оператора"))
+        assertTrue(markdown.contains("Детектировано: да"))
+        assertTrue(markdown.contains("google.com/generate_204: недоступен"))
+        assertTrue(markdown.contains("yandex.ru (контроль): доступен"))
+        assertTrue(markdown.contains("Длительность: 3000 мс"))
+    }
+
+    @Test
+    fun `markdown export omits operator whitelist section when probe is null`() {
+        val markdown = CheckResultMarkdownExportFormatter.format(
+            context = context,
+            snapshot = createCompletedExportSnapshot(
+                result = exportEmptyCheckResult(),
+                privacyMode = false,
+                finishedAtMillis = 0L,
+            ),
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertFalse(markdown.contains("## Белые списки оператора"))
     }
 }

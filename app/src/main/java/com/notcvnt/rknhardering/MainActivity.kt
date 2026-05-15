@@ -312,6 +312,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var verdictTitle: TextView
     private lateinit var verdictSubtitle: TextView
     private lateinit var verdictHomeRoutedRoamingNote: TextView
+    private lateinit var whitelistWarningBanner: View
     private lateinit var hiddenLegacyCardsHost: LinearLayout
     private lateinit var btnPrivacyInfo: MaterialButton
     private val tiles = mutableMapOf<String, TileHolder>()
@@ -546,6 +547,7 @@ class MainActivity : AppCompatActivity() {
         verdictTitle = findViewById(R.id.verdictTitle)
         verdictSubtitle = findViewById(R.id.verdictSubtitle)
         verdictHomeRoutedRoamingNote = findViewById(R.id.verdictHomeRoutedRoamingNote)
+        whitelistWarningBanner = findViewById(R.id.whitelistWarningBanner)
         hiddenLegacyCardsHost = findViewById(R.id.hiddenLegacyCardsHost)
         btnPrivacyInfo = findViewById(R.id.btnPrivacyInfo)
         btnPrivacyInfo.setOnClickListener { showPrivacyFooterDialog() }
@@ -3042,6 +3044,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         bindVerdictNarrative(VerdictNarrativeBuilder.build(this, result, privacyMode))
+        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
+    }
+
+    private fun bindWhitelistWarningBanner(show: Boolean) {
+        whitelistWarningBanner.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun bindVerdictNarrative(narrative: VerdictNarrative) {
@@ -3161,6 +3168,7 @@ class MainActivity : AppCompatActivity() {
         textVerdictExplanation.text = ""
         textVerdictExplanation.visibility = View.GONE
         bindHomeRoutedRoamingNote(null)
+        bindWhitelistWarningBanner(false)
         verdictDetailsDivider.visibility = View.GONE
         btnVerdictDetails.visibility = View.GONE
         btnVerdictDetails.text = getString(R.string.main_verdict_details)
@@ -3528,6 +3536,7 @@ class MainActivity : AppCompatActivity() {
         verdictTitle.text = getString(R.string.verdict_title_idle)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_idle)
         bindHomeRoutedRoamingNote(null)
+        bindWhitelistWarningBanner(false)
     }
 
     private fun bindVerdictHeroRunning() {
@@ -3538,6 +3547,7 @@ class MainActivity : AppCompatActivity() {
         verdictTitle.text = getString(R.string.verdict_title_idle)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_running)
         bindHomeRoutedRoamingNote(null)
+        bindWhitelistWarningBanner(false)
     }
 
     private fun bindVerdictHero(result: CheckResult) {
@@ -3552,6 +3562,7 @@ class MainActivity : AppCompatActivity() {
         verdictLabel.text = getString(R.string.verdict_label)
         verdictTitle.text = getString(titleRes)
         verdictSubtitle.text = getString(R.string.verdict_subtitle_done, tiles.size)
+        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
     }
 
     private fun applyVerdictHeroColors(visual: StatusVisual) {

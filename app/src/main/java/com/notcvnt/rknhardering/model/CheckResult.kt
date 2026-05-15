@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering.model
 
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
@@ -386,4 +387,5 @@ data class CheckResult(
         findings = emptyList(),
     ),
     val ipConsensus: IpConsensusResult = IpConsensusResult.empty(),
+    val operatorWhitelistProbe: OperatorWhitelistProbeResult? = null,
 )

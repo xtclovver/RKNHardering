@@ -61,6 +61,7 @@ object DirectSignsChecker {
     fun check(
         context: Context,
         tunActiveProbeResult: UnderlyingNetworkProber.ProbeResult? = null,
+        tunInterfacePresent: Boolean = false,
     ): CategoryResult {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
@@ -75,6 +76,29 @@ object DirectSignsChecker {
         val systemProxyOutcome = checkSystemProxy(context, findings, evidence)
         detected = detected || systemProxyOutcome.detected
         needsReview = needsReview || systemProxyOutcome.needsReview
+
+        // Per-app exclusion: tun0 physically present but this app is excluded from VPN,
+        // so vpnActive=false even though the tunnel is running.
+        if (tunActiveProbeResult != null && !tunActiveProbeResult.vpnActive && tunInterfacePresent) {
+            findings.add(
+                Finding(
+                    description = context.getString(R.string.checker_direct_per_app_vpn_excluded),
+                    detected = true,
+                    source = EvidenceSource.TUN_ACTIVE_PROBE,
+                    confidence = EvidenceConfidence.MEDIUM,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.TUN_ACTIVE_PROBE,
+                    detected = true,
+                    confidence = EvidenceConfidence.MEDIUM,
+                    description = "App excluded from active per-app VPN (tun0 present but not accessible)",
+                    kind = com.notcvnt.rknhardering.model.VpnAppKind.TARGETED_BYPASS,
+                ),
+            )
+            detected = true
+        }
 
         tunActiveProbeResult
             ?.takeIf { it.vpnActive }
@@ -721,6 +745,20 @@ object DirectSignsChecker {
                     ),
                 )
                 detected = true
+
+                // Per-app OS-device-binding probe: both paths reachable with different IPs.
+                // This is the strongest signal for per-app whitelist VPN with excluded app.
+                if (result.underlyingReachable) {
+                    evidence.add(
+                        EvidenceItem(
+                            source = EvidenceSource.TUN_ACTIVE_PROBE,
+                            detected = true,
+                            confidence = EvidenceConfidence.HIGH,
+                            description = "Per-app VPN exclusion confirmed: tun/underlying IP mismatch (${target.targetGroup}): vpn=$vpnIp underlying=${target.directIp}",
+                            kind = com.notcvnt.rknhardering.model.VpnAppKind.TARGETED_BYPASS,
+                        ),
+                    )
+                }
             } else {
                 evidence.add(
                     EvidenceItem(

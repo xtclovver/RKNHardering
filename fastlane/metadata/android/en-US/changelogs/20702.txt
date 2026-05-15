@@ -1,0 +1,4 @@
+Added operator whitelist-mode detection: a warning banner appears under the verdict to indicate the result may be distorted (#61).
+Per-app split-tunnel VPN: added an OS-binding probe to tun0 — underlying network leak is now detected even when the app is excluded from the tunnel (#61).
+DNS: automatic fallback to Yandex DoH (77.88.8.8) after three consecutive system-resolver failures — keeps probes working under operator whitelist mode.
+JSON/Markdown/Debug exports extended with the operator_whitelist section.

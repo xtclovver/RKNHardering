@@ -203,6 +203,68 @@ object IfconfigClient {
         )
     }
 
+    // Per-app VPN exclusion probe: no Android Network object available, bind via
+    // OS SO_BINDTODEVICE directly. CURL_COMPATIBLE (NativeCurl) is the only viable
+    // transport since the strict path needs AndroidNetworkBinding.
+    suspend fun fetchIpViaOsDeviceBinding(
+        binding: ResolverBinding.OsDeviceBinding,
+        timeoutMs: Int = DEFAULT_HTTP_TIMEOUT_MS,
+        resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        modeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
+        collectTrace: Boolean = false,
+        targetUrls: List<String>? = null,
+        okHttpRetryCount: Int = ResolverNetworkStack.OKHTTP_RETRY_COUNT,
+        nativeCurlRetryCount: Int = ResolverNetworkStack.NATIVE_CURL_RETRY_COUNT,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): PublicIpNetworkComparison = withContext(Dispatchers.IO) {
+        val endpoints = if (!targetUrls.isNullOrEmpty()) {
+            targetUrls.map(::IpEndpointSpec)
+        } else {
+            ENDPOINTS
+        }
+        // Strict same-path requires AndroidNetworkBinding; with only OsDeviceBinding available
+        // it is always skipped. Curl-compatible (NativeCurl) uses SO_BINDTODEVICE which works.
+        val strict = PublicIpModeProbeResult(
+            mode = PublicIpProbeMode.STRICT_SAME_PATH,
+            status = PublicIpProbeStatus.SKIPPED,
+            error = "AndroidNetworkBinding not available for per-app excluded interface",
+        )
+        val curlCompatible = if (modeOverride == TunProbeModeOverride.STRICT_SAME_PATH) {
+            PublicIpModeProbeResult(
+                mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                status = PublicIpProbeStatus.SKIPPED,
+                error = DISABLED_BY_OVERRIDE_MESSAGE,
+            )
+        } else {
+            fetchModeProbeResult(
+                mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                timeoutMs = timeoutMs,
+                resolverConfig = resolverConfig,
+                binding = binding,
+                collectTrace = collectTrace,
+                endpoints = endpoints,
+                okHttpRetryCount = okHttpRetryCount,
+                nativeCurlRetryCount = nativeCurlRetryCount,
+                executionContext = executionContext,
+            )
+        }
+        val selectedMode = when {
+            curlCompatible.status == PublicIpProbeStatus.SUCCEEDED -> PublicIpProbeMode.CURL_COMPATIBLE
+            else -> null
+        }
+        val selectedIp = curlCompatible.ip.takeIf { selectedMode != null }
+        val selectedError = if (selectedIp != null) null else curlCompatible.error ?: strict.error
+
+        PublicIpNetworkComparison(
+            strict = strict,
+            curlCompatible = curlCompatible,
+            selectedMode = selectedMode,
+            selectedIp = selectedIp,
+            selectedError = selectedError,
+            dnsPathMismatch = false,
+        )
+    }
+
     private suspend fun fetchIpWithFallback(
         timeoutMs: Int,
         resolverConfig: DnsResolverConfig,

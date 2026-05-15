@@ -27,6 +27,14 @@ import java.io.FileReader
 import java.net.InetAddress
 import java.net.NetworkInterface
 
+data class TunInterfaceInfo(
+    val tunInterfacePresent: Boolean,
+    val tunInterfaceName: String?,
+    // Default route interface name (e.g. "rmnet0", "wlan0") used as underlying path
+    // in per-app VPN exclusion probes.
+    val underlyingInterfaceName: String?,
+)
+
 object IndirectSignsChecker {
 
     private data class SignalOutcome(
@@ -1313,5 +1321,42 @@ object IndirectSignsChecker {
 
     private fun yesNo(context: Context, value: Boolean): String {
         return context.getString(if (value) R.string.checker_yes else R.string.checker_no)
+    }
+
+    // Collects tun interface presence and default-route interface name so callers
+    // can pass them into UnderlyingNetworkProber for the per-app exclusion fallback.
+    fun collectTunInterfaceInfo(context: Context): TunInterfaceInfo {
+        return try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
+            val networkSnapshots = try {
+                collectNetworkSnapshots(context)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val snapshotByInterface = buildSnapshotIndex(networkSnapshots)
+
+            val tunIface = interfaces.firstOrNull { iface ->
+                iface.isUp &&
+                    classifyTunnel(iface.name, snapshotByInterface.snapshotFor(iface.name)) == TunnelClass.CONFIRMED_VPN &&
+                    VPN_INTERFACE_PATTERNS.any { it.matches(iface.name) }
+            }
+
+            // Find default-route interface from network snapshots (standard cellular/wifi).
+            val defaultRouteIface = networkSnapshots
+                .flatMap { snap -> snap.routes.filter { it.isDefault }.mapNotNull { it.interfaceName } }
+                .firstOrNull { isStandardInterface(it) }
+
+            TunInterfaceInfo(
+                tunInterfacePresent = tunIface != null,
+                tunInterfaceName = tunIface?.name,
+                underlyingInterfaceName = defaultRouteIface,
+            )
+        } catch (_: Exception) {
+            TunInterfaceInfo(
+                tunInterfacePresent = false,
+                tunInterfaceName = null,
+                underlyingInterfaceName = null,
+            )
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -278,5 +279,62 @@ class CheckResultJsonExportFormatterTest {
         assertEquals("Xray/V2Ray", metadata.getString("coreType"))
         assertEquals("1.2.3", metadata.getString("versionName"))
         assertEquals("ExampleService", metadata.getJSONArray("serviceNames").getString(0))
+    }
+
+    @Test
+    fun `json export includes operator_whitelist section when probe present with whitelistDetected true`() {
+        val base = exportEmptyCheckResult()
+        val json = JSONObject(
+            CheckResultJsonExportFormatter.format(
+                context = context,
+                snapshot = createCompletedExportSnapshot(
+                    result = base.copy(
+                        operatorWhitelistProbe = OperatorWhitelistProbeResult(
+                            whitelistDetected = true,
+                            googleReachable = false,
+                            appleReachable = false,
+                            firefoxReachable = false,
+                            russianControlReachable = true,
+                            errors = mapOf("google" to "timeout", "apple" to "refused"),
+                            durationMs = 4521L,
+                        ),
+                    ),
+                    privacyMode = false,
+                    finishedAtMillis = 0L,
+                ),
+                appVersionName = "1.0",
+                buildType = "debug",
+            ),
+        )
+
+        assertTrue(json.has("operator_whitelist"))
+        val wl = json.getJSONObject("operator_whitelist")
+        assertTrue(wl.getBoolean("detected"))
+        assertFalse(wl.getBoolean("google_reachable"))
+        assertFalse(wl.getBoolean("apple_reachable"))
+        assertFalse(wl.getBoolean("firefox_reachable"))
+        assertTrue(wl.getBoolean("russian_control_reachable"))
+        assertEquals(4521L, wl.getLong("duration_ms"))
+        val errors = wl.getJSONObject("errors")
+        assertEquals("timeout", errors.getString("google"))
+        assertEquals("refused", errors.getString("apple"))
+    }
+
+    @Test
+    fun `json export omits operator_whitelist section when probe is null`() {
+        val json = JSONObject(
+            CheckResultJsonExportFormatter.format(
+                context = context,
+                snapshot = createCompletedExportSnapshot(
+                    result = exportEmptyCheckResult(),
+                    privacyMode = false,
+                    finishedAtMillis = 0L,
+                ),
+                appVersionName = "1.0",
+                buildType = "debug",
+            ),
+        )
+
+        assertFalse(json.has("operator_whitelist"))
     }
 }

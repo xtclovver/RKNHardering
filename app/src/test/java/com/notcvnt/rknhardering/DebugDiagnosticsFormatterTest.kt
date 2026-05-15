@@ -37,6 +37,7 @@ import com.notcvnt.rknhardering.model.VpnAppKind
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.DnsResolverMode
 import com.notcvnt.rknhardering.model.StunScope
+import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.XrayApiEndpoint
@@ -649,5 +650,119 @@ class DebugDiagnosticsFormatterTest {
         assertTrue(report.contains("callTransport.respondedStunTargets: 2"))
         assertTrue(report.contains("scope=GLOBAL"))
         assertTrue(report.contains("name=probeStunTargets durationMs=30000 skipped=false"))
+    }
+
+    @Test
+    fun `formatter includes operatorWhitelist section with errors when probe present`() {
+        val base = CheckResult(
+            geoIp = CategoryResult(name = "GeoIP", detected = false, findings = emptyList()),
+            ipComparison = IpComparisonResult(
+                detected = false,
+                summary = "",
+                ruGroup = IpCheckerGroupResult(
+                    title = "RU",
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+                nonRuGroup = IpCheckerGroupResult(
+                    title = "NON_RU",
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+            ),
+            directSigns = CategoryResult(name = "Direct", detected = false, findings = emptyList()),
+            indirectSigns = CategoryResult(name = "Indirect", detected = false, findings = emptyList()),
+            locationSignals = CategoryResult(name = "Location", detected = false, findings = emptyList()),
+            bypassResult = BypassResult(
+                proxyEndpoint = null,
+                directIp = null,
+                proxyIp = null,
+                xrayApiScanResult = null,
+                findings = emptyList(),
+                detected = false,
+            ),
+            verdict = Verdict.NOT_DETECTED,
+            operatorWhitelistProbe = OperatorWhitelistProbeResult(
+                whitelistDetected = true,
+                googleReachable = false,
+                appleReachable = false,
+                firefoxReachable = false,
+                russianControlReachable = true,
+                errors = mapOf("google" to "timeout", "apple" to "connection refused"),
+                durationMs = 4521L,
+            ),
+        )
+
+        val report = DebugDiagnosticsFormatter.format(
+            result = base,
+            settings = CheckSettings(tunProbeDebugEnabled = false),
+            privacyMode = false,
+            timestampMillis = 0L,
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(report.contains("[operatorWhitelist]"))
+        assertTrue(report.contains("collected: true"))
+        assertTrue(report.contains("detected: true"))
+        assertTrue(report.contains("googleReachable: false"))
+        assertTrue(report.contains("russianControlReachable: true"))
+        assertTrue(report.contains("durationMs: 4521"))
+        assertTrue(report.contains("- google: timeout"))
+        assertTrue(report.contains("- apple: connection refused"))
+    }
+
+    @Test
+    fun `formatter reports operatorWhitelist not collected when probe is null`() {
+        val base = CheckResult(
+            geoIp = CategoryResult(name = "GeoIP", detected = false, findings = emptyList()),
+            ipComparison = IpComparisonResult(
+                detected = false,
+                summary = "",
+                ruGroup = IpCheckerGroupResult(
+                    title = "RU",
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+                nonRuGroup = IpCheckerGroupResult(
+                    title = "NON_RU",
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+            ),
+            directSigns = CategoryResult(name = "Direct", detected = false, findings = emptyList()),
+            indirectSigns = CategoryResult(name = "Indirect", detected = false, findings = emptyList()),
+            locationSignals = CategoryResult(name = "Location", detected = false, findings = emptyList()),
+            bypassResult = BypassResult(
+                proxyEndpoint = null,
+                directIp = null,
+                proxyIp = null,
+                xrayApiScanResult = null,
+                findings = emptyList(),
+                detected = false,
+            ),
+            verdict = Verdict.NOT_DETECTED,
+        )
+
+        val report = DebugDiagnosticsFormatter.format(
+            result = base,
+            settings = CheckSettings(tunProbeDebugEnabled = false),
+            privacyMode = false,
+            timestampMillis = 0L,
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(report.contains("[operatorWhitelist]"))
+        assertTrue(report.contains("collected: false"))
+        assertFalse(report.contains("detected: true"))
     }
 }

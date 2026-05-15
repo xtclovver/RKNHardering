@@ -333,6 +333,9 @@
     <string name="narrative_home_routed_roaming_likely_country">Иностранная SIM (%1$s) подключена в гостевую российскую сеть. Скорее всего, дата-сессия выходит в интернет в домашней стране — это легитимный сценарий, который выглядит как обход.</string>
     <string name="narrative_home_routed_roaming_generic">Иностранная SIM подключена в гостевую российскую сеть. Дата-сессия может законно выходить в интернет за рубежом (home-routed роуминг).</string>
 
+    <string name="whitelist_warning_banner">Вы выполняете проверку в белых списках, результат может быть искажён</string>
+    <string name="narrative_whitelist_note">Скан выполнен в режиме whitelist оператора, результаты могут быть неполными</string>
+
     <!-- Checker strings -->
     <string name="checker_yes">да</string>
     <string name="checker_no">нет</string>
@@ -416,6 +419,7 @@
     <string name="checker_direct_proxyinfo_invalid">%1$s: невалидный профиль proxy</string>
     <string name="checker_direct_proxyinfo_unavailable">%1$s: проверка ProxyInfo недоступна (%2$s)</string>
     <string name="checker_direct_proxyinfo_network_none">ProxyInfo на отслеживаемых сетях: не обнаружен</string>
+    <string name="checker_direct_per_app_vpn_excluded">Приложение исключено из активного per-app VPN (tun0 присутствует, но недоступен из приложения)</string>
 
     <!-- IndirectSignsChecker -->
     <string name="checker_indirect_category_name">Косвенные признаки</string>

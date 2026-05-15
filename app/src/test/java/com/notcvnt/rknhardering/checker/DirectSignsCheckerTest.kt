@@ -15,6 +15,7 @@ import com.notcvnt.rknhardering.probe.TunProbeResolveStrategy
 import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.probe.PerTargetProbe
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
+import com.notcvnt.rknhardering.model.VpnAppKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -316,6 +317,87 @@ class DirectSignsCheckerTest {
                 it.detected &&
                     it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
                     it.confidence == EvidenceConfidence.HIGH
+            },
+        )
+    }
+
+    @Test
+    fun `per-app vpn exclusion with tun0 present and vpnActive false produces TARGETED_BYPASS evidence`() {
+        val result = DirectSignsChecker.check(
+            context = context,
+            tunActiveProbeResult = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = false,
+                underlyingReachable = false,
+                activeNetworkIsVpn = false,
+            ),
+            tunInterfacePresent = true,
+        )
+
+        assertTrue(result.detected)
+        assertTrue(
+            result.findings.any {
+                it.detected &&
+                    it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
+                    it.confidence == EvidenceConfidence.MEDIUM
+            },
+        )
+        assertTrue(
+            result.evidence.any {
+                it.detected &&
+                    it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
+                    it.kind == VpnAppKind.TARGETED_BYPASS
+            },
+        )
+    }
+
+    @Test
+    fun `per-app vpn exclusion with tun0 and underlying probe differing IPs produces HIGH confidence evidence`() {
+        // Simulates probeViaOsDeviceBinding result: vpnActive=true, underlyingReachable=true,
+        // IP mismatch between tun and underlying → dnsPathMismatch=true.
+        val tunComparison = PublicIpNetworkComparison(
+            strict = PublicIpModeProbeResult(
+                mode = PublicIpProbeMode.STRICT_SAME_PATH,
+                status = PublicIpProbeStatus.SKIPPED,
+                error = "AndroidNetworkBinding not available for per-app excluded interface",
+            ),
+            curlCompatible = PublicIpModeProbeResult(
+                mode = PublicIpProbeMode.CURL_COMPATIBLE,
+                status = PublicIpProbeStatus.SUCCEEDED,
+                ip = "10.8.0.1",
+                transportDiagnostics = PublicIpTransportDiagnostics(
+                    resolveStrategy = TunProbeResolveStrategy.KOTLIN_INJECTED,
+                ),
+            ),
+            selectedMode = PublicIpProbeMode.CURL_COMPATIBLE,
+            selectedIp = "10.8.0.1",
+            dnsPathMismatch = true,
+        )
+
+        val result = DirectSignsChecker.check(
+            context = context,
+            tunActiveProbeResult = UnderlyingNetworkProber.ProbeResult(
+                vpnActive = true,
+                underlyingReachable = true,
+                ruTarget = PerTargetProbe(
+                    targetHost = "ipv4-internet.yandex.net",
+                    targetGroup = TargetGroup.RU,
+                    vpnIp = "10.8.0.1",
+                    directIp = "203.0.113.1",
+                    comparison = tunComparison,
+                ),
+                dnsPathMismatch = true,
+                activeNetworkIsVpn = false,
+            ),
+            tunInterfacePresent = true,
+        )
+
+        assertTrue(result.detected)
+        assertTrue(
+            result.evidence.any {
+                it.detected &&
+                    it.source == EvidenceSource.TUN_ACTIVE_PROBE &&
+                    it.confidence == EvidenceConfidence.HIGH &&
+                    it.kind == VpnAppKind.TARGETED_BYPASS
             },
         )
     }

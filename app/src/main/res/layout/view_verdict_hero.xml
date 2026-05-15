@@ -126,5 +126,36 @@
             android:visibility="gone"
             tools:text="@string/narrative_home_routed_roaming_generic"
             tools:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/whitelistWarningBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_verdict_home_routed_roaming_note"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_warning"
+                app:tint="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/whitelistWarningText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/whitelist_warning_banner"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
