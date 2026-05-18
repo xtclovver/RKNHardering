@@ -509,6 +509,7 @@ object UnderlyingNetworkProber {
         )
     }
 
+    @Suppress("DEPRECATION")
     private fun buildProbeEnvironment(context: Context): ProbeEnvironment {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val networks = cm.allNetworks.mapNotNull { network ->

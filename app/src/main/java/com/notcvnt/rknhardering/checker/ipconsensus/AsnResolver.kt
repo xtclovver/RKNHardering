@@ -44,7 +44,7 @@ class AsnResolver(
         const val BATCH_TIMEOUT_MS = 5_000L
         const val PER_REQUEST_TIMEOUT_MS = 3_000L
 
-        fun default(context: Context, resolverConfig: DnsResolverConfig): AsnResolver {
+        fun default(@Suppress("UNUSED_PARAMETER") context: Context, resolverConfig: DnsResolverConfig): AsnResolver {
             return AsnResolver(
                 lookup = { ip -> lookupViaIpapiIs(ip, resolverConfig) },
             )

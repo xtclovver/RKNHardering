@@ -126,6 +126,9 @@
     <string name="settings_github_desc">xtclovver/RKNHardering</string>
     <string name="settings_matrix">Matrix</string>
     <string name="settings_matrix_desc">RKN_Hardering:matrix.kangel.tech</string>
+    <string name="telegram_group_url">https://t.me/RKNHardering</string>
+    <string name="settings_telegram">Telegram</string>
+    <string name="settings_telegram_desc">@RKNHardering</string>
     <string name="settings_port_range_from">From</string>
     <string name="settings_port_range_to">To</string>
 

@@ -57,7 +57,7 @@ object VpnAppMetadataScanner {
                 @Suppress("DEPRECATION")
                 pm.getApplicationInfo(packageName, 0)
             }
-            pm.getApplicationLabel(appInfo)?.toString()?.trim()?.takeIf { it.isNotBlank() }
+            pm.getApplicationLabel(appInfo).toString().trim().takeIf { it.isNotBlank() }
         }.getOrNull()
     }
 

@@ -333,8 +333,7 @@ object IndirectSignsChecker {
                     capsString = capsString,
                     routes = linkProperties.routes.map { route ->
                         RouteSnapshot(
-                            destination = route.destination?.toString()
-                                ?: if (route.isDefaultRoute) "0.0.0.0/0" else "unknown",
+                            destination = route.destination.toString(),
                             gateway = route.gateway?.hostAddress?.takeUnless { it == "0.0.0.0" || it == "::" },
                             interfaceName = NetworkInterfaceNameNormalizer.canonicalName(
                                 route.`interface` ?: linkProperties.interfaceName,

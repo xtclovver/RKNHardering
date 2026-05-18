@@ -529,7 +529,7 @@ internal class DirectDns(
                 }
             }
             if (!typeResolved && type == 1 && resolved.isEmpty() && lastFailure is UnknownHostException) {
-                throw lastFailure as UnknownHostException
+                throw lastFailure
             }
         }
 

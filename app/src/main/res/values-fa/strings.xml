@@ -115,6 +115,9 @@
     <string name="settings_github">GitHub</string>
     <string name="settings_matrix">Matrix</string>
     <string name="settings_matrix_desc">RKN_Hardering:matrix.kangel.tech</string>
+    <string name="telegram_group_url">https://t.me/RKNHardering</string>
+    <string name="settings_telegram">Telegram</string>
+    <string name="settings_telegram_desc">@RKNHardering</string>
     <string name="main_copy_diagnostics">کپی تشخیص</string>
     <string name="main_diagnostics_copied">تشخیص کپی شد</string>
     <string name="main_export">خروجی</string>

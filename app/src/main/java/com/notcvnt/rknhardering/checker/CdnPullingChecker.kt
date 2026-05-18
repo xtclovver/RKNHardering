@@ -195,7 +195,6 @@ object CdnPullingChecker {
         val successfulCount = successfulResponses.size
         val actionableResponses = successfulResponses.filter { it.targetLabel in ACTIONABLE_TARGETS }
         val actionableCount = actionableResponses.size
-        val actionableTargetCount = responses.count { it.targetLabel in ACTIONABLE_TARGETS }
 
         val allIpv4s = successfulResponses.mapNotNull { it.ipv4 ?: it.ip?.takeIf { ip -> CdnPullingClient.looksLikeIpv4(ip) } }.distinct()
         val allIpv6s = successfulResponses.mapNotNull { it.ipv6 ?: it.ip?.takeIf { ip -> CdnPullingClient.looksLikeIpv6(ip) } }.distinct()

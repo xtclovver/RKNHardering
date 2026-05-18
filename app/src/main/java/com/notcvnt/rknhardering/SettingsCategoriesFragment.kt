@@ -138,7 +138,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
             "dark" -> getString(R.string.settings_theme_dark)
             else -> getString(R.string.settings_theme_system)
         }
-        val language = when (val stored = prefs.getString(SettingsPrefs.PREF_LANGUAGE, "").orEmpty()) {
+        val language = when (prefs.getString(SettingsPrefs.PREF_LANGUAGE, "").orEmpty()) {
             "en" -> "EN"
             "ru" -> "RU"
             "fa" -> "FA"

@@ -260,6 +260,7 @@ object DirectSignsChecker {
         return SignalOutcome(detected = detected, needsReview = needsReview)
     }
 
+    @Suppress("DEPRECATION")
     private fun collectProxyInfoProfiles(context: Context): ProxyProfileCollection {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -734,7 +735,7 @@ object DirectSignsChecker {
             val hasDnsPathMismatch = comparison?.dnsPathMismatch == true
             if (hasDnsPathMismatch) {
                 val transportOnly = comparison!!.usedCurlCompatibleFallback() &&
-                    comparison!!.curlCompatible!!.transportDiagnostics.resolveStrategy != TunProbeResolveStrategy.KOTLIN_INJECTED
+                    comparison.curlCompatible.transportDiagnostics.resolveStrategy != TunProbeResolveStrategy.KOTLIN_INJECTED
                 val confidence = if (transportOnly) EvidenceConfidence.MEDIUM else EvidenceConfidence.HIGH
                 evidence.add(
                     EvidenceItem(

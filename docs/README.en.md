@@ -3,6 +3,7 @@
 # RKNHardering
 
 <a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+<a href="https://t.me/RKNHardering"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram" width="200"></a>
 
 Android app for detecting VPNs and proxies on a device. Implements the Roskomnadzor-style methodology for identifying censorship circumvention tools.
 
@@ -23,7 +24,7 @@ I am looking for people willing to help collect, organize, and test information 
 - **Bypassing native checks** (countering JNI-based checks through `/proc/self/maps`, `getifaddrs()`, and `dlsym`)
 - **Masking installed applications** (hiding VPN app packages from `PackageManager`)
 
-If you have expertise in these areas, please open an Issue or Pull Request, or reach out in the [Matrix chat](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech) describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
+If you have expertise in these areas, please open an Issue or Pull Request, or reach out in the [Matrix chat](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech)/[Telegram](https://t.me/RKNHardering) describing the method, the conditions under which it applies, and its limitations. Any information is valuable, from theoretical ideas to working PoCs.
 
 ## Architecture
 

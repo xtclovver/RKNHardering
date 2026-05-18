@@ -78,7 +78,7 @@ object NativeCurlBridge {
         if (!isLibraryLoaded()) {
             return NativeCurlResponse(localError = lastLoadErrorMessage() ?: "Native curl bridge is not loaded")
         }
-        val activeCaBundle = request.caBundlePath?.takeIf { it.isNotBlank() } ?: caBundleInfo?.absolutePath
+        val activeCaBundle = request.caBundlePath.takeIf { it.isNotBlank() } ?: caBundleInfo?.absolutePath
         if (activeCaBundle.isNullOrBlank()) {
             return NativeCurlResponse(localError = "Native CA bundle is unavailable")
         }

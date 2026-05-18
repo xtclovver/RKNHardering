@@ -145,8 +145,8 @@ object IpConsensusBuilder {
                 channel = Channel.DIRECT,
                 source = "geoip",
                 targetGroup = null,
-                countryCode = geoIp.geoFacts?.countryCode,
-                asn = geoIp.geoFacts?.asn,
+                countryCode = geoIp.geoFacts.countryCode,
+                asn = geoIp.geoFacts.asn,
             )
         }
 

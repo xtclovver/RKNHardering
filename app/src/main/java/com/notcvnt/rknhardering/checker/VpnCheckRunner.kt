@@ -178,7 +178,7 @@ object VpnCheckRunner {
     }
 
     private object Fallbacks {
-        fun geoIp(context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun geoIp(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
@@ -243,18 +243,18 @@ object VpnCheckRunner {
             needsReview = true,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun indirect(context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun indirect(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
             name = "Indirect",
             detected = false,
             needsReview = true,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun location(context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun location(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
             name = "Location",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun native(context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun native(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
             name = "Native",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),

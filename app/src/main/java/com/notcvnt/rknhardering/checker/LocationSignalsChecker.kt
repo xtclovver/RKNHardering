@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.notcvnt.rknhardering.checker
 
 import android.Manifest

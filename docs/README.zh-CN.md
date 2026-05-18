@@ -3,6 +3,7 @@
 # RKNHardering
 
 <a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+<a href="https://t.me/RKNHardering"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram" width="200"></a>
 
 用于检测设备上 VPN 和代理的 Android 应用。该项目实现了一套类似 Roskomnadzor 的封锁绕过工具识别方法。
 
@@ -23,7 +24,7 @@
 - **绕过原生检查**（对抗通过 `/proc/self/maps`、`getifaddrs()`、`dlsym` 进行的 JNI 检查）
 - **隐藏已安装的应用**（对 `PackageManager` 隐藏 VPN 应用的包名）
 
-如果你在这些领域有专业知识，请提交 Issue 或 Pull Request，或在 [Matrix 聊天室](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech)中描述方法、适用条件和限制。任何信息都很有价值——从理论想法到可用的 PoC。
+如果你在这些领域有专业知识，请提交 Issue 或 Pull Request，或在 [Matrix 聊天室](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech)/[Telegram](https://t.me/RKNHardering) 中描述方法、适用条件和限制。任何信息都很有价值——从理论想法到可用的 PoC。
 
 ## 架构
 

@@ -282,7 +282,7 @@ object InstalledVpnAppDetector {
 
         return resolveInfos
             .asSequence()
-            .mapNotNull { it.loadLabel(pm)?.toString()?.trim() }
+            .mapNotNull { it.loadLabel(pm).toString().trim() }
             .firstOrNull { it.isNotBlank() }
     }
 

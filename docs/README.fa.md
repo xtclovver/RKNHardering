@@ -3,6 +3,7 @@
 # RKNHardering
 
 <a href="https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech"><img src="https://img.shields.io/badge/matrix-%23000000?style=for-the-badge&logo=matrix&logoColor=white" alt="Matrix" width="200"></a>
+<a href="https://t.me/RKNHardering"><img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram" width="200"></a>
 
 برنامه Android برای شناسایی VPN و proxy روی دستگاه. این پروژه روش مبتنی بر منطق روس‌کومنادزور برای تشخیص ابزارهای دور زدن مسدودسازی را پیاده‌سازی می‌کند.
 
@@ -23,7 +24,7 @@
 - **دور زدن بررسی‌های بومی/native** (مقابله با بررسی‌های مبتنی بر JNI از طریق `/proc/self/maps`، `getifaddrs()` و `dlsym`)
 - **پنهان‌سازی برنامه‌های نصب‌شده** (مخفی کردن بسته‌های برنامه VPN از `PackageManager`)
 
-اگر در این زمینه‌ها تخصص دارید، لطفاً یک Issue یا Pull Request باز کنید، یا در [چت Matrix](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech) روش خود را همراه با شرایط کاربرد و محدودیت‌های آن شرح دهید. هر اطلاعاتی ارزشمند است — از ایده‌های تئوری تا PoCهای کاربردی.
+اگر در این زمینه‌ها تخصص دارید، لطفاً یک Issue یا Pull Request باز کنید، یا در [چت Matrix](https://matrix.to/#/%23RKN_Hardering:matrix.kangel.tech)/[Telegram](https://t.me/RKNHardering) روش خود را همراه با شرایط کاربرد و محدودیت‌های آن شرح دهید. هر اطلاعاتی ارزشمند است — از ایده‌های تئوری تا PoCهای کاربردی.
 
 ## معماری
 

@@ -1869,7 +1869,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun ensureCardVisible(
         card: MaterialCardView,
-        animate: Boolean = true,
+        @Suppress("UNUSED_PARAMETER") animate: Boolean = true,
         shouldAutoScroll: Boolean = false,
     ) {
         val inHiddenHost = card.parent === hiddenLegacyCardsHost
@@ -2704,14 +2704,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.main_card_call_transport_stun_none_responded)
         }
-        val groupResult = com.notcvnt.rknhardering.model.IpCheckerGroupResult(
-            title = groupTitle,
-            detected = false,
-            needsReview = false,
-            statusLabel = statusLabel,
-            summary = statusLabel,
-            responses = emptyList(),
-        )
 
         val card = com.google.android.material.card.MaterialCardView(themedContext()).apply {
             layoutParams = LinearLayout.LayoutParams(

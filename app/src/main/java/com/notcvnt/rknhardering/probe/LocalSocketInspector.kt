@@ -124,7 +124,7 @@ object LocalSocketInspector {
                 @Suppress("DEPRECATION")
                 pm.getApplicationInfo(packageName, 0)
             }
-            pm.getApplicationLabel(appInfo)?.toString()
+            pm.getApplicationLabel(appInfo).toString()
         }.getOrNull()
     }
 

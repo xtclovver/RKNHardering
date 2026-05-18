@@ -20,6 +20,10 @@ internal class SettingsAboutFragment : Fragment(R.layout.fragment_settings_about
             startActivity(Intent(Intent.ACTION_VIEW, getString(R.string.matrix_room_url).toUri()))
         }
 
+        view.findViewById<MaterialCardView>(R.id.cardTelegram).setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, getString(R.string.telegram_group_url).toUri()))
+        }
+
         view.findViewById<MaterialCardView>(R.id.cardGithub).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, getString(R.string.github_repo_url).toUri()))
         }
