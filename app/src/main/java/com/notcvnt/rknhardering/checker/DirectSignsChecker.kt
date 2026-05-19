@@ -260,7 +260,6 @@ object DirectSignsChecker {
         return SignalOutcome(detected = detected, needsReview = needsReview)
     }
 
-    @Suppress("DEPRECATION")
     private fun collectProxyInfoProfiles(context: Context): ProxyProfileCollection {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -269,8 +268,11 @@ object DirectSignsChecker {
         val networkProfiles = mutableListOf<ProxyProfileSnapshot>()
         var networkError: String? = null
 
+        val activeNetwork = runCatching { cm.activeNetwork }.getOrNull()
+
         runCatching {
-            defaultProfile = cm.defaultProxy?.let { proxyInfo ->
+            val activeLinkProperties = activeNetwork?.let { cm.getLinkProperties(it) }
+            defaultProfile = activeLinkProperties?.httpProxy?.let { proxyInfo ->
                 proxyProfileSnapshot(proxyInfo = proxyInfo, isDefault = true)
             }
         }.onFailure { error ->
@@ -278,9 +280,14 @@ object DirectSignsChecker {
         }
 
         runCatching {
-            val activeNetwork = cm.activeNetwork
+            // cm.allNetworks is deprecated since API 31 in favour of NetworkCallback,
+            // but here we need a one-shot synchronous inspection across all networks
+            // (active + INTERNET-capable). NetworkCallback would force an async flow
+            // and add lifecycle overhead with no behavioural gain.
+            @Suppress("DEPRECATION")
+            val allNetworks = cm.allNetworks
 
-            for (network in cm.allNetworks) {
+            for (network in allNetworks) {
                 val caps = cm.getNetworkCapabilities(network)
                 val isTracked = network == activeNetwork ||
                     caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
@@ -732,9 +739,8 @@ object DirectSignsChecker {
                 ),
             )
 
-            val hasDnsPathMismatch = comparison?.dnsPathMismatch == true
-            if (hasDnsPathMismatch) {
-                val transportOnly = comparison!!.usedCurlCompatibleFallback() &&
+            if (comparison != null && comparison.dnsPathMismatch) {
+                val transportOnly = comparison.usedCurlCompatibleFallback() &&
                     comparison.curlCompatible.transportDiagnostics.resolveStrategy != TunProbeResolveStrategy.KOTLIN_INJECTED
                 val confidence = if (transportOnly) EvidenceConfidence.MEDIUM else EvidenceConfidence.HIGH
                 evidence.add(

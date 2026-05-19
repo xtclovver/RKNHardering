@@ -14,7 +14,7 @@ class AsnResolverTest {
         val calls = AtomicInteger(0)
         val resolver = AsnResolver(
             maxIps = 6,
-            lookup = { ip ->
+            lookup = {
                 calls.incrementAndGet()
                 AsnInfo(asn = "AS1 Example", countryCode = "DE")
             },

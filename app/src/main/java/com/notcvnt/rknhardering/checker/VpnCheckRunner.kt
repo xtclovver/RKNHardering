@@ -178,7 +178,7 @@ object VpnCheckRunner {
     }
 
     private object Fallbacks {
-        fun geoIp(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun geoIp(error: Throwable): CategoryResult = CategoryResult(
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
@@ -243,18 +243,18 @@ object VpnCheckRunner {
             needsReview = true,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun indirect(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun indirect(error: Throwable): CategoryResult = CategoryResult(
             name = "Indirect",
             detected = false,
             needsReview = true,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun location(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun location(error: Throwable): CategoryResult = CategoryResult(
             name = "Location",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
-        fun native(@Suppress("UNUSED_PARAMETER") context: Context, error: Throwable): CategoryResult = CategoryResult(
+        fun native(error: Throwable): CategoryResult = CategoryResult(
             name = "Native",
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
@@ -343,7 +343,7 @@ object VpnCheckRunner {
         supervisorScope {
         val dependencies = dependenciesOverride ?: Dependencies()
         val geoIpDeferred = if (settings.networkRequestsEnabled) {
-            safeAsync(fallback = { Fallbacks.geoIp(context, it) }) {
+            safeAsync(fallback = { Fallbacks.geoIp(it) }) {
                 dependencies.geoIpCheck(context, settings.resolverConfig)
             }
         } else null
@@ -410,7 +410,7 @@ object VpnCheckRunner {
                 tunInterfaceInfo.tunInterfacePresent,
             )
         }
-        val indirectDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.indirect(context, it) }) {
+        val indirectDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.indirect(it) }) {
             dependencies.indirectCheck(
                 context,
                 settings.networkRequestsEnabled,
@@ -418,10 +418,10 @@ object VpnCheckRunner {
                 settings.resolverConfig,
             )
         }
-        val locationDeferred = safeAsync(fallback = { Fallbacks.location(context, it) }) {
+        val locationDeferred = safeAsync(fallback = { Fallbacks.location(it) }) {
             dependencies.locationCheck(context, settings.networkRequestsEnabled, settings.resolverConfig)
         }
-        val nativeDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.native(context, it) }) {
+        val nativeDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.native(it) }) {
             dependencies.nativeCheck(context)
         }
         val bypassEnabled = settings.splitTunnelEnabled
@@ -593,7 +593,7 @@ object VpnCheckRunner {
                 tunProbe = tunProbeResult,
                 bypass = bypassResult,
                 callTransportLeaks = indirectSigns.callTransportLeaks,
-                asnResolver = AsnResolver.default(context, settings.resolverConfig),
+                asnResolver = AsnResolver.default(settings.resolverConfig),
             )
         }.getOrElse { IpConsensusResult.empty(needsReview = true) }
 

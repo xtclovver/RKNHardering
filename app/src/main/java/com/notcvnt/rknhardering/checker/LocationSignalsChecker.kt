@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.notcvnt.rknhardering.checker
 
 import android.Manifest
@@ -22,7 +20,6 @@ import android.telephony.CellInfoLte
 import android.telephony.CellInfoWcdma
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
-import android.telephony.gsm.GsmCellLocation
 import androidx.annotation.DoNotInline
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -461,7 +458,9 @@ object LocationSignalsChecker {
     @Suppress("DEPRECATION", "MissingPermission")
     private fun legacyGsmCellCandidate(tm: TelephonyManager): CellLookupCandidate? {
         val operator = normalizeOperatorCode(tm.networkOperator)?.takeIf { it.length >= 4 } ?: return null
-        val location = runCatching { tm.cellLocation as? GsmCellLocation }.getOrNull() ?: return null
+        val location = runCatching {
+            tm.cellLocation as? android.telephony.gsm.GsmCellLocation
+        }.getOrNull() ?: return null
         val areaCode = normalizeCellValue(location.lac) ?: return null
         val cellId = normalizeCellValue(location.cid) ?: return null
         return CellLookupCandidate(

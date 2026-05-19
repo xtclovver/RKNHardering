@@ -509,10 +509,15 @@ object UnderlyingNetworkProber {
         )
     }
 
-    @Suppress("DEPRECATION")
     private fun buildProbeEnvironment(context: Context): ProbeEnvironment {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networks = cm.allNetworks.mapNotNull { network ->
+        // cm.allNetworks is deprecated since API 31. NetworkCallback is the
+        // recommended replacement but only emits events asynchronously; this
+        // prober needs a synchronous snapshot to compare VPN vs underlying
+        // paths within a single probe.
+        @Suppress("DEPRECATION")
+        val allNetworks = cm.allNetworks
+        val networks = allNetworks.mapNotNull { network ->
             val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
             NetworkSnapshot(
                 network = network,

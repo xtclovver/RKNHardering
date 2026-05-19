@@ -2,3 +2,5 @@
 Per-app split-tunnel VPN: добавлен зонд через OS-binding к tun0, теперь утечка underlying-сети детектируется даже когда приложение исключено из туннеля (#61).
 DNS: автоматический фолбэк на Yandex DoH (77.88.8.8) после трёх подряд провалов системного резолвера — спасает проверки под whitelist оператора.
 JSON/Markdown/Debug-экспорт расширены секцией operator_whitelist.
+Добавлена ссылка на Telegram-канал @RKNHardering в настройках и README (#68).
+Чистка предупреждений компилятора: удалены мёртвые параметры и переменные, заменены устаревшие API ConnectivityManager.defaultProxy на LinkProperties.httpProxy.

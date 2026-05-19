@@ -1,6 +1,5 @@
 package com.notcvnt.rknhardering.checker.ipconsensus
 
-import android.content.Context
 import com.notcvnt.rknhardering.model.AsnInfo
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
@@ -44,7 +43,7 @@ class AsnResolver(
         const val BATCH_TIMEOUT_MS = 5_000L
         const val PER_REQUEST_TIMEOUT_MS = 3_000L
 
-        fun default(@Suppress("UNUSED_PARAMETER") context: Context, resolverConfig: DnsResolverConfig): AsnResolver {
+        fun default(resolverConfig: DnsResolverConfig): AsnResolver {
             return AsnResolver(
                 lookup = { ip -> lookupViaIpapiIs(ip, resolverConfig) },
             )

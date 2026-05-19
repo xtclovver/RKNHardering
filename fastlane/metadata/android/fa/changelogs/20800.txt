@@ -2,3 +2,5 @@
 VPN در حالت per-app split-tunnel: زوند جدید با اتصال OS-binding به tun0 افزوده شد؛ نشت شبکه زیرین حتی زمانی که برنامه از تونل کنار گذاشته شده باشد تشخیص داده می‌شود (#61).
 DNS: پس از سه شکست متوالی resolver سیستمی، fallback خودکار به Yandex DoH (77.88.8.8) فعال می‌شود تا بررسی‌ها در شرایط فهرست سفید اپراتور کار کنند.
 خروجی JSON/Markdown/Debug با بخش operator_whitelist گسترش یافت.
+افزودن لینک کانال تلگرام @RKNHardering در تنظیمات و README (#68).
+پاک‌سازی هشدارهای کامپایلر: حذف پارامترها و متغیرهای مرده، انتقال از API منسوخ ConnectivityManager.defaultProxy به LinkProperties.httpProxy.

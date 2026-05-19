@@ -1346,7 +1346,7 @@ class MainActivity : AppCompatActivity() {
         when (update) {
             is CheckUpdate.GeoIpReady -> {
                 markStageCompleted(RunningStage.GEO_IP)
-                ensureCardVisible(cardGeoIp, animate = false)
+                ensureCardVisible(cardGeoIp)
                 displayCategory(
                     update.result,
                     cardGeoIp,
@@ -1360,21 +1360,21 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.IpComparisonReady -> {
                 markStageCompleted(RunningStage.IP_COMPARISON)
-                ensureCardVisible(cardIpComparison, animate = false)
+                ensureCardVisible(cardIpComparison)
                 displayIpComparison(update.result, activeCheckPrivacyMode)
                 updateTileFromIpComparison(update.result)
                 if (animate) animateContentReveal(textIpComparisonSummary, ipComparisonGroups)
             }
             is CheckUpdate.CdnPullingReady -> {
                 markStageCompleted(RunningStage.CDN_PULLING)
-                ensureCardVisible(cardCdnPulling, animate = false)
+                ensureCardVisible(cardCdnPulling)
                 displayCdnPulling(update.result, activeCheckPrivacyMode)
                 updateTileFromCdn(update.result)
                 if (animate) animateContentReveal(textCdnPullingSummary, cdnPullingResponses)
             }
             is CheckUpdate.IcmpSpoofingReady -> {
                 markStageCompleted(RunningStage.ICMP)
-                ensureCardVisible(cardIcmpSpoofing, animate = false)
+                ensureCardVisible(cardIcmpSpoofing)
                 displayCategory(
                     update.result,
                     cardIcmpSpoofing,
@@ -1388,7 +1388,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.RttTriangulationReady -> {
                 markStageCompleted(RunningStage.RTT_TRIANGULATION)
-                ensureCardVisible(cardRttTriangulation, animate = false)
+                ensureCardVisible(cardRttTriangulation)
                 displayCategory(
                     update.result,
                     cardRttTriangulation,
@@ -1402,7 +1402,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.DirectSignsReady -> {
                 markStageCompleted(RunningStage.DIRECT)
-                ensureCardVisible(cardDirect, animate = false)
+                ensureCardVisible(cardDirect)
                 displayCategory(
                     update.result,
                     cardDirect,
@@ -1416,7 +1416,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.IndirectSignsReady -> {
                 markStageCompleted(RunningStage.INDIRECT)
-                ensureCardVisible(cardIndirect, animate = false)
+                ensureCardVisible(cardIndirect)
                 displayCategory(
                     update.result,
                     cardIndirect,
@@ -1439,7 +1439,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.LocationSignalsReady -> {
                 markStageCompleted(RunningStage.LOCATION)
-                ensureCardVisible(cardLocation, animate = false)
+                ensureCardVisible(cardLocation)
                 displayCategory(
                     update.result,
                     cardLocation,
@@ -1463,7 +1463,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.BypassReady -> {
                 markStageCompleted(RunningStage.BYPASS)
-                ensureCardVisible(cardBypass, animate = false)
+                ensureCardVisible(cardBypass)
                 displayBypass(update.result, activeCheckPrivacyMode)
                 updateTileFromBypass(update.result)
                 if (animate) animateContentReveal(findingsBypass)
@@ -1717,7 +1717,7 @@ class MainActivity : AppCompatActivity() {
         findingsContainer.removeAllViews()
         findingsContainer.addView(createLoadingHintView(message))
         findingsContainer.visibility = View.VISIBLE
-        ensureCardVisible(card, animate = false)
+        ensureCardVisible(card)
     }
 
     private fun showIpComparisonStopped(stage: RunningStage) {
@@ -1729,7 +1729,7 @@ class MainActivity : AppCompatActivity() {
         textIpComparisonSummary.text = stageStoppedMessage(stage)
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.GONE
-        ensureCardVisible(cardIpComparison, animate = false)
+        ensureCardVisible(cardIpComparison)
     }
 
     private fun showCdnPullingStopped(stage: RunningStage) {
@@ -1741,7 +1741,7 @@ class MainActivity : AppCompatActivity() {
         textCdnPullingSummary.text = stageStoppedMessage(stage)
         cdnPullingResponses.removeAllViews()
         cdnPullingResponses.visibility = View.GONE
-        ensureCardVisible(cardCdnPulling, animate = false)
+        ensureCardVisible(cardCdnPulling)
     }
 
     private fun showBypassStopped(stage: RunningStage) {
@@ -1754,7 +1754,7 @@ class MainActivity : AppCompatActivity() {
         findingsBypass.visibility = View.GONE
         textBypassProgress.text = stageStoppedMessage(stage)
         textBypassProgress.visibility = View.VISIBLE
-        ensureCardVisible(cardBypass, animate = false)
+        ensureCardVisible(cardBypass)
     }
 
     private fun bindCardLoadingState(stage: RunningStage, icon: ImageView, status: TextView) {
@@ -1869,7 +1869,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun ensureCardVisible(
         card: MaterialCardView,
-        @Suppress("UNUSED_PARAMETER") animate: Boolean = true,
         shouldAutoScroll: Boolean = false,
     ) {
         val inHiddenHost = card.parent === hiddenLegacyCardsHost
