@@ -55,8 +55,6 @@ object VerdictEngine {
             return Verdict.DETECTED
         }
 
-        // R2 check removed (MATRIX_DIRECT_SOURCES moved to R5)
-
         val geoAxis = ipConsensus.foreignIps.isNotEmpty() ||
             ipConsensus.geoCountryMismatch ||
             ipConsensus.warpLikeIndicator

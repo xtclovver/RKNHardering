@@ -65,11 +65,6 @@ object NativeCurlBridge {
         return executeOverride != null || (isLibraryLoaded() && caBundleInfo?.absolutePath?.isNotBlank() == true)
     }
 
-    fun execute(requestJson: String): String {
-        val request = NativeCurlRequest.fromJson(requestJson)
-        return execute(request).toJson()
-    }
-
     internal fun execute(
         request: NativeCurlRequest,
         requestId: String = "",
