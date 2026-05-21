@@ -3,6 +3,11 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.customcheck.EndpointScope
+import com.notcvnt.rknhardering.customcheck.IpComparisonConfig
+import com.notcvnt.rknhardering.customcheck.ResponseType
+import com.notcvnt.rknhardering.customcheck.mapper.EndpointResponseMapper
+import com.notcvnt.rknhardering.customcheck.mapper.MappingField
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
@@ -101,10 +106,44 @@ object IpComparisonChecker {
         context: Context,
         timeoutMs: Int = 5_000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        config: IpComparisonConfig = IpComparisonConfig(),
     ): IpComparisonResult = withContext(Dispatchers.IO) {
+        if (!config.enabled) {
+            return@withContext IpComparisonResult(
+                detected = false,
+                needsReview = false,
+                hasError = false,
+                summary = "",
+                ruGroup = IpCheckerGroupResult(
+                    title = context.getString(R.string.checker_ip_comp_ru_checkers),
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+                nonRuGroup = IpCheckerGroupResult(
+                    title = context.getString(R.string.checker_ip_comp_non_ru_checkers),
+                    detected = false,
+                    statusLabel = "",
+                    summary = "",
+                    responses = emptyList(),
+                ),
+            )
+        }
+
+        val effectiveTimeoutMs = config.timeoutMs
+
         coroutineScope {
             val executionContext = ScanExecutionContext.currentOrDefault()
-            val responses = ENDPOINTS.map { endpoint ->
+
+            val filteredBuiltin = ENDPOINTS.filter { endpoint ->
+                when (endpoint.scope) {
+                    IpCheckerScope.RU -> config.builtinRuCheckersEnabled
+                    IpCheckerScope.NON_RU -> config.builtinNonRuCheckersEnabled
+                }
+            }
+
+            val builtinJobs = filteredBuiltin.map { endpoint ->
                 async {
                     val dnsRecords = PublicIpClient.resolveDnsRecords(
                         endpoint = endpoint.url,
@@ -113,7 +152,7 @@ object IpComparisonChecker {
                     )
                     val result = fetchIpWithRetries(
                         endpoint = endpoint.url,
-                        timeoutMs = timeoutMs,
+                        timeoutMs = effectiveTimeoutMs,
                         resolverConfig = resolverConfig,
                         addressFamily = endpoint.addressFamily,
                     )
@@ -133,7 +172,53 @@ object IpComparisonChecker {
                         ),
                     )
                 }
-            }.map { it.await() }
+            }
+
+            val customJobs = config.customEndpoints.filter { it.enabled }.map { custom ->
+                async {
+                    val mappedScope = when (custom.scope) {
+                        EndpointScope.RU -> IpCheckerScope.RU
+                        EndpointScope.NON_RU -> IpCheckerScope.NON_RU
+                    }
+                    val ip: String?
+                    val error: String?
+                    if (custom.responseMapping.responseType == ResponseType.PLAIN_TEXT) {
+                        val result = fetchIpWithRetries(
+                            endpoint = custom.url,
+                            timeoutMs = effectiveTimeoutMs,
+                            resolverConfig = resolverConfig,
+                            addressFamily = null,
+                        )
+                        ip = result.getOrNull()
+                        error = result.exceptionOrNull()?.let(::formatError)
+                    } else {
+                        val testResult = EndpointResponseMapper.testEndpoint(custom.url, effectiveTimeoutMs)
+                        if (testResult.success && testResult.rawBody != null) {
+                            ip = EndpointResponseMapper.extractField(
+                                testResult.rawBody,
+                                custom.responseMapping,
+                                MappingField.IP,
+                            )
+                            error = if (ip == null) "IP field not found in response" else null
+                        } else {
+                            ip = null
+                            error = testResult.error ?: "Request failed"
+                        }
+                    }
+                    IpCheckerResponse(
+                        label = custom.label,
+                        url = custom.url,
+                        scope = mappedScope,
+                        ip = ip,
+                        error = error,
+                        ipv4Records = emptyList(),
+                        ipv6Records = emptyList(),
+                        ignoredIpv6Error = false,
+                    )
+                }
+            }
+
+            val responses = (builtinJobs + customJobs).map { it.await() }
             evaluate(context, responses)
         }
     }

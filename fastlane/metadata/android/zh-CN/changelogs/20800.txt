@@ -6,3 +6,7 @@ Markdown/JSON/Debug 导出新增 operator_whitelist 分节。
 清理编译器警告：移除无用参数和变量，将已弃用的 ConnectivityManager.defaultProxy 迁移到 LinkProperties.httpProxy。
 移除死代码：废弃的 NativeCurlBridge.execute(String) 重载以及旧版启动器图标（minSdk=26 已使用自适应图标）。
 结构性重构：导出格式化类移至 export 子包，VerdictNarrative 移至 model，TunProbeDiagnosticsFormatter 移至 probe；消除了网络接口模式的重复（顺带修复了 IndirectSignsChecker 中遗漏的 dummy 接口检测）。
+新增自定义检查配置文件：可创建、编辑、克隆、导入和导出自己的检查集合（超时、Ping 次数、自定义端点、响应映射规则），并可在设置中切换当前生效的配置文件。
+新增应用内市场，用于分发社区配置文件：支持搜索、评分、verified/official 徽章，以及一键安装并处理冲突。
+新增域名可达性检查（DomainReachabilityChecker），以及带响应映射 DSL 的可配置端点编辑器，可用于自定义 IP/地理/泄漏检测器。
+各检查器全面改造：CDN pulling、GeoIP、IP comparison、Call transport、ICMP spoofing、RTT triangulation 等现在接受按配置文件传入的参数，并在 JSON/Markdown/Debug 导出中提供更丰富的诊断信息。

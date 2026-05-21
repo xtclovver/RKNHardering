@@ -7,6 +7,7 @@ import android.net.Proxy
 import android.net.ProxyInfo
 import android.os.Build
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.customcheck.DirectSignsConfig
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -62,18 +63,39 @@ object DirectSignsChecker {
         context: Context,
         tunActiveProbeResult: UnderlyingNetworkProber.ProbeResult? = null,
         tunInterfacePresent: Boolean = false,
+        config: DirectSignsConfig = DirectSignsConfig(),
     ): CategoryResult {
+        if (!config.enabled) {
+            return CategoryResult(
+                name = context.getString(R.string.checker_direct_category_name),
+                detected = false,
+                findings = emptyList(),
+                needsReview = false,
+                evidence = emptyList(),
+                matchedApps = emptyList(),
+            )
+        }
+
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
         val matchedApps = mutableListOf<MatchedVpnApp>()
         var detected = false
         var needsReview = false
 
-        val vpnTransportOutcome = checkVpnTransport(context, findings, evidence)
-        detected = detected || vpnTransportOutcome.detected
-        needsReview = needsReview || vpnTransportOutcome.needsReview
+        if (config.checkTransportVpn) {
+            val vpnTransportOutcome = checkVpnTransport(context, findings, evidence)
+            detected = detected || vpnTransportOutcome.detected
+            needsReview = needsReview || vpnTransportOutcome.needsReview
+        }
 
-        val systemProxyOutcome = checkSystemProxy(context, findings, evidence)
+        val systemProxyOutcome = checkSystemProxy(
+            context = context,
+            findings = findings,
+            evidence = evidence,
+            checkHttpProxy = config.checkHttpProxy,
+            checkSocksProxy = config.checkSocksProxy,
+            checkProxyInfo = config.checkProxyInfo,
+        )
         detected = detected || systemProxyOutcome.detected
         needsReview = needsReview || systemProxyOutcome.needsReview
 
@@ -108,10 +130,12 @@ object DirectSignsChecker {
                 needsReview = needsReview || tunActiveProbeOutcome.needsReview
             }
 
-        val appDetection = InstalledVpnAppDetector.detect(context)
-        findings += appDetection.findings
-        evidence += appDetection.evidence
-        matchedApps += appDetection.matchedApps
+        if (config.checkVpnService) {
+            val appDetection = InstalledVpnAppDetector.detect(context)
+            findings += appDetection.findings
+            evidence += appDetection.evidence
+            matchedApps += appDetection.matchedApps
+        }
 
         return CategoryResult(
             name = context.getString(R.string.checker_direct_category_name),
@@ -220,42 +244,51 @@ object DirectSignsChecker {
         context: Context,
         findings: MutableList<Finding>,
         evidence: MutableList<EvidenceItem>,
+        checkHttpProxy: Boolean = true,
+        checkSocksProxy: Boolean = true,
+        checkProxyInfo: Boolean = true,
     ): SignalOutcome {
-        val httpHost = System.getProperty("http.proxyHost") ?: Proxy.getDefaultHost()
-        val httpPort = System.getProperty("http.proxyPort")
-            ?: Proxy.getDefaultPort().takeIf { it > 0 }?.toString()
-        val socksHost = System.getProperty("socksProxyHost")
-        val socksPort = System.getProperty("socksProxyPort")
         var detected = false
         var needsReview = false
 
-        val httpOutcome = addProxyFinding(
-            context = context,
-            type = context.getString(R.string.checker_direct_http_proxy),
-            host = httpHost,
-            port = httpPort,
-            findings = findings,
-            evidence = evidence,
-        )
-        detected = detected || httpOutcome.detected
-        needsReview = needsReview || httpOutcome.needsReview
+        if (checkHttpProxy) {
+            val httpHost = System.getProperty("http.proxyHost") ?: Proxy.getDefaultHost()
+            val httpPort = System.getProperty("http.proxyPort")
+                ?: Proxy.getDefaultPort().takeIf { it > 0 }?.toString()
+            val httpOutcome = addProxyFinding(
+                context = context,
+                type = context.getString(R.string.checker_direct_http_proxy),
+                host = httpHost,
+                port = httpPort,
+                findings = findings,
+                evidence = evidence,
+            )
+            detected = detected || httpOutcome.detected
+            needsReview = needsReview || httpOutcome.needsReview
+        }
 
-        val socksOutcome = addProxyFinding(
-            context = context,
-            type = context.getString(R.string.checker_direct_socks_proxy),
-            host = socksHost,
-            port = socksPort,
-            findings = findings,
-            evidence = evidence,
-        )
-        detected = detected || socksOutcome.detected
-        needsReview = needsReview || socksOutcome.needsReview
+        if (checkSocksProxy) {
+            val socksHost = System.getProperty("socksProxyHost")
+            val socksPort = System.getProperty("socksProxyPort")
+            val socksOutcome = addProxyFinding(
+                context = context,
+                type = context.getString(R.string.checker_direct_socks_proxy),
+                host = socksHost,
+                port = socksPort,
+                findings = findings,
+                evidence = evidence,
+            )
+            detected = detected || socksOutcome.detected
+            needsReview = needsReview || socksOutcome.needsReview
+        }
 
-        val proxyInfoResult = evaluateProxyProfileCollection(context, collectProxyInfoProfiles(context))
-        findings += proxyInfoResult.findings
-        evidence += proxyInfoResult.evidence
-        detected = detected || proxyInfoResult.detected
-        needsReview = needsReview || proxyInfoResult.needsReview
+        if (checkProxyInfo) {
+            val proxyInfoResult = evaluateProxyProfileCollection(context, collectProxyInfoProfiles(context))
+            findings += proxyInfoResult.findings
+            evidence += proxyInfoResult.evidence
+            detected = detected || proxyInfoResult.detected
+            needsReview = needsReview || proxyInfoResult.needsReview
+        }
 
         return SignalOutcome(detected = detected, needsReview = needsReview)
     }

@@ -53,48 +53,6 @@ class SettingsActivityTest {
     }
 
     @Test
-    fun `cdn pulling warning cancel keeps switch and pref disabled`() {
-        val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-        activity.supportFragmentManager.beginTransaction()
-            .replace(R.id.settingsFragmentContainer, SettingsNetworkFragment())
-            .commitNow()
-        val fragment = activity.supportFragmentManager
-            .findFragmentById(R.id.settingsFragmentContainer) as SettingsNetworkFragment
-        val switch = fragment.requireView().findViewById<MaterialSwitch>(R.id.switchCdnPulling)
-
-        switch.performClick()
-        val dialog = ShadowDialog.getLatestDialog() as AlertDialog
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        assertFalse(switch.isChecked)
-        assertFalse(
-            AppUiSettings.prefs(activity).getBoolean(SettingsActivity.PREF_CDN_PULLING_ENABLED, false),
-        )
-    }
-
-    @Test
-    fun `cdn pulling warning confirm enables switch and saves pref`() {
-        val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-        activity.supportFragmentManager.beginTransaction()
-            .replace(R.id.settingsFragmentContainer, SettingsNetworkFragment())
-            .commitNow()
-        val fragment = activity.supportFragmentManager
-            .findFragmentById(R.id.settingsFragmentContainer) as SettingsNetworkFragment
-        val switch = fragment.requireView().findViewById<MaterialSwitch>(R.id.switchCdnPulling)
-
-        switch.performClick()
-        val dialog = ShadowDialog.getLatestDialog() as AlertDialog
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        assertTrue(switch.isChecked)
-        assertTrue(
-            AppUiSettings.prefs(activity).getBoolean(SettingsActivity.PREF_CDN_PULLING_ENABLED, false),
-        )
-    }
-
-    @Test
     fun `settings root shows live values from shared preferences`() {
         AppUiSettings.prefs(context).edit {
             putBoolean(SettingsPrefs.PREF_SPLIT_TUNNEL_ENABLED, false)

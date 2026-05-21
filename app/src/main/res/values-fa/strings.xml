@@ -212,6 +212,7 @@
     <string name="main_preview_rtt_triangulation">سرویس‌های محلی و خارجی پینگ خواهند شد تا تاخیر مقایسه شود.</string>
     <string name="main_preview_location">جمع‌آوری نشانه‌های اپراتور، دکل و Wi-Fiهای نزدیک انجام خواهد شد.</string>
     <string name="main_preview_bypass">جست‌وجوی split tunnel bypass محلی و proxy endpointهای در دسترس انجام خواهد شد.</string>
+    <string name="main_preview_domain_reachability">دامنه‌های تنظیم‌شده از طریق DNS، TCP و TLS handshake برای انسداد در سطح DPI آزمایش خواهند شد.</string>
 
     <string name="main_loading_geo_ip">در حال بررسی کشور، ASN و نشانه‌های میزبانی.</string>
     <string name="main_loading_ip_comparison">در حال مقایسه IP عمومی از طریق چند سرویس مستقل.</string>
@@ -628,4 +629,269 @@
     <string name="auto_update_onboarding_message">در اولین اجرا، برنامه می‌تواند برای بررسی GitHub Releases و یافتن APK جدیدتر به api.github.com متصل شود. اگر اکنون آن را غیرفعال کنید، این بررسی تا وقتی که خودتان آن را در تنظیمات شبکه فعال نکنید انجام نخواهد شد.</string>
     <string name="auto_update_onboarding_enable">فعال کردن</string>
     <string name="auto_update_onboarding_disable">فعال نکن</string>
+
+    <!-- Custom Checks -->
+    <string name="settings_cat_custom_checks">بررسی‌های سفارشی</string>
+    <string name="settings_custom_checks_enabled">استفاده از پروفایل سفارشی</string>
+    <string name="settings_custom_checks_active_label">پروفایل فعال</string>
+    <string name="settings_custom_checks_no_active">استاندارد (داخلی)</string>
+    <string name="settings_custom_check_create">ایجاد پروفایل جدید</string>
+    <string name="settings_custom_check_import">وارد کردن از فایل</string>
+    <string name="settings_custom_check_marketplace">بازار</string>
+    <string name="settings_custom_check_instructions">راهنما</string>
+    <string name="settings_custom_check_profiles_label">پروفایل‌های من</string>
+    <string name="settings_custom_check_export_done">پروفایل صادر شد</string>
+    <string name="settings_custom_check_export_failed">صادر کردن پروفایل ناموفق بود</string>
+    <string name="settings_custom_check_import_done">پروفایل وارد شد</string>
+    <string name="settings_custom_check_import_failed">وارد کردن پروفایل ناموفق بود</string>
+
+    <!-- Custom Check Editor -->
+    <string name="settings_custom_check_editor_title">ویرایش پروفایل</string>
+    <string name="settings_custom_check_name">نام پروفایل</string>
+    <string name="settings_custom_check_description">توضیحات</string>
+    <string name="settings_custom_check_author">نویسنده</string>
+    <string name="settings_custom_check_version">نسخه</string>
+    <string name="settings_custom_check_save">ذخیره</string>
+    <string name="settings_custom_check_cancel">انصراف</string>
+    <string name="settings_custom_check_add_endpoint">افزودن endpoint سفارشی</string>
+    <string name="settings_custom_check_name_required">نام پروفایل الزامی است</string>
+    <string name="settings_custom_check_no_checks_enabled">برای ذخیره پروفایل حداقل یک بررسی را فعال کنید</string>
+    <string name="settings_custom_check_dependency_required">«%1$s» به «%2$s» نیاز دارد — به‌طور خودکار فعال شد</string>
+    <string name="settings_custom_check_timeout_ms">زمان‌انتظار (ms)</string>
+    <string name="settings_custom_check_ping_count">تعداد ping</string>
+
+    <!-- Custom Check Editor: sub-toggles -->
+    <string name="settings_custom_check_ip_builtin_ru">استفاده از بررسی‌کننده‌های RU داخلی</string>
+    <string name="settings_custom_check_ip_builtin_non_ru">استفاده از بررسی‌کننده‌های non-RU داخلی</string>
+    <string name="settings_custom_check_cdn_builtin_targets">استفاده از CDN هدف‌های داخلی</string>
+    <string name="settings_custom_check_cdn_meduza">شامل کردن meduza.io</string>
+    <string name="settings_custom_check_cdn_rutracker">شامل کردن rutracker.org</string>
+    <string name="settings_custom_check_direct_check_transport_vpn">بررسی قابلیت VPN transport</string>
+    <string name="settings_custom_check_direct_check_http_proxy">بررسی HTTP proxy</string>
+    <string name="settings_custom_check_direct_check_socks_proxy">بررسی SOCKS proxy</string>
+    <string name="settings_custom_check_direct_check_proxy_info">بررسی ProxyInfo (per-network)</string>
+    <string name="settings_custom_check_direct_check_vpn_service">بررسی اپلیکیشن‌های VPN نصب شده</string>
+    <string name="settings_custom_check_indirect_not_vpn_cap">بررسی NOT_VPN capability</string>
+    <string name="settings_custom_check_indirect_vpn_interfaces">بررسی رابط‌های VPN</string>
+    <string name="settings_custom_check_indirect_mtu_anomaly">بررسی ناهنجاری MTU</string>
+    <string name="settings_custom_check_indirect_ipsec">بررسی رابط‌های IPsec</string>
+    <string name="settings_custom_check_indirect_routing">بررسی جدول مسیریابی</string>
+    <string name="settings_custom_check_indirect_dns">بررسی پیکربندی DNS</string>
+    <string name="settings_custom_check_indirect_proxy_tools">بررسی ابزارهای proxy</string>
+    <string name="settings_custom_check_indirect_local_listeners">بررسی listener‌های محلی</string>
+    <string name="settings_custom_check_indirect_dumpsys">بررسی dumpsys VPN</string>
+    <string name="settings_custom_check_indirect_listener_port_threshold">آستانه پورت‌های listener (پیش‌فرض: ۵)</string>
+    <string name="settings_custom_check_location_beacondb">استفاده از جستجوی BeaconDB</string>
+    <string name="settings_custom_check_location_cell_towers">جمع‌آوری اطلاعات دکل‌های مخابراتی</string>
+    <string name="settings_custom_check_location_wifi_signals">جمع‌آوری سیگنال‌های WiFi</string>
+    <string name="settings_custom_check_icmp_builtin_targets">استفاده از هدف‌های داخلی</string>
+    <string name="settings_custom_check_add_icmp_target">افزودن هدف ICMP</string>
+    <string name="settings_custom_check_icmp_target_is_control">هدف کنترلی</string>
+    <string name="settings_custom_check_rtt_builtin_targets">استفاده از هدف‌های داخلی</string>
+    <string name="settings_custom_check_add_rtt_target">افزودن هدف RTT</string>
+    <string name="settings_custom_check_rtt_expected_location">مکان مورد انتظار (مثلاً RU)</string>
+    <string name="settings_custom_check_call_builtin_global_stun">استفاده از STUN جهانی داخلی</string>
+    <string name="settings_custom_check_call_builtin_ru_stun">استفاده از STUN روسیه داخلی</string>
+    <string name="settings_custom_check_call_mtproto">بررسی MTProto</string>
+    <string name="settings_custom_check_add_stun_server">افزودن سرور STUN</string>
+    <string name="settings_custom_check_stun_port">پورت (پیش‌فرض: ۳۴۷۸)</string>
+    <string name="settings_custom_check_split_proxy_scan">فعال کردن اسکن proxy</string>
+    <string name="settings_custom_check_split_xray_api_scan">فعال کردن اسکن Xray API</string>
+    <string name="settings_custom_check_split_connect_timeout">تایم‌اوت اتصال (ms، پیش‌فرض: ۳۰۰)</string>
+    <string name="settings_custom_check_split_check_underlying_network">بررسی شبکه زیرین</string>
+    <string name="settings_custom_check_split_check_vpn_network_binding">بررسی VPN network binding</string>
+    <string name="settings_custom_check_split_check_mtproto_via_proxy">بررسی MTProto از طریق proxy</string>
+    <string name="settings_custom_check_split_port_range_label">بازه پورت</string>
+
+    <!-- Custom domains section -->
+    <string name="settings_custom_check_section_custom_domains">دامنه‌های سفارشی</string>
+    <string name="settings_custom_check_add_custom_domain">افزودن دامنه</string>
+    <string name="settings_custom_check_domain_field">دامنه (example.com)</string>
+    <string name="settings_custom_check_check_type_field">نوع بررسی (http/dns/tcp)</string>
+    <string name="settings_custom_check_description_field">توضیحات</string>
+
+    <!-- Network configuration section -->
+    <string name="settings_custom_check_section_network_config">تنظیمات شبکه</string>
+    <string name="settings_custom_check_network_requests">درخواست‌های شبکه</string>
+    <string name="settings_custom_check_dns_mode">حالت DNS</string>
+    <string name="settings_custom_check_dns_mode_system">سیستم</string>
+    <string name="settings_custom_check_dns_mode_direct">مستقیم</string>
+    <string name="settings_custom_check_dns_mode_doh">DoH</string>
+    <string name="settings_custom_check_dns_preset">پیش‌تنظیم DNS</string>
+    <string name="settings_custom_check_dns_preset_custom">سفارشی</string>
+    <string name="settings_custom_check_dns_preset_cloudflare">Cloudflare</string>
+    <string name="settings_custom_check_dns_preset_google">Google</string>
+    <string name="settings_custom_check_dns_preset_yandex">Yandex</string>
+    <string name="settings_custom_check_dns_servers">سرورهای DNS (با کاما)</string>
+    <string name="settings_custom_check_doh_url">DoH URL</string>
+    <string name="settings_custom_check_doh_bootstrap">IPهای Bootstrap (با کاما)</string>
+
+    <!-- GeoIP builtin providers -->
+    <string name="settings_custom_check_geoip_provider_ipapi_is">ipapi.is (داخلی)</string>
+    <string name="settings_custom_check_geoip_provider_iplocate">iplocate.io (داخلی)</string>
+    <string name="settings_custom_check_geoip_provider_ipquery">ipquery.io (داخلی)</string>
+    <string name="settings_custom_check_geoip_provider_iplookup">iplookup.it (داخلی)</string>
+    <string name="settings_custom_check_geoip_provider_ipbot">ipbot.com (داخلی)</string>
+
+    <string name="settings_custom_check_target_host">هاست</string>
+    <string name="settings_custom_check_target_label">برچسب (اختیاری)</string>
+
+    <!-- Check sections -->
+    <string name="settings_custom_check_section_geo_ip">GeoIP</string>
+    <string name="settings_custom_check_section_ip_comparison">مقایسه IP</string>
+    <string name="settings_custom_check_section_cdn_pulling">CDN pulling</string>
+    <string name="settings_custom_check_section_direct_signs">نشانه‌های مستقیم</string>
+    <string name="settings_custom_check_section_indirect_signs">نشانه‌های غیرمستقیم</string>
+    <string name="settings_custom_check_section_native_signs">نشانه‌های بومی</string>
+    <string name="settings_custom_check_section_location_signals">سیگنال‌های مکانی</string>
+    <string name="settings_custom_check_section_icmp_spoofing">جعل ICMP</string>
+    <string name="settings_custom_check_section_rtt_triangulation">مثلث‌بندی RTT</string>
+    <string name="settings_custom_check_section_call_transport">Call transport</string>
+    <string name="settings_custom_check_section_split_tunnel">Split tunnel</string>
+    <string name="settings_custom_check_section_domain_reachability">دسترس‌پذیری دامنه</string>
+    <string name="settings_custom_check_section_domain_reachability_desc">دامنه‌های پیکربندی‌شده برای مسدودسازی در سطح DPI از طریق DNS، TCP و دست‌دهی TLS آزمایش می‌شوند.</string>
+    <string name="settings_custom_check_add_reachability_domain">افزودن دامنه</string>
+    <string name="settings_custom_check_reachability_blocked_in_generic">برای این نوع، از بخش «دسترس‌پذیری دامنه» استفاده کنید.</string>
+    <string name="editor_summary_domain_reachability">%1$d دامنه</string>
+
+    <!-- Endpoint Mapper -->
+    <string name="endpoint_mapper_title">Endpoint mapper</string>
+    <string name="endpoint_mapper_scope_ru">RU</string>
+    <string name="endpoint_mapper_scope_non_ru">NON_RU</string>
+    <string name="endpoint_mapper_url_hint">آدرس Endpoint</string>
+    <string name="endpoint_mapper_label_hint">برچسب (اختیاری)</string>
+    <string name="endpoint_mapper_test_button">درخواست آزمایشی</string>
+    <string name="endpoint_mapper_response_label">پاسخ</string>
+    <string name="endpoint_mapper_detected_type">نوع تشخیص داده‌شده: %1$s</string>
+    <string name="endpoint_mapper_mapping_section">نگاشت فیلد (JSONPath / کلید / regex)</string>
+    <string name="endpoint_mapper_field_ip">مسیر IP</string>
+    <string name="endpoint_mapper_field_country_code">مسیر کد کشور</string>
+    <string name="endpoint_mapper_field_country_name">مسیر نام کشور</string>
+    <string name="endpoint_mapper_field_isp">مسیر ISP</string>
+    <string name="endpoint_mapper_field_org">مسیر سازمان</string>
+    <string name="endpoint_mapper_field_asn">مسیر ASN</string>
+    <string name="endpoint_mapper_field_is_hosting">مسیر نشانگر hosting</string>
+    <string name="endpoint_mapper_field_is_proxy">مسیر نشانگر proxy</string>
+    <string name="endpoint_mapper_error_network">خطای شبکه</string>
+
+    <!-- Badges -->
+    <string name="badge_official">رسمی</string>
+    <string name="badge_verified">تأیید شده</string>
+
+    <!-- Actions -->
+    <string name="action_activate">فعال کردن</string>
+    <string name="action_deactivate">غیرفعال کردن</string>
+    <string name="action_edit">ویرایش</string>
+    <string name="action_clone">کپی</string>
+    <string name="action_export">صادر کردن</string>
+    <string name="action_delete">حذف</string>
+
+    <!-- Import intent label -->
+    <string name="import_rkncheck_label">باز کردن با RKNHardering</string>
+    <string name="import_rkncheck_hint">برای بارگذاری پروفایل به تنظیمات → بررسی‌های سفارشی → وارد کردن بروید</string>
+
+    <!-- Marketplace -->
+    <string name="marketplace_search_hint">جستجو بر اساس نام، نویسنده، توضیحات…</string>
+    <string name="marketplace_retry">تلاش مجدد</string>
+    <string name="marketplace_empty">پروفایلی یافت نشد</string>
+    <string name="marketplace_error_unknown">خطای ناشناخته</string>
+    <string name="marketplace_meta_format">از %1$s · v%2$s</string>
+    <string name="marketplace_install_count">%1$d نصب</string>
+    <string name="marketplace_action_install">نصب</string>
+    <string name="marketplace_action_clone_edit">کپی و ویرایش</string>
+    <string name="marketplace_preview_author">نویسنده: %1$s</string>
+    <string name="marketplace_preview_version">نسخه: %1$s</string>
+    <string name="marketplace_install_done">پروفایل «%1$s» نصب شد</string>
+    <string name="marketplace_install_failed">نصب پروفایل ناموفق بود</string>
+
+    <!-- Security warning -->
+    <string name="security_warning_title">⚠️ پروفایل تأیید نشده است</string>
+    <string name="security_warning_message">پروفایل «%1$s» توسط نگهدارندگان مخزن تأیید نشده است. این پروفایل شامل endpointهای شبکه سفارشی زیر است:\n\n%2$s\n\nتنها در صورت اعتماد به نویسنده نصب کنید.</string>
+    <string name="security_warning_no_custom_urls">هیچ endpoint سفارشی تعریف نشده است.</string>
+    <string name="security_warning_install_anyway">در هر صورت نصب کن</string>
+    <string name="security_warning_cancel">انصراف</string>
+
+    <!-- Domain Reachability -->
+    <string name="main_loading_domain_reachability">آزمایش دسترسی دامنه‌ها از طریق DNS، TCP و دست‌دهی TLS.</string>
+    <string name="main_card_domain_reachability">دسترسی دامنه</string>
+    <string name="main_card_domain_reachability_description">آزمایش دامنه‌ها برای مسدودسازی در سطح DPI (DNS، TCP، TLS)</string>
+    <string name="domain_reachability_hint_all_ok">%1$d از %2$d در دسترس</string>
+    <string name="domain_reachability_hint_blocked">%1$d از %2$d مسدود</string>
+
+    <!-- Marketplace stub -->
+    <string name="settings_marketplace_stub">مارکت‌پلیس به‌زودی در دسترس خواهد بود.\n\nپروفایل‌های بررسی اجتماعی اینجا قرار می‌گیرند.</string>
+
+    <!-- Profile list redesign -->
+    <string name="profiles_section_active">پروفایل فعال</string>
+    <string name="profiles_create_new">پروفایل جدید</string>
+    <string name="profiles_import">وارد کردن</string>
+    <string name="profiles_installed_marker_cd">نصب شده از مارکت‌پلیس</string>
+    <string name="profile_row_menu_cd">عملیات پروفایل</string>
+    <string name="profile_builtin_standard_name">استاندارد</string>
+    <string name="profile_builtin_standard_desc">پروفایل پیش‌فرض داخلی</string>
+    <string name="profile_subtitle_all_enabled">%1$d بررسی · همه فعال</string>
+    <string name="profile_subtitle_enabled_of">%1$d از %2$d فعال</string>
+    <string name="profile_subtitle_from_marketplace">از مارکت‌پلیس</string>
+    <string name="profile_name_edited_suffix"> (ویرایش‌شده)</string>
+    <string name="settings_custom_check_delete_confirm">این پروفایل حذف شود؟</string>
+
+    <!-- Discover card -->
+    <string name="discover_profiles_title">کشف پروفایل‌ها</string>
+    <string name="discover_profiles_subtitle">منتخب از مارکت‌پلیس</string>
+    <string name="discover_profiles_see_all">همه ›</string>
+    <string name="discover_profiles_empty">هنوز پروفایل منتخبی نیست</string>
+
+    <!-- Editor: checker section accordion -->
+    <string name="editor_checkers_section">بررسی‌ها</string>
+    <string name="editor_checkers_section_count">بررسی‌ها · %1$d</string>
+    <string name="checker_section_disabled_note">برای ویرایش پارامترها، این بررسی را فعال کنید</string>
+    <string name="checker_section_summary_disabled">غیرفعال</string>
+    <string name="editor_summary_geoip">%1$d/%2$d داخلی · %3$d سفارشی</string>
+    <string name="editor_summary_ip_comparison">%1$d/%2$d داخلی · %3$d سفارشی</string>
+    <string name="editor_summary_cdn">%1$d/%2$d داخلی · %3$d سفارشی</string>
+    <string name="editor_summary_x_of_y_active">%1$d/%2$d فعال</string>
+    <string name="editor_summary_targets">%1$d هدف</string>
+    <string name="section_native_signs_description">بررسی‌های JNI برای مسیرها، رابط‌ها، نشانه‌های هوک و نشانه‌های روت. بدون پارامتر اضافه.</string>
+
+    <!-- Inline endpoint editor -->
+    <string name="inline_editor_title_new">endpoint جدید</string>
+    <string name="inline_editor_close_cd">بستن ویرایشگر</string>
+    <string name="inline_editor_url_hint">URL</string>
+    <string name="inline_editor_label_hint">برچسب (اختیاری)</string>
+    <string name="inline_editor_test">آزمایش درخواست</string>
+    <string name="inline_editor_testing">در حال آزمایش…</string>
+    <string name="inline_editor_retest">آزمایش مجدد</string>
+    <string name="inline_editor_field_mapping">نگاشت فیلدها</string>
+    <string name="inline_editor_not_detected">شناسایی نشد</string>
+    <string name="inline_editor_path_hint">JSONPath / کلید / regex</string>
+    <string name="inline_editor_save">ذخیره endpoint</string>
+    <string name="inline_editor_custom_providers">ارائه‌دهندگان سفارشی</string>
+    <string name="inline_editor_custom_endpoints">endpointهای سفارشی</string>
+    <string name="inline_editor_custom_targets">اهداف سفارشی</string>
+    <string name="inline_editor_url_required">URL الزامی است</string>
+    <string name="inline_editor_test_failed">آزمایش ناموفق: %1$s</string>
+    <string name="inline_editor_unknown_error">خطای ناشناخته</string>
+    <string name="inline_editor_result_status">%1$d · %2$d ms</string>
+
+    <!-- Marketplace redesign -->
+    <string name="marketplace_by_author">نویسنده %1$s</string>
+    <string name="marketplace_action_installed">نصب‌شده</string>
+    <string name="marketplace_filter_all">همه</string>
+    <string name="marketplace_filter_official">رسمی</string>
+    <string name="marketplace_filter_verified">تأیید‌شده</string>
+    <string name="marketplace_filter_privacy">حریم خصوصی</string>
+    <string name="marketplace_filter_mobile">موبایل</string>
+
+    <!-- Install dialog redesign -->
+    <string name="install_verified_title">نصب پروفایل تأیید‌شده</string>
+    <string name="install_subtitle_format">%1$s · از %2$s</string>
+    <string name="security_warning_intro">پس از نصب، این پروفایل به URLهای زیر درخواست خواهد فرستاد:</string>
+
+    <!-- Domain reachability expected booleans -->
+    <string name="editor_expected_availability">در دسترس‌بودن مورد انتظار</string>
+    <string name="domain_reachability_hint_mismatch">%1$d از %2$d مغایرت دارد</string>
+    <string name="domain_reachability_hint_all_match">%1$d از %2$d طبق انتظار</string>
+    <string name="domain_reachability_expected_prefix">انتظار:</string>
+    <string name="domain_reachability_test_running">در حال آزمایش DNS → TCP → TLS…</string>
+    <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
 </resources>

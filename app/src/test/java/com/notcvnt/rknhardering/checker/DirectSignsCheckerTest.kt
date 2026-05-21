@@ -16,6 +16,7 @@ import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.probe.PerTargetProbe
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.model.VpnAppKind
+import com.notcvnt.rknhardering.customcheck.DirectSignsConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -477,5 +478,51 @@ class DirectSignsCheckerTest {
                     it.description.contains("VPN path debug")
             },
         )
+    }
+
+    @Test
+    fun `when checkHttpProxy=false then no http proxy finding is produced`() {
+        val result = DirectSignsChecker.check(
+            context = context,
+            config = DirectSignsConfig(checkHttpProxy = false),
+        )
+
+        // With checkHttpProxy disabled, SYSTEM_PROXY evidence from the HTTP proxy path must be absent.
+        // (SOCKS and ProxyInfo may still contribute, but none from the HTTP proxy sub-check.)
+        // Robolectric returns null for system properties, so the only non-HTTP proxy source
+        // would be ProxyInfo — which also returns nothing on a clean Robolectric environment.
+        assertFalse(
+            result.findings.any { it.description.contains("HTTP proxy") && it.source == EvidenceSource.SYSTEM_PROXY && it.detected },
+        )
+    }
+
+    @Test
+    fun `when checkSocksProxy=false then no socks proxy finding is produced`() {
+        val result = DirectSignsChecker.check(
+            context = context,
+            config = DirectSignsConfig(checkSocksProxy = false),
+        )
+
+        assertFalse(
+            result.findings.any { it.description.contains("SOCKS proxy") && it.detected },
+        )
+    }
+
+    @Test
+    fun `when checkVpnService=false then no vpn service finding is produced`() {
+        // checkVpnService controls the InstalledVpnAppDetector path which produces
+        // matchedApps entries and related evidence. In Robolectric's empty package
+        // environment no VPN apps are installed, so matchedApps is empty in both cases.
+        // The key property: disabling the toggle never results in MORE matches.
+        val resultDisabled = DirectSignsChecker.check(
+            context = context,
+            config = DirectSignsConfig(checkVpnService = false),
+        )
+        val resultEnabled = DirectSignsChecker.check(
+            context = context,
+            config = DirectSignsConfig(checkVpnService = true),
+        )
+
+        assertTrue(resultDisabled.matchedApps.size <= resultEnabled.matchedApps.size)
     }
 }

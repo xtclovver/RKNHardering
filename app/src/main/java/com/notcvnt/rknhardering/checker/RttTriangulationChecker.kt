@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.customcheck.RttTriangulationConfig
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -69,8 +70,8 @@ internal object RttTriangulationChecker {
                 ?: throw IOException("No IPv4 address resolved for $host")
             ipv4.hostAddress ?: throw IOException("Resolved IPv4 address is empty for $host")
         },
-        val ping: suspend (String, Int) -> SystemPingProber.PingResult = { address, count ->
-            SystemPingProber.probe(address = address, count = count)
+        val ping: suspend (String, Int, Int) -> SystemPingProber.PingResult = { address, count, replyTimeoutSeconds ->
+            SystemPingProber.probe(address = address, count = count, replyTimeoutSeconds = replyTimeoutSeconds)
         },
     )
 
@@ -81,7 +82,16 @@ internal object RttTriangulationChecker {
         context: Context,
         resolverConfig: DnsResolverConfig,
         geoFacts: GeoIpFacts?,
+        config: RttTriangulationConfig = RttTriangulationConfig(enabled = false),
     ): CategoryResult = withContext(Dispatchers.IO) {
+        if (!config.enabled) {
+            return@withContext CategoryResult(
+                name = "RTT triangulation",
+                detected = false,
+                findings = emptyList(),
+            )
+        }
+
         val resolved = HomeCountryResolver.resolve(context, geoFacts)
 
         if (resolved.country == null) {
@@ -117,15 +127,25 @@ internal object RttTriangulationChecker {
         }
 
         val deps = dependenciesOverride ?: Dependencies()
-        val allSpecs = RU_TARGETS.map { TargetSpec(it, TargetGroup.RU) } +
-            FOREIGN_TARGETS.map { TargetSpec(it, TargetGroup.FOREIGN) }
+        val pingCount = if (config.pingCount > 0) config.pingCount else PING_COUNT
+        val replyTimeoutSeconds = maxOf(1, config.timeoutMs / 1_000)
+
+        val builtinRu = if (config.builtinTargetsEnabled) RU_TARGETS.map { TargetSpec(it, TargetGroup.RU) } else emptyList()
+        val builtinForeign = if (config.builtinTargetsEnabled) FOREIGN_TARGETS.map { TargetSpec(it, TargetGroup.FOREIGN) } else emptyList()
+        val customSpecs = config.customTargets
+            .filter { it.host.isNotBlank() }
+            .map { target ->
+                val group = if (target.expectedLocation.equals("RU", ignoreCase = true)) TargetGroup.RU else TargetGroup.FOREIGN
+                TargetSpec(target.host, group)
+            }
+        val allSpecs = builtinRu + builtinForeign + customSpecs
 
         val outcomes: List<TargetOutcome> = coroutineScope {
             allSpecs.map { spec ->
                 async {
                     val (ip, pingResult) = try {
                         val address = deps.resolveIpv4(spec.host, resolverConfig)
-                        val result = deps.ping(address, PING_COUNT)
+                        val result = deps.ping(address, pingCount, replyTimeoutSeconds)
                         address to result
                     } catch (_: Throwable) {
                         return@async TargetOutcome(

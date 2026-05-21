@@ -250,6 +250,14 @@ data class LocalProxyCheckResult(
     val summaryReason: LocalProxySummaryReason? = null,
 )
 
+data class GeoIpResponse(
+    val provider: String,
+    val isCustom: Boolean,
+    val ip: String? = null,
+    val error: String? = null,
+    val rawBody: String? = null,
+)
+
 data class CategoryResult(
     val name: String,
     val detected: Boolean,
@@ -262,6 +270,7 @@ data class CategoryResult(
     val stunProbeGroups: List<StunProbeGroupResult> = emptyList(),
     val geoFacts: GeoIpFacts? = null,
     val locationFacts: LocationSignalsFacts? = null,
+    val geoIpResponses: List<GeoIpResponse> = emptyList(),
 ) {
     val hasError: Boolean
         get() = findings.any { it.isError }
@@ -361,6 +370,72 @@ data class CdnPullingResult(
     }
 }
 
+// === Domain Reachability (DPI) ===
+
+enum class DomainReachabilityStepStatus {
+    OK,
+    FAILED,
+    SKIPPED,
+}
+
+data class DomainReachabilityResponse(
+    val domain: String,
+    val label: String,
+    val dnsStatus: DomainReachabilityStepStatus,
+    val dnsError: String? = null,
+    val resolvedIps: List<String> = emptyList(),
+    val tcpStatus: DomainReachabilityStepStatus = DomainReachabilityStepStatus.SKIPPED,
+    val tcpError: String? = null,
+    val tlsStatus: DomainReachabilityStepStatus = DomainReachabilityStepStatus.SKIPPED,
+    val tlsError: String? = null,
+    val expectedDnsAvailable: Boolean = true,
+    val expectedTcpAvailable: Boolean = true,
+    val expectedTlsAvailable: Boolean = true,
+) {
+    val reachable: Boolean
+        get() = dnsStatus == DomainReachabilityStepStatus.OK &&
+            tcpStatus == DomainReachabilityStepStatus.OK &&
+            tlsStatus == DomainReachabilityStepStatus.OK
+
+    val blocked: Boolean
+        get() = dnsStatus == DomainReachabilityStepStatus.FAILED ||
+            tcpStatus == DomainReachabilityStepStatus.FAILED ||
+            tlsStatus == DomainReachabilityStepStatus.FAILED
+
+    val blockStage: String?
+        get() = when {
+            dnsStatus == DomainReachabilityStepStatus.FAILED -> "DNS"
+            tcpStatus == DomainReachabilityStepStatus.FAILED -> "TCP"
+            tlsStatus == DomainReachabilityStepStatus.FAILED -> "TLS"
+            else -> null
+        }
+
+    /** true when every step matches the expected availability */
+    val matchesExpectation: Boolean
+        get() {
+            val dnsOk = (dnsStatus == DomainReachabilityStepStatus.OK) == expectedDnsAvailable
+            val tcpOk = if (dnsStatus == DomainReachabilityStepStatus.FAILED) true
+                else (tcpStatus == DomainReachabilityStepStatus.OK) == expectedTcpAvailable
+            val tlsOk = if (tcpStatus != DomainReachabilityStepStatus.OK) true
+                else (tlsStatus == DomainReachabilityStepStatus.OK) == expectedTlsAvailable
+            return dnsOk && tcpOk && tlsOk
+        }
+}
+
+data class DomainReachabilityResult(
+    val responses: List<DomainReachabilityResponse> = emptyList(),
+) {
+    val reachableCount: Int get() = responses.count { it.reachable }
+    val blockedCount: Int get() = responses.count { it.blocked }
+    val totalCount: Int get() = responses.size
+    val hasBlocked: Boolean get() = blockedCount > 0
+    val isEmpty: Boolean get() = responses.isEmpty()
+
+    companion object {
+        fun empty(): DomainReachabilityResult = DomainReachabilityResult()
+    }
+}
+
 data class CheckResult(
     val geoIp: CategoryResult,
     val ipComparison: IpComparisonResult,
@@ -388,4 +463,7 @@ data class CheckResult(
     ),
     val ipConsensus: IpConsensusResult = IpConsensusResult.empty(),
     val operatorWhitelistProbe: OperatorWhitelistProbeResult? = null,
+    val customProfileId: String? = null,
+    val customProfileName: String? = null,
+    val domainReachability: DomainReachabilityResult = DomainReachabilityResult.empty(),
 )

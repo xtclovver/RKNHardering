@@ -55,6 +55,8 @@ import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
+import com.notcvnt.rknhardering.model.DomainReachabilityResult
+import com.notcvnt.rknhardering.model.DomainReachabilityStepStatus
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
@@ -118,6 +120,7 @@ class MainActivity : AppCompatActivity() {
         LOCATION,
         IP_CONSENSUS,
         BYPASS,
+        DOMAIN_REACHABILITY,
     }
 
     private lateinit var btnRunCheck: MaterialButton
@@ -176,6 +179,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var findingsDirect: LinearLayout
     private lateinit var findingsIndirect: LinearLayout
     private lateinit var findingsLocation: LinearLayout
+    private lateinit var cardDomainReachability: MaterialCardView
+    private lateinit var findingsDomainReachability: LinearLayout
     private lateinit var cardBypass: MaterialCardView
     private lateinit var iconBypass: ImageView
     private lateinit var statusBypass: TextView
@@ -293,8 +298,22 @@ class MainActivity : AppCompatActivity() {
         btnExport.setOnClickListener { showExportFormatDialog() }
         observeScanEvents()
 
+        handleRkncheckImportIntent()
+
         if (showAutoUpdateOnboardingIfNeeded()) return
         continueStartupFlow()
+    }
+
+    private fun handleRkncheckImportIntent() {
+        val data = intent?.data ?: return
+        val uriStr = data.toString()
+        if (intent?.action == Intent.ACTION_VIEW && (uriStr.endsWith(".rkncheck", ignoreCase = true) || uriStr.contains(".rkncheck"))) {
+            val settingsIntent = Intent(this, SettingsActivity::class.java).apply {
+                putExtra(SettingsActivity.EXTRA_IMPORT_RKNCHECK_URI, uriStr)
+            }
+            startActivity(settingsIntent)
+            intent.data = null
+        }
     }
 
     private fun continueStartupFlow() {
@@ -428,6 +447,8 @@ class MainActivity : AppCompatActivity() {
         findingsDirect = findViewById(R.id.findingsDirect)
         findingsIndirect = findViewById(R.id.findingsIndirect)
         findingsLocation = findViewById(R.id.findingsLocation)
+        cardDomainReachability = findViewById(R.id.cardDomainReachability)
+        findingsDomainReachability = findViewById(R.id.findingsDomainReachability)
         cardBypass = findViewById(R.id.cardBypass)
         iconBypass = findViewById(R.id.iconBypass)
         statusBypass = findViewById(R.id.statusBypass)
@@ -485,6 +506,7 @@ class MainActivity : AppCompatActivity() {
             Triple(CATEGORY_RTT, getString(R.string.main_card_rtt_triangulation), R.drawable.ic_pin),
             Triple(CATEGORY_LOC, getString(R.string.main_card_location_signals), R.drawable.ic_location_on),
             Triple(CATEGORY_BYP, getString(R.string.settings_split_tunnel), R.drawable.ic_call_split),
+            Triple(CATEGORY_REA, getString(R.string.main_card_domain_reachability), R.drawable.ic_globe),
         )
         specs.forEach { (id, title, iconRes) ->
             val holder = createTileHolder(id)
@@ -525,6 +547,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.cardRttTriangulation
         CATEGORY_LOC -> R.id.cardLocation
         CATEGORY_BYP -> R.id.cardBypass
+        CATEGORY_REA -> R.id.cardDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -540,6 +563,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.headerRttTriangulation
         CATEGORY_LOC -> R.id.headerLocation
         CATEGORY_BYP -> R.id.headerBypass
+        CATEGORY_REA -> R.id.headerDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -555,6 +579,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.headerDotRttTriangulation
         CATEGORY_LOC -> R.id.headerDotLocation
         CATEGORY_BYP -> R.id.headerDotBypass
+        CATEGORY_REA -> R.id.headerDotDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -570,6 +595,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.headerIconRttTriangulation
         CATEGORY_LOC -> R.id.headerIconLocation
         CATEGORY_BYP -> R.id.headerIconBypass
+        CATEGORY_REA -> R.id.headerIconDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -585,6 +611,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.headerTitleRttTriangulation
         CATEGORY_LOC -> R.id.headerTitleLocation
         CATEGORY_BYP -> R.id.headerTitleBypass
+        CATEGORY_REA -> R.id.headerTitleDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -600,6 +627,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.headerHintRttTriangulation
         CATEGORY_LOC -> R.id.headerHintLocation
         CATEGORY_BYP -> R.id.headerHintBypass
+        CATEGORY_REA -> R.id.headerHintDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -615,6 +643,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.chevronRttTriangulation
         CATEGORY_LOC -> R.id.chevronLocation
         CATEGORY_BYP -> R.id.chevronBypass
+        CATEGORY_REA -> R.id.chevronDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -630,6 +659,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_RTT -> R.id.bodyRttTriangulation
         CATEGORY_LOC -> R.id.bodyLocation
         CATEGORY_BYP -> R.id.bodyBypass
+        CATEGORY_REA -> R.id.bodyDomainReachability
         else -> error("Unknown category id: $id")
     }
 
@@ -1006,7 +1036,7 @@ class MainActivity : AppCompatActivity() {
             dohBootstrapPref = SettingsActivity.PREF_DNS_RESOLVER_DOH_BOOTSTRAP,
         )
 
-        val settings = CheckSettings(
+        val baseSettings = CheckSettings(
             splitTunnelEnabled = splitTunnelEnabled,
             proxyScanEnabled = proxyScanEnabled,
             xrayApiScanEnabled = xrayApiScanEnabled,
@@ -1023,7 +1053,11 @@ class MainActivity : AppCompatActivity() {
             portRangeEnd = portRangeEnd,
         )
 
-        viewModel.startScan(settings, privacyMode)
+        val customEnabled = prefs.getBoolean(SettingsActivity.PREF_CUSTOM_CHECKS_ENABLED, false)
+        val activeProfile = if (customEnabled) com.notcvnt.rknhardering.customcheck.CustomCheckRunner.getActiveProfile(this) else null
+        val effectiveSettings = activeProfile?.let { com.notcvnt.rknhardering.customcheck.CustomCheckRunner.toCheckSettings(it, baseSettings) } ?: baseSettings
+
+        viewModel.startScan(effectiveSettings, privacyMode)
     }
 
     private fun observeScanEvents() {
@@ -1084,6 +1118,7 @@ class MainActivity : AppCompatActivity() {
         resetBypassProgress()
         clearStageContent()
         resetAllTiles()
+        applyTileVisibilityFromSettings(settings)
         if (settings.callTransportProbeEnabled) {
             setTileStatus(CATEGORY_STN, TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
         }
@@ -1094,6 +1129,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAllLoadingCardsNow(settings: CheckSettings) {
         enabledStages(settings).forEach { stage -> showLoadingCardForStage(stage) }
+    }
+
+    private fun applyTileVisibilityFromSettings(settings: CheckSettings) {
+        val enabledTileIds = enabledStages(settings).map { tileIdForStage(it) }.toMutableSet()
+        if (settings.callTransportProbeEnabled) {
+            enabledTileIds += CATEGORY_STN
+        }
+        tiles.forEach { (id, holder) ->
+            holder.card.visibility = if (id in enabledTileIds) View.VISIBLE else View.GONE
+        }
     }
 
     private fun applyScanEvent(event: ScanEvent, animate: Boolean) {
@@ -1171,6 +1216,127 @@ class MainActivity : AppCompatActivity() {
             )
             updateTileFromCategory(CATEGORY_ICM, result.icmpSpoofing)
         }
+
+        if (cardDomainReachability.isVisible || !result.domainReachability.isEmpty) {
+            displayDomainReachability(result.domainReachability)
+            updateTileFromDomainReachability(result.domainReachability)
+        }
+    }
+
+    private fun displayDomainReachability(result: DomainReachabilityResult) {
+        findingsDomainReachability.removeAllViews()
+        if (result.isEmpty) return
+
+        result.responses.forEach { response ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 8.dp, 0, 8.dp)
+            }
+
+            // Header with match/mismatch indicator
+            val matchIcon = if (response.matchesExpectation) "✅" else "⚠\uFE0F"
+            val header = TextView(this).apply {
+                text = "$matchIcon ${response.label}"
+                setTextColor(resolveTextColorPrimary())
+                textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            }
+            row.addView(header)
+
+            val stepsLine = TextView(this).apply {
+                val dns = stepIcon(response.dnsStatus)
+                val tcp = stepIcon(response.tcpStatus)
+                val tls = stepIcon(response.tlsStatus)
+                text = buildString {
+                    append("DNS $dns")
+                    append("  \u2192  ")
+                    append("TCP $tcp")
+                    append("  \u2192  ")
+                    append("TLS $tls")
+                }
+                textSize = 12f
+                setTextColor(resolveTextColorSecondary())
+            }
+            row.addView(stepsLine)
+
+            // Show expected line when not all expected=true (custom expectations)
+            val hasCustomExpectations = !response.expectedDnsAvailable || !response.expectedTcpAvailable || !response.expectedTlsAvailable
+            if (hasCustomExpectations) {
+                val expectedLine = TextView(this).apply {
+                    val dn = if (response.expectedDnsAvailable) "\u2705" else "\u274C"
+                    val tc = if (response.expectedTcpAvailable) "\u2705" else "\u274C"
+                    val tl = if (response.expectedTlsAvailable) "\u2705" else "\u274C"
+                    text = getString(R.string.domain_reachability_expected_prefix) + " DNS $dn  TCP $tc  TLS $tl"
+                    textSize = 11f
+                    setTextColor(resolveTextColorSecondary())
+                    setPadding(0, 2.dp, 0, 0)
+                }
+                row.addView(expectedLine)
+            }
+
+            // Show error detail if any step failed
+            val errorDetail = when {
+                response.dnsStatus == DomainReachabilityStepStatus.FAILED ->
+                    response.dnsError?.let { "DNS: $it" }
+                response.tcpStatus == DomainReachabilityStepStatus.FAILED ->
+                    response.tcpError?.let { "TCP: $it" }
+                response.tlsStatus == DomainReachabilityStepStatus.FAILED ->
+                    response.tlsError?.let { "TLS: $it" }
+                else -> null
+            }
+            if (errorDetail != null) {
+                val errorView = TextView(this).apply {
+                    text = errorDetail
+                    textSize = 11f
+                    setTextColor(statusColor(StatusSemantic.DETECTED))
+                    setPadding(0, 2.dp, 0, 0)
+                }
+                row.addView(errorView)
+            }
+
+            findingsDomainReachability.addView(row)
+        }
+        findingsDomainReachability.visibility = View.VISIBLE
+    }
+
+    private fun stepIcon(status: DomainReachabilityStepStatus): String = when (status) {
+        DomainReachabilityStepStatus.OK -> "✅"
+        DomainReachabilityStepStatus.FAILED -> "❌"
+        DomainReachabilityStepStatus.SKIPPED -> "⏭"
+    }
+
+    private fun resolveTextColorPrimary(): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
+        return getColor(tv.resourceId)
+    }
+
+    private fun resolveTextColorSecondary(): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.textColorSecondary, tv, true)
+        return getColor(tv.resourceId)
+    }
+
+    private fun updateTileFromDomainReachability(result: DomainReachabilityResult) {
+        if (result.isEmpty) return
+        val mismatchCount = result.responses.count { !it.matchesExpectation }
+        val status = when {
+            mismatchCount > 0 -> TILE_STATUS_DETECTED
+            else -> TILE_STATUS_CLEAN
+        }
+        val hint = if (mismatchCount > 0) {
+            getString(R.string.domain_reachability_hint_mismatch, mismatchCount, result.totalCount)
+        } else {
+            getString(R.string.domain_reachability_hint_all_match, result.responses.size, result.totalCount)
+        }
+        setTileStatus(CATEGORY_REA, status, hint)
+    }
+
+    private fun showDomainReachabilityLoading(stage: RunningStage) {
+        findingsDomainReachability.removeAllViews()
+        findingsDomainReachability.addView(createLoadingHintView(stageLoadingMessage(stage)))
+        findingsDomainReachability.visibility = View.VISIBLE
+        ensureCardVisible(cardDomainReachability)
     }
 
     private fun clearStageContent() {
@@ -1219,6 +1385,9 @@ class MainActivity : AppCompatActivity() {
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
 
+        findingsDomainReachability.removeAllViews()
+        findingsDomainReachability.visibility = View.GONE
+
         ipChannelsContainer.removeAllViews()
         cardIpChannels.visibility = View.GONE
 
@@ -1228,8 +1397,8 @@ class MainActivity : AppCompatActivity() {
     private fun enabledStages(settings: CheckSettings): List<RunningStage> {
         val stages = mutableListOf<RunningStage>()
         if (settings.networkRequestsEnabled) {
-            stages += RunningStage.GEO_IP
-            stages += RunningStage.IP_COMPARISON
+            if (settings.geoIp.enabled) stages += RunningStage.GEO_IP
+            if (settings.ipComparison.enabled) stages += RunningStage.IP_COMPARISON
             if (settings.cdnPullingEnabled) {
                 stages += RunningStage.CDN_PULLING
             }
@@ -1240,15 +1409,18 @@ class MainActivity : AppCompatActivity() {
                 stages += RunningStage.RTT_TRIANGULATION
             }
         }
-        stages += RunningStage.DIRECT
-        stages += RunningStage.INDIRECT
-        stages += RunningStage.NATIVE_SIGNS
-        stages += RunningStage.LOCATION
+        if (settings.directSigns.enabled) stages += RunningStage.DIRECT
+        if (settings.indirectSigns.enabled) stages += RunningStage.INDIRECT
+        if (settings.nativeSignsEnabled) stages += RunningStage.NATIVE_SIGNS
+        if (settings.locationSignals.enabled) stages += RunningStage.LOCATION
         if (settings.networkRequestsEnabled || settings.splitTunnelEnabled) {
             stages += RunningStage.IP_CONSENSUS
         }
         if (settings.splitTunnelEnabled) {
             stages += RunningStage.BYPASS
+        }
+        if (settings.domainReachabilityEnabled && settings.reachabilityDomains.isNotEmpty()) {
+            stages += RunningStage.DOMAIN_REACHABILITY
         }
         return stages
     }
@@ -1382,6 +1554,13 @@ class MainActivity : AppCompatActivity() {
             is CheckUpdate.IpConsensusReady -> {
                 markStageCompleted(RunningStage.IP_CONSENSUS)
             }
+            is CheckUpdate.DomainReachabilityReady -> {
+                markStageCompleted(RunningStage.DOMAIN_REACHABILITY)
+                ensureCardVisible(cardDomainReachability)
+                displayDomainReachability(update.result)
+                updateTileFromDomainReachability(update.result)
+                if (animate) animateContentReveal(findingsDomainReachability)
+            }
             is CheckUpdate.VerdictReady -> {
                 Unit
             }
@@ -1400,6 +1579,7 @@ class MainActivity : AppCompatActivity() {
         RunningStage.LOCATION -> CATEGORY_LOC
         RunningStage.IP_CONSENSUS -> CATEGORY_IPS
         RunningStage.BYPASS -> CATEGORY_BYP
+        RunningStage.DOMAIN_REACHABILITY -> CATEGORY_REA
     }
 
     private fun showLoadingCardForStage(stage: RunningStage) {
@@ -1476,6 +1656,7 @@ class MainActivity : AppCompatActivity() {
             )
             RunningStage.IP_CONSENSUS -> Unit
             RunningStage.BYPASS -> showBypassLoading(stage)
+            RunningStage.DOMAIN_REACHABILITY -> showDomainReachabilityLoading(stage)
         }
         syncLoadingStatusAnimation()
     }
@@ -1601,6 +1782,11 @@ class MainActivity : AppCompatActivity() {
                 )
                 RunningStage.IP_CONSENSUS -> Unit
                 RunningStage.BYPASS -> showBypassStopped(stage)
+                RunningStage.DOMAIN_REACHABILITY -> {
+                    findingsDomainReachability.removeAllViews()
+                    findingsDomainReachability.addView(createLoadingHintView(stageStoppedMessage(stage)))
+                    findingsDomainReachability.visibility = View.VISIBLE
+                }
             }
         }
         loadingStages.clear()
@@ -1736,6 +1922,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.LOCATION -> getString(R.string.main_loading_location)
             RunningStage.IP_CONSENSUS -> getString(R.string.main_loading_ip_comparison)
             RunningStage.BYPASS -> getString(R.string.main_loading_bypass)
+            RunningStage.DOMAIN_REACHABILITY -> getString(R.string.main_loading_domain_reachability)
         }
     }
 
@@ -1759,6 +1946,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.LOCATION -> cardLocation
             RunningStage.IP_CONSENSUS -> cardIpChannels
             RunningStage.BYPASS -> cardBypass
+            RunningStage.DOMAIN_REACHABILITY -> cardDomainReachability
         }
     }
 
@@ -1775,6 +1963,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.LOCATION -> statusLocation
             RunningStage.IP_CONSENSUS -> statusGeoIp
             RunningStage.BYPASS -> statusBypass
+            RunningStage.DOMAIN_REACHABILITY -> statusGeoIp // No dedicated status view; reuse placeholder
         }
     }
 
@@ -3113,6 +3302,7 @@ class MainActivity : AppCompatActivity() {
         private const val CATEGORY_LOC = "loc"
         private const val CATEGORY_BYP = "byp"
         private const val CATEGORY_NAT = "nat"
+        private const val CATEGORY_REA = "rea"
 
         private const val TILE_STATUS_NEUTRAL = 0
         private const val TILE_STATUS_CLEAN = 1
@@ -3389,6 +3579,10 @@ class MainActivity : AppCompatActivity() {
                 textBypassProgress.text = previewMessageForCategory(id)
                 textBypassProgress.visibility = View.VISIBLE
             }
+            CATEGORY_REA -> {
+                if (findingsDomainReachability.childCount > 0) return
+                syncHintOnlyContainer(findingsDomainReachability, previewMessageForCategory(id))
+            }
         }
     }
 
@@ -3405,6 +3599,7 @@ class MainActivity : AppCompatActivity() {
             CATEGORY_RTT -> getString(R.string.main_preview_rtt_triangulation)
             CATEGORY_LOC -> getString(R.string.main_preview_location)
             CATEGORY_BYP -> getString(R.string.main_preview_bypass)
+            CATEGORY_REA -> getString(R.string.main_preview_domain_reachability)
             else -> getString(R.string.tile_hint_placeholder)
         }
     }

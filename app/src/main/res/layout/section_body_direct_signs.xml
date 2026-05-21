@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchDirectTransportVpn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_custom_check_direct_check_transport_vpn"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchDirectHttpProxy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_direct_check_http_proxy"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchDirectSocksProxy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_direct_check_socks_proxy"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchDirectProxyInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_direct_check_proxy_info"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchDirectVpnService"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_direct_check_vpn_service"
+        android:checked="true" />
+</LinearLayout>

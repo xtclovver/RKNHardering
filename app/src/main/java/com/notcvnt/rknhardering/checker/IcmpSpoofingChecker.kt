@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.customcheck.IcmpSpoofingConfig
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -50,8 +51,8 @@ object IcmpSpoofingChecker {
                 ?: throw IOException("No IPv4 address resolved for $host")
             ipv4.hostAddress ?: throw IOException("Resolved IPv4 address is empty for $host")
         },
-        val ping: suspend (String) -> SystemPingProber.PingResult = { address ->
-            SystemPingProber.probe(address = address)
+        val ping: suspend (String, Int, Int) -> SystemPingProber.PingResult = { address, count, timeoutSeconds ->
+            SystemPingProber.probe(address = address, count = count, replyTimeoutSeconds = timeoutSeconds)
         },
     )
 
@@ -66,17 +67,35 @@ object IcmpSpoofingChecker {
     suspend fun check(
         context: Context,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        config: IcmpSpoofingConfig = IcmpSpoofingConfig(enabled = true),
     ): CategoryResult = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
+
+        val effectiveTargets = buildList {
+            if (config.builtinTargetsEnabled) addAll(defaultTargets)
+            config.customTargets
+                .filter { it.host.isNotBlank() }
+                .forEach { ct ->
+                    add(Target(host = ct.host.trim(), role = if (ct.isControl) Role.CONTROL else Role.BLOCKED))
+                }
+        }
+        if (effectiveTargets.none { it.role == Role.BLOCKED } || effectiveTargets.none { it.role == Role.CONTROL }) {
+            // No usable target pair (need at least one blocked + one control) — return inconclusive.
+            return@withContext unsupportedResult(context, IOException("No usable ICMP target pair configured"))
+        }
+
+        val pingCount = config.pingCount.coerceAtLeast(1)
+        val timeoutSeconds = (config.timeoutMs / 1000).coerceAtLeast(1)
+
         val outcomes = try {
             coroutineScope {
-                defaultTargets.map { target ->
+                effectiveTargets.map { target ->
                     async {
                         val address = dependencies.resolveIpv4(target.host, resolverConfig)
-                        val ping = dependencies.ping(address)
-                        TargetOutcome(target = target, address = address, ping = ping)
+                        val pingResult = dependencies.ping(address, pingCount, timeoutSeconds)
+                        TargetOutcome(target = target, address = address, ping = pingResult)
                     }
                 }.awaitAll()
             }

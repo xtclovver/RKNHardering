@@ -212,6 +212,7 @@
     <string name="main_preview_rtt_triangulation">Будут пингнуты локальные и зарубежные сервисы для сравнения задержек.</string>
     <string name="main_preview_location">Будет выполнен сбор сигналов оператора, вышек и ближайших Wi-Fi точек.</string>
     <string name="main_preview_bypass">Будет выполнен поиск локального split tunnel bypass и доступных proxy endpoints.</string>
+    <string name="main_preview_domain_reachability">Настроенные домены будут проверены на блокировку на уровне DPI через DNS, TCP и TLS handshake.</string>
 
     <string name="main_loading_geo_ip">Сверяем страну, ASN и признаки хостинга.</string>
     <string name="main_loading_ip_comparison">Сравниваем внешний IP через несколько независимых сервисов.</string>
@@ -649,4 +650,269 @@
     <string name="auto_update_onboarding_message">При первом запуске приложение может обратиться к api.github.com и проверить GitHub Releases на наличие новой APK. Если сейчас отказаться, эта проверка не будет выполняться, пока вы вручную не включите её в настройках сети.</string>
     <string name="auto_update_onboarding_enable">Включить</string>
     <string name="auto_update_onboarding_disable">Не включать</string>
+
+    <!-- Custom Checks -->
+    <string name="settings_cat_custom_checks">Кастомные проверки</string>
+    <string name="settings_custom_checks_enabled">Использовать кастомный профиль</string>
+    <string name="settings_custom_checks_active_label">Активный профиль</string>
+    <string name="settings_custom_checks_no_active">Стандартный (встроенный)</string>
+    <string name="settings_custom_check_create">Создать профиль</string>
+    <string name="settings_custom_check_import">Импорт из файла</string>
+    <string name="settings_custom_check_marketplace">Маркетплейс</string>
+    <string name="settings_custom_check_instructions">Инструкции</string>
+    <string name="settings_custom_check_profiles_label">Мои профили</string>
+    <string name="settings_custom_check_export_done">Профиль экспортирован</string>
+    <string name="settings_custom_check_export_failed">Не удалось экспортировать профиль</string>
+    <string name="settings_custom_check_import_done">Профиль импортирован</string>
+    <string name="settings_custom_check_import_failed">Не удалось импортировать профиль</string>
+
+    <!-- Custom Check Editor -->
+    <string name="settings_custom_check_editor_title">Редактор профиля</string>
+    <string name="settings_custom_check_name">Название профиля</string>
+    <string name="settings_custom_check_description">Описание</string>
+    <string name="settings_custom_check_author">Автор</string>
+    <string name="settings_custom_check_version">Версия</string>
+    <string name="settings_custom_check_save">Сохранить</string>
+    <string name="settings_custom_check_cancel">Отмена</string>
+    <string name="settings_custom_check_add_endpoint">Добавить endpoint</string>
+    <string name="settings_custom_check_name_required">Требуется название профиля</string>
+    <string name="settings_custom_check_no_checks_enabled">Включите хотя бы одну проверку для сохранения профиля</string>
+    <string name="settings_custom_check_dependency_required">«%1$s» требует «%2$s» — включена автоматически</string>
+    <string name="settings_custom_check_timeout_ms">Таймаут (мс)</string>
+    <string name="settings_custom_check_ping_count">Количество пингов</string>
+
+    <!-- Custom Check Editor: sub-toggles -->
+    <string name="settings_custom_check_ip_builtin_ru">Использовать встроенные RU-чекеры</string>
+    <string name="settings_custom_check_ip_builtin_non_ru">Использовать встроенные non-RU чекеры</string>
+    <string name="settings_custom_check_cdn_builtin_targets">Использовать встроенные CDN-цели</string>
+    <string name="settings_custom_check_cdn_meduza">Включить meduza.io</string>
+    <string name="settings_custom_check_cdn_rutracker">Включить rutracker.org</string>
+    <string name="settings_custom_check_direct_check_transport_vpn">Проверять VPN transport capability</string>
+    <string name="settings_custom_check_direct_check_http_proxy">Проверять HTTP proxy</string>
+    <string name="settings_custom_check_direct_check_socks_proxy">Проверять SOCKS proxy</string>
+    <string name="settings_custom_check_direct_check_proxy_info">Проверять ProxyInfo (per-network)</string>
+    <string name="settings_custom_check_direct_check_vpn_service">Проверять установленные VPN-приложения</string>
+    <string name="settings_custom_check_indirect_not_vpn_cap">Проверять NOT_VPN capability</string>
+    <string name="settings_custom_check_indirect_vpn_interfaces">Проверять VPN-интерфейсы</string>
+    <string name="settings_custom_check_indirect_mtu_anomaly">Проверять аномалию MTU</string>
+    <string name="settings_custom_check_indirect_ipsec">Проверять IPsec-интерфейсы</string>
+    <string name="settings_custom_check_indirect_routing">Проверять таблицу маршрутов</string>
+    <string name="settings_custom_check_indirect_dns">Проверять конфигурацию DNS</string>
+    <string name="settings_custom_check_indirect_proxy_tools">Проверять proxy-инструменты</string>
+    <string name="settings_custom_check_indirect_local_listeners">Проверять локальные listeners</string>
+    <string name="settings_custom_check_indirect_dumpsys">Проверять dumpsys VPN</string>
+    <string name="settings_custom_check_indirect_listener_port_threshold">Порог числа listener-портов (по умолчанию: 5)</string>
+    <string name="settings_custom_check_location_beacondb">Использовать BeaconDB</string>
+    <string name="settings_custom_check_location_cell_towers">Собирать данные сотовых вышек</string>
+    <string name="settings_custom_check_location_wifi_signals">Собирать WiFi-сигналы</string>
+    <string name="settings_custom_check_icmp_builtin_targets">Использовать встроенные цели</string>
+    <string name="settings_custom_check_add_icmp_target">Добавить ICMP-цель</string>
+    <string name="settings_custom_check_icmp_target_is_control">Контрольная цель</string>
+    <string name="settings_custom_check_rtt_builtin_targets">Использовать встроенные цели</string>
+    <string name="settings_custom_check_add_rtt_target">Добавить RTT-цель</string>
+    <string name="settings_custom_check_rtt_expected_location">Ожидаемая локация (например RU)</string>
+    <string name="settings_custom_check_call_builtin_global_stun">Использовать встроенные глобальные STUN</string>
+    <string name="settings_custom_check_call_builtin_ru_stun">Использовать встроенные RU STUN</string>
+    <string name="settings_custom_check_call_mtproto">Проверять MTProto</string>
+    <string name="settings_custom_check_add_stun_server">Добавить STUN-сервер</string>
+    <string name="settings_custom_check_stun_port">Порт (по умолчанию: 3478)</string>
+    <string name="settings_custom_check_split_proxy_scan">Включить скан proxy</string>
+    <string name="settings_custom_check_split_xray_api_scan">Включить скан Xray API</string>
+    <string name="settings_custom_check_split_connect_timeout">Таймаут подключения (мс, по умолчанию: 300)</string>
+    <string name="settings_custom_check_split_check_underlying_network">Проверять underlying network</string>
+    <string name="settings_custom_check_split_check_vpn_network_binding">Проверять VPN network binding</string>
+    <string name="settings_custom_check_split_check_mtproto_via_proxy">Проверять MTProto через proxy</string>
+    <string name="settings_custom_check_split_port_range_label">Диапазон портов</string>
+
+    <!-- Custom domains section -->
+    <string name="settings_custom_check_section_custom_domains">Кастомные домены</string>
+    <string name="settings_custom_check_add_custom_domain">Добавить домен</string>
+    <string name="settings_custom_check_domain_field">Домен (example.com)</string>
+    <string name="settings_custom_check_check_type_field">Тип проверки (http/dns/tcp)</string>
+    <string name="settings_custom_check_description_field">Описание</string>
+
+    <!-- Network configuration section -->
+    <string name="settings_custom_check_section_network_config">Сетевая конфигурация</string>
+    <string name="settings_custom_check_network_requests">Сетевые запросы</string>
+    <string name="settings_custom_check_dns_mode">Режим DNS</string>
+    <string name="settings_custom_check_dns_mode_system">Системный</string>
+    <string name="settings_custom_check_dns_mode_direct">Прямой</string>
+    <string name="settings_custom_check_dns_mode_doh">DoH</string>
+    <string name="settings_custom_check_dns_preset">Пресет DNS</string>
+    <string name="settings_custom_check_dns_preset_custom">Свой</string>
+    <string name="settings_custom_check_dns_preset_cloudflare">Cloudflare</string>
+    <string name="settings_custom_check_dns_preset_google">Google</string>
+    <string name="settings_custom_check_dns_preset_yandex">Yandex</string>
+    <string name="settings_custom_check_dns_servers">Серверы DNS (через запятую)</string>
+    <string name="settings_custom_check_doh_url">DoH URL</string>
+    <string name="settings_custom_check_doh_bootstrap">Bootstrap IPs (через запятую)</string>
+
+    <!-- GeoIP builtin providers -->
+    <string name="settings_custom_check_geoip_provider_ipapi_is">ipapi.is (встроенный)</string>
+    <string name="settings_custom_check_geoip_provider_iplocate">iplocate.io (встроенный)</string>
+    <string name="settings_custom_check_geoip_provider_ipquery">ipquery.io (встроенный)</string>
+    <string name="settings_custom_check_geoip_provider_iplookup">iplookup.it (встроенный)</string>
+    <string name="settings_custom_check_geoip_provider_ipbot">ipbot.com (встроенный)</string>
+
+    <string name="settings_custom_check_target_host">Хост</string>
+    <string name="settings_custom_check_target_label">Метка (необязательно)</string>
+
+    <!-- Check sections -->
+    <string name="settings_custom_check_section_geo_ip">GeoIP</string>
+    <string name="settings_custom_check_section_ip_comparison">Сравнение IP</string>
+    <string name="settings_custom_check_section_cdn_pulling">CDN pulling</string>
+    <string name="settings_custom_check_section_direct_signs">Прямые признаки</string>
+    <string name="settings_custom_check_section_indirect_signs">Косвенные признаки</string>
+    <string name="settings_custom_check_section_native_signs">Нативные признаки</string>
+    <string name="settings_custom_check_section_location_signals">Сигналы геолокации</string>
+    <string name="settings_custom_check_section_icmp_spoofing">Подмена ICMP</string>
+    <string name="settings_custom_check_section_rtt_triangulation">RTT-триангуляция</string>
+    <string name="settings_custom_check_section_call_transport">Call transport</string>
+    <string name="settings_custom_check_section_split_tunnel">Split tunnel</string>
+    <string name="settings_custom_check_section_domain_reachability">Доступность доменов</string>
+    <string name="settings_custom_check_section_domain_reachability_desc">Указанные домены будут проверены на блокировку DPI через DNS, TCP и TLS-рукопожатие.</string>
+    <string name="settings_custom_check_add_reachability_domain">Добавить домен</string>
+    <string name="settings_custom_check_reachability_blocked_in_generic">Для этого типа используйте секцию «Доступность доменов».</string>
+    <string name="editor_summary_domain_reachability">%1$d доменов</string>
+
+    <!-- Endpoint Mapper -->
+    <string name="endpoint_mapper_title">Маппер endpoint</string>
+    <string name="endpoint_mapper_scope_ru">RU</string>
+    <string name="endpoint_mapper_scope_non_ru">NON_RU</string>
+    <string name="endpoint_mapper_url_hint">URL endpoint</string>
+    <string name="endpoint_mapper_label_hint">Метка (необязательно)</string>
+    <string name="endpoint_mapper_test_button">Тестовый запрос</string>
+    <string name="endpoint_mapper_response_label">Ответ</string>
+    <string name="endpoint_mapper_detected_type">Определённый тип: %1$s</string>
+    <string name="endpoint_mapper_mapping_section">Маппинг полей (JSONPath / ключ / regex)</string>
+    <string name="endpoint_mapper_field_ip">Путь к IP</string>
+    <string name="endpoint_mapper_field_country_code">Путь к коду страны</string>
+    <string name="endpoint_mapper_field_country_name">Путь к названию страны</string>
+    <string name="endpoint_mapper_field_isp">Путь к ISP</string>
+    <string name="endpoint_mapper_field_org">Путь к организации</string>
+    <string name="endpoint_mapper_field_asn">Путь к ASN</string>
+    <string name="endpoint_mapper_field_is_hosting">Путь к признаку хостинга</string>
+    <string name="endpoint_mapper_field_is_proxy">Путь к признаку прокси</string>
+    <string name="endpoint_mapper_error_network">Ошибка сети</string>
+
+    <!-- Badges -->
+    <string name="badge_official">Официальный</string>
+    <string name="badge_verified">Проверенный</string>
+
+    <!-- Actions -->
+    <string name="action_activate">Активировать</string>
+    <string name="action_deactivate">Деактивировать</string>
+    <string name="action_edit">Редактировать</string>
+    <string name="action_clone">Клонировать</string>
+    <string name="action_export">Экспорт</string>
+    <string name="action_delete">Удалить</string>
+
+    <!-- Import intent label -->
+    <string name="import_rkncheck_label">Открыть в RKNHardering</string>
+    <string name="import_rkncheck_hint">Откройте Настройки → Кастомные проверки → Импорт для загрузки профиля</string>
+
+    <!-- Marketplace -->
+    <string name="marketplace_search_hint">Поиск по названию, автору, описанию…</string>
+    <string name="marketplace_retry">Повторить</string>
+    <string name="marketplace_empty">Профили не найдены</string>
+    <string name="marketplace_error_unknown">Неизвестная ошибка</string>
+    <string name="marketplace_meta_format">от %1$s · v%2$s</string>
+    <string name="marketplace_install_count">%1$d установок</string>
+    <string name="marketplace_action_install">Установить</string>
+    <string name="marketplace_action_clone_edit">Клонировать и редактировать</string>
+    <string name="marketplace_preview_author">Автор: %1$s</string>
+    <string name="marketplace_preview_version">Версия: %1$s</string>
+    <string name="marketplace_install_done">Профиль «%1$s» установлен</string>
+    <string name="marketplace_install_failed">Не удалось установить профиль</string>
+
+    <!-- Security warning -->
+    <string name="security_warning_title">⚠️ Профиль не верифицирован</string>
+    <string name="security_warning_message">Профиль «%1$s» не верифицирован сопровождающими репозитория. Он содержит следующие кастомные сетевые endpoints:\n\n%2$s\n\nУстанавливайте только если доверяете автору.</string>
+    <string name="security_warning_no_custom_urls">Кастомные endpoints не объявлены.</string>
+    <string name="security_warning_install_anyway">Всё равно установить</string>
+    <string name="security_warning_cancel">Отмена</string>
+
+    <!-- Domain Reachability -->
+    <string name="main_loading_domain_reachability">Проверка доступности доменов через DNS, TCP и TLS-рукопожатие.</string>
+    <string name="main_card_domain_reachability">Доступность доменов</string>
+    <string name="main_card_domain_reachability_description">Проверяет домены на блокировку уровня DPI (DNS, TCP, TLS)</string>
+    <string name="domain_reachability_hint_all_ok">Доступно %1$d из %2$d</string>
+    <string name="domain_reachability_hint_blocked">Заблокировано %1$d из %2$d</string>
+
+    <!-- Marketplace stub -->
+    <string name="settings_marketplace_stub">Маркетплейс скоро будет доступен.\n\nЗдесь появятся профили проверок от сообщества.</string>
+
+    <!-- Profile list redesign -->
+    <string name="profiles_section_active">Активный профиль</string>
+    <string name="profiles_create_new">Создать профиль</string>
+    <string name="profiles_import">Импорт</string>
+    <string name="profiles_installed_marker_cd">Установлен из маркетплейса</string>
+    <string name="profile_row_menu_cd">Действия с профилем</string>
+    <string name="profile_builtin_standard_name">Стандартный</string>
+    <string name="profile_builtin_standard_desc">Встроенный профиль проверок по умолчанию</string>
+    <string name="profile_subtitle_all_enabled">%1$d проверок · все включены</string>
+    <string name="profile_subtitle_enabled_of">%1$d из %2$d включены</string>
+    <string name="profile_subtitle_from_marketplace">из маркетплейса</string>
+    <string name="profile_name_edited_suffix"> (изменено)</string>
+    <string name="settings_custom_check_delete_confirm">Удалить этот профиль?</string>
+
+    <!-- Discover card -->
+    <string name="discover_profiles_title">Открыть профили</string>
+    <string name="discover_profiles_subtitle">Избранное из маркетплейса</string>
+    <string name="discover_profiles_see_all">Все ›</string>
+    <string name="discover_profiles_empty">Пока нет избранных профилей</string>
+
+    <!-- Editor: checker section accordion -->
+    <string name="editor_checkers_section">Проверки</string>
+    <string name="editor_checkers_section_count">Проверки · %1$d</string>
+    <string name="checker_section_disabled_note">Включите проверку, чтобы изменить параметры</string>
+    <string name="checker_section_summary_disabled">Отключено</string>
+    <string name="editor_summary_geoip">%1$d/%2$d встроенных · %3$d кастомных</string>
+    <string name="editor_summary_ip_comparison">%1$d/%2$d встроенных · %3$d кастомных</string>
+    <string name="editor_summary_cdn">%1$d/%2$d встроенных · %3$d кастомных</string>
+    <string name="editor_summary_x_of_y_active">%1$d/%2$d активно</string>
+    <string name="editor_summary_targets">%1$d целей</string>
+    <string name="section_native_signs_description">JNI-проверки маршрутов, интерфейсов, hook-маркеров и root-признаков. Дополнительных параметров нет.</string>
+
+    <!-- Inline endpoint editor -->
+    <string name="inline_editor_title_new">Новый endpoint</string>
+    <string name="inline_editor_close_cd">Закрыть редактор</string>
+    <string name="inline_editor_url_hint">URL</string>
+    <string name="inline_editor_label_hint">Подпись (опционально)</string>
+    <string name="inline_editor_test">Тестовый запрос</string>
+    <string name="inline_editor_testing">Проверка…</string>
+    <string name="inline_editor_retest">Повтор</string>
+    <string name="inline_editor_field_mapping">Маппинг полей</string>
+    <string name="inline_editor_not_detected">не определено</string>
+    <string name="inline_editor_path_hint">JSONPath / ключ / regex</string>
+    <string name="inline_editor_save">Сохранить endpoint</string>
+    <string name="inline_editor_custom_providers">Кастомные провайдеры</string>
+    <string name="inline_editor_custom_endpoints">Кастомные endpoints</string>
+    <string name="inline_editor_custom_targets">Кастомные цели</string>
+    <string name="inline_editor_url_required">Укажите URL</string>
+    <string name="inline_editor_test_failed">Ошибка запроса: %1$s</string>
+    <string name="inline_editor_unknown_error">неизвестная ошибка</string>
+    <string name="inline_editor_result_status">%1$d · %2$d мс</string>
+
+    <!-- Marketplace redesign -->
+    <string name="marketplace_by_author">от %1$s</string>
+    <string name="marketplace_action_installed">Установлено</string>
+    <string name="marketplace_filter_all">Все</string>
+    <string name="marketplace_filter_official">Official</string>
+    <string name="marketplace_filter_verified">Verified</string>
+    <string name="marketplace_filter_privacy">Приватность</string>
+    <string name="marketplace_filter_mobile">Мобильные</string>
+
+    <!-- Install dialog redesign -->
+    <string name="install_verified_title">Установить проверенный профиль</string>
+    <string name="install_subtitle_format">%1$s · от %2$s</string>
+    <string name="security_warning_intro">При использовании профиля будут делаться запросы к следующим URL:</string>
+
+    <!-- Domain reachability expected booleans -->
+    <string name="editor_expected_availability">ОЖИДАЕМАЯ ДОСТУПНОСТЬ</string>
+    <string name="domain_reachability_hint_mismatch">%1$d из %2$d не совпадает</string>
+    <string name="domain_reachability_hint_all_match">%1$d из %2$d как ожидалось</string>
+    <string name="domain_reachability_expected_prefix">Ожидается:</string>
+    <string name="domain_reachability_test_running">Тестирование DNS → TCP → TLS…</string>
+    <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
 </resources>

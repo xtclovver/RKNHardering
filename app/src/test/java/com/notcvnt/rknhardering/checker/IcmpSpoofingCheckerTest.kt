@@ -69,7 +69,7 @@ class IcmpSpoofingCheckerTest {
     fun `unavailable ping yields error without review`() = runBlocking {
         IcmpSpoofingChecker.dependenciesOverride = IcmpSpoofingChecker.Dependencies(
             resolveIpv4 = { _, _ -> "203.0.113.10" },
-            ping = { throw IOException("ping unavailable") },
+            ping = { _, _, _ -> throw IOException("ping unavailable") },
         )
 
         val result = IcmpSpoofingChecker.check(context, DnsResolverConfig.system())
@@ -88,7 +88,7 @@ class IcmpSpoofingCheckerTest {
                     else -> error("Unexpected host $host")
                 }
             },
-            ping = { address ->
+            ping = { address, _, _ ->
                 delay(300)
                 when (address) {
                     "157.240.22.174" -> pingResult(received = 0)
@@ -121,7 +121,7 @@ class IcmpSpoofingCheckerTest {
                     else -> error("Unexpected host $host")
                 }
             },
-            ping = { address ->
+            ping = { address, _, _ ->
                 when (address) {
                     "157.240.22.174" -> blocked
                     "8.8.8.8" -> control

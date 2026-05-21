@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.notcvnt.rknhardering.customcheck.RttTriangulationConfig
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.network.DnsResolverConfig
@@ -35,6 +36,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = null,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -55,6 +57,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -74,6 +77,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertTrue(result.detected)
@@ -94,6 +98,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -113,7 +118,7 @@ class RttTriangulationCheckerTest {
         val ruHosts = setOf("yandex.ru", "mail.ru", "vk.com", "sberbank.ru", "gosuslugi.ru")
         RttTriangulationChecker.dependenciesOverride = RttTriangulationChecker.Dependencies(
             resolveIpv4 = { host, _ -> "10.0.${if (host in ruHosts) "1" else "2"}.1" },
-            ping = { address, _ ->
+            ping = { address, _, _ ->
                 if (address.startsWith("10.0.1")) {
                     makePingResult(received = 3, avg = 150.0, min = 70.0, max = 150.0)
                 } else {
@@ -126,6 +131,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertTrue(result.detected)
@@ -138,13 +144,14 @@ class RttTriangulationCheckerTest {
     fun `all_unreachable_unavailable`() = runBlocking {
         RttTriangulationChecker.dependenciesOverride = RttTriangulationChecker.Dependencies(
             resolveIpv4 = { host, _ -> throw IOException("network unreachable for $host") },
-            ping = { _, _ -> error("should not be called") },
+            ping = { _, _, _ -> error("should not be called") },
         )
 
         val result = RttTriangulationChecker.check(
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -162,6 +169,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = deGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -175,7 +183,7 @@ class RttTriangulationCheckerTest {
             resolveIpv4 = { host, _ ->
                 if (host in ruHosts) "10.0.1.1" else "198.18.0.1"
             },
-            ping = { address, _ ->
+            ping = { address, _, _ ->
                 if (address == "10.0.1.1") {
                     makePingResult(received = 3, avg = 150.0, min = 145.0, max = 155.0)
                 } else {
@@ -188,6 +196,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -212,7 +221,7 @@ class RttTriangulationCheckerTest {
                     else -> "10.0.2.2"
                 }
             },
-            ping = { address, _ ->
+            ping = { address, _, _ ->
                 when {
                     address == "10.0.1.1" -> makePingResult(
                         received = 3,
@@ -235,6 +244,7 @@ class RttTriangulationCheckerTest {
             context = context,
             resolverConfig = DnsResolverConfig.system(),
             geoFacts = ruGeoFacts,
+            config = enabledConfig(),
         )
 
         assertFalse(result.detected)
@@ -243,6 +253,8 @@ class RttTriangulationCheckerTest {
     }
 
     // Helpers
+
+    private fun enabledConfig() = RttTriangulationConfig(enabled = true)
 
     /**
      * Builds Dependencies where all RU targets return [ruAvgMs] and all foreign targets return
@@ -255,7 +267,7 @@ class RttTriangulationCheckerTest {
         val ruHosts = setOf("yandex.ru", "mail.ru", "vk.com", "sberbank.ru", "gosuslugi.ru")
         return RttTriangulationChecker.Dependencies(
             resolveIpv4 = { host, _ -> "10.0.${if (host in ruHosts) "1" else "2"}.1" },
-            ping = { address, _ ->
+            ping = { address, _, _ ->
                 val avg = if (address.startsWith("10.0.1")) ruAvgMs else foreignAvgMs
                 // jitter = max - min = 10 ms ≤ 60 → no downgrade
                 makePingResult(received = 3, avg = avg, min = avg - 5.0, max = avg + 5.0)

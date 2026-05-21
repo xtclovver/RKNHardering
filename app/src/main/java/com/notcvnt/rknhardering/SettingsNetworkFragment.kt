@@ -16,19 +16,9 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
     private lateinit var switchNetworkRequests: MaterialSwitch
     private lateinit var cardAutoUpdate: MaterialCardView
     private lateinit var switchAutoUpdate: MaterialSwitch
-    private lateinit var cardCdnPulling: MaterialCardView
-    private lateinit var switchCdnPulling: MaterialSwitch
-    private lateinit var cardCdnPullingMeduza: MaterialCardView
-    private lateinit var switchCdnPullingMeduza: MaterialSwitch
-    private lateinit var cardCallTransportProbe: MaterialCardView
-    private lateinit var switchCallTransportProbe: MaterialSwitch
-    private lateinit var cardRttTriangulation: MaterialCardView
-    private lateinit var switchRttTriangulation: MaterialSwitch
 
     private var suppressAutoUpdateToggleCallback = false
-    private var suppressCdnPullingToggleCallback = false
     private var suppressNetworkRequestsToggleCallback = false
-    private var cdnWarningDialog: AlertDialog? = null
     private var networkDisableDialog: AlertDialog? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -41,8 +31,6 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
 
     override fun onDestroyView() {
         super.onDestroyView()
-        cdnWarningDialog?.dismiss()
-        cdnWarningDialog = null
         networkDisableDialog?.dismiss()
         networkDisableDialog = null
     }
@@ -51,30 +39,13 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
         switchNetworkRequests = view.findViewById(R.id.switchNetworkRequests)
         cardAutoUpdate = view.findViewById(R.id.cardAutoUpdate)
         switchAutoUpdate = view.findViewById(R.id.switchAutoUpdate)
-        cardCdnPulling = view.findViewById(R.id.cardCdnPulling)
-        switchCdnPulling = view.findViewById(R.id.switchCdnPulling)
-        cardCdnPullingMeduza = view.findViewById(R.id.cardCdnPullingMeduza)
-        switchCdnPullingMeduza = view.findViewById(R.id.switchCdnPullingMeduza)
-        cardCallTransportProbe = view.findViewById(R.id.cardCallTransportProbe)
-        switchCallTransportProbe = view.findViewById(R.id.switchCallTransportProbe)
-        cardRttTriangulation = view.findViewById(R.id.cardRttTriangulation)
-        switchRttTriangulation = view.findViewById(R.id.switchRttTriangulation)
     }
 
     private fun loadSettings() {
         val networkRequestsEnabled = prefs.getBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, true)
         switchNetworkRequests.isChecked = networkRequestsEnabled
         setAutoUpdateSwitch(networkRequestsEnabled && AppUpdateChecker.isAutoUpdateEnabled(requireContext()))
-        switchCdnPulling.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CDN_PULLING_ENABLED, false)
-        switchCdnPullingMeduza.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CDN_PULLING_MEDUZA_ENABLED, true)
-        switchCallTransportProbe.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
-        switchRttTriangulation.isChecked = prefs.getBoolean(SettingsPrefs.PREF_RTT_TRIANGULATION_ENABLED, false)
-
         updateAutoUpdateEnabled(networkRequestsEnabled)
-        updateCdnPullingEnabled(networkRequestsEnabled)
-        updateCdnPullingMeduzaVisible(switchCdnPulling.isChecked)
-        updateCallTransportEnabled(networkRequestsEnabled)
-        updateRttTriangulationEnabled(networkRequestsEnabled)
     }
 
     private fun setupListeners() {
@@ -85,37 +56,12 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
             } else {
                 prefs.edit { putBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, true) }
                 updateAutoUpdateEnabled(true)
-                updateCdnPullingEnabled(true)
-                updateCallTransportEnabled(true)
-                updateRttTriangulationEnabled(true)
             }
         }
 
         switchAutoUpdate.setOnCheckedChangeListener { _, isChecked ->
             if (suppressAutoUpdateToggleCallback) return@setOnCheckedChangeListener
             AppUpdateChecker.setAutoUpdateEnabled(requireContext(), isChecked)
-        }
-
-        switchCdnPulling.setOnCheckedChangeListener { _, isChecked ->
-            if (suppressCdnPullingToggleCallback) return@setOnCheckedChangeListener
-            if (isChecked) {
-                showCdnPullingWarning()
-            } else {
-                prefs.edit { putBoolean(SettingsPrefs.PREF_CDN_PULLING_ENABLED, false) }
-                updateCdnPullingMeduzaVisible(false)
-            }
-        }
-
-        switchCdnPullingMeduza.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(SettingsPrefs.PREF_CDN_PULLING_MEDUZA_ENABLED, isChecked) }
-        }
-
-        switchCallTransportProbe.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(SettingsPrefs.PREF_CALL_TRANSPORT_PROBE_ENABLED, isChecked) }
-        }
-
-        switchRttTriangulation.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit { putBoolean(SettingsPrefs.PREF_RTT_TRIANGULATION_ENABLED, isChecked) }
         }
     }
 
@@ -128,49 +74,6 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
         } else {
             setAutoUpdateSwitch(AppUpdateChecker.isAutoUpdateEnabled(requireContext()))
         }
-    }
-
-    private fun updateCdnPullingEnabled(enabled: Boolean) {
-        cardCdnPulling.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardCdnPulling, enabled)
-        updateCdnPullingMeduzaVisible(enabled && switchCdnPulling.isChecked)
-    }
-
-    private fun updateCdnPullingMeduzaVisible(visible: Boolean) {
-        cardCdnPullingMeduza.visibility = if (visible) View.VISIBLE else View.GONE
-    }
-
-    private fun updateCallTransportEnabled(enabled: Boolean) {
-        cardCallTransportProbe.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardCallTransportProbe, enabled)
-    }
-
-    private fun updateRttTriangulationEnabled(enabled: Boolean) {
-        cardRttTriangulation.alpha = if (enabled) 1.0f else 0.5f
-        setViewAndChildrenEnabled(cardRttTriangulation, enabled)
-    }
-
-    private fun showCdnPullingWarning() {
-        cdnWarningDialog = AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_cdn_pulling_warning_title)
-            .setMessage(buildCdnPullingWarningMessage(requireContext()))
-            .setPositiveButton(R.string.settings_cdn_pulling_warning_confirm) { _, _ ->
-                prefs.edit { putBoolean(SettingsPrefs.PREF_CDN_PULLING_ENABLED, true) }
-                updateCdnPullingMeduzaVisible(true)
-            }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                setCdnPullingSwitch(false)
-            }
-            .setOnCancelListener {
-                setCdnPullingSwitch(false)
-            }
-            .show()
-    }
-
-    private fun setCdnPullingSwitch(checked: Boolean) {
-        suppressCdnPullingToggleCallback = true
-        switchCdnPulling.isChecked = checked
-        suppressCdnPullingToggleCallback = false
     }
 
     private fun setAutoUpdateSwitch(checked: Boolean) {
@@ -186,9 +89,6 @@ internal class SettingsNetworkFragment : Fragment(R.layout.fragment_settings_net
             .setPositiveButton(R.string.settings_network_disable_confirm) { _, _ ->
                 prefs.edit { putBoolean(SettingsPrefs.PREF_NETWORK_REQUESTS_ENABLED, false) }
                 updateAutoUpdateEnabled(false)
-                updateCdnPullingEnabled(false)
-                updateCallTransportEnabled(false)
-                updateRttTriangulationEnabled(false)
             }
             .setNegativeButton(android.R.string.cancel) { _, _ ->
                 setNetworkRequestsSwitch(true)

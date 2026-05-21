@@ -5,10 +5,27 @@ import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.checker.ipconsensus.AsnResolver
 import com.notcvnt.rknhardering.checker.ipconsensus.IpConsensusBuilder
+import com.notcvnt.rknhardering.customcheck.CallTransportConfig
+import com.notcvnt.rknhardering.customcheck.CdnPullingConfig
+import com.notcvnt.rknhardering.customcheck.CustomCdnTarget
+import com.notcvnt.rknhardering.customcheck.CustomDomain
+import com.notcvnt.rknhardering.customcheck.CustomGeoIpProvider
+import com.notcvnt.rknhardering.customcheck.CustomIpEndpoint
+import com.notcvnt.rknhardering.customcheck.DirectSignsConfig
+import com.notcvnt.rknhardering.customcheck.GeoIpConfig
+import com.notcvnt.rknhardering.customcheck.IcmpSpoofingConfig
+import com.notcvnt.rknhardering.customcheck.IcmpTarget
+import com.notcvnt.rknhardering.customcheck.IndirectSignsConfig
+import com.notcvnt.rknhardering.customcheck.IpComparisonConfig
+import com.notcvnt.rknhardering.customcheck.LocationSignalsConfig
+import com.notcvnt.rknhardering.customcheck.RttTarget
+import com.notcvnt.rknhardering.customcheck.RttTriangulationConfig
+import com.notcvnt.rknhardering.customcheck.StunServer
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
+import com.notcvnt.rknhardering.model.DomainReachabilityResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
@@ -44,12 +61,32 @@ data class CheckSettings(
     val cdnPullingMeduzaEnabled: Boolean = true,
     val icmpSpoofingEnabled: Boolean = true,
     val rttTriangulationEnabled: Boolean = false,
+    val nativeSignsEnabled: Boolean = true,
     val tunProbeDebugEnabled: Boolean = false,
     val tunProbeModeOverride: TunProbeModeOverride = TunProbeModeOverride.AUTO,
     val resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
     val portRange: String = "full",
     val portRangeStart: Int = 1024,
     val portRangeEnd: Int = 65535,
+    val splitTunnelConnectTimeoutMs: Int = 80,
+    val splitTunnelCheckUnderlyingNetwork: Boolean = true,
+    val splitTunnelCheckVpnNetworkBinding: Boolean = true,
+    val splitTunnelCheckMtprotoViaProxy: Boolean = true,
+
+    // === Per-checker custom-profile parameters (defaults preserve legacy behaviour) ===
+    val geoIp: GeoIpConfig = GeoIpConfig(),
+    val ipComparison: IpComparisonConfig = IpComparisonConfig(),
+    val cdnPulling: CdnPullingConfig = CdnPullingConfig(enabled = false),
+    val directSigns: DirectSignsConfig = DirectSignsConfig(),
+    val indirectSigns: IndirectSignsConfig = IndirectSignsConfig(),
+    val locationSignals: LocationSignalsConfig = LocationSignalsConfig(),
+    val icmpSpoofing: IcmpSpoofingConfig = IcmpSpoofingConfig(enabled = true),
+    val rttTriangulation: RttTriangulationConfig = RttTriangulationConfig(enabled = false),
+    val callTransport: CallTransportConfig = CallTransportConfig(enabled = false),
+
+    // Domain reachability (DPI detection)
+    val domainReachabilityEnabled: Boolean = false,
+    val reachabilityDomains: List<CustomDomain> = emptyList(),
 )
 
 sealed interface CheckUpdate {
@@ -65,22 +102,27 @@ sealed interface CheckUpdate {
     data class BypassProgress(val progress: BypassChecker.Progress) : CheckUpdate
     data class BypassReady(val result: BypassResult) : CheckUpdate
     data class IpConsensusReady(val result: IpConsensusResult) : CheckUpdate
+    data class DomainReachabilityReady(val result: DomainReachabilityResult) : CheckUpdate
     data class VerdictReady(val verdict: Verdict) : CheckUpdate
 }
 
 object VpnCheckRunner {
 
     internal data class Dependencies(
-        val geoIpCheck: suspend (Context, DnsResolverConfig) -> CategoryResult =
-            { ctx, resolverConfig -> GeoIpChecker.check(ctx, resolverConfig) },
-        val ipComparisonCheck: suspend (Context, DnsResolverConfig) -> IpComparisonResult =
-            { ctx, resolverConfig -> IpComparisonChecker.check(ctx, resolverConfig = resolverConfig) },
-        val cdnPullingCheck: suspend (Context, DnsResolverConfig, Boolean) -> CdnPullingResult =
-            { ctx, resolverConfig, meduzaEnabled -> CdnPullingChecker.check(ctx, resolverConfig = resolverConfig, meduzaEnabled = meduzaEnabled) },
-        val icmpSpoofingCheck: suspend (Context, DnsResolverConfig) -> CategoryResult =
-            { ctx, resolverConfig -> IcmpSpoofingChecker.check(ctx, resolverConfig) },
-        val rttTriangulationCheck: suspend (Context, DnsResolverConfig, GeoIpFacts?) -> CategoryResult =
-            { ctx, cfg, geo -> RttTriangulationChecker.check(ctx, cfg, geo) },
+        val geoIpCheck: suspend (Context, DnsResolverConfig, GeoIpConfig) -> CategoryResult =
+            { ctx, resolverConfig, geoIpConfig -> GeoIpChecker.check(ctx, resolverConfig, geoIpConfig) },
+        val ipComparisonCheck: suspend (Context, DnsResolverConfig, IpComparisonConfig) -> IpComparisonResult =
+            { ctx, resolverConfig, ipComparisonConfig ->
+                IpComparisonChecker.check(ctx, resolverConfig = resolverConfig, config = ipComparisonConfig)
+            },
+        val cdnPullingCheck: suspend (Context, DnsResolverConfig, CdnPullingConfig) -> CdnPullingResult =
+            { ctx, resolverConfig, cdnConfig ->
+                CdnPullingChecker.check(ctx, resolverConfig = resolverConfig, config = cdnConfig)
+            },
+        val icmpSpoofingCheck: suspend (Context, DnsResolverConfig, IcmpSpoofingConfig) -> CategoryResult =
+            { ctx, resolverConfig, icmpConfig -> IcmpSpoofingChecker.check(ctx, resolverConfig, icmpConfig) },
+        val rttTriangulationCheck: suspend (Context, DnsResolverConfig, GeoIpFacts?, RttTriangulationConfig) -> CategoryResult =
+            { ctx, cfg, geo, rttConfig -> RttTriangulationChecker.check(ctx, cfg, geo, rttConfig) },
         val underlyingProbe: suspend (
             Context,
             DnsResolverConfig,
@@ -101,37 +143,43 @@ object VpnCheckRunner {
                     underlyingInterfaceName = underlyingInterfaceName,
                 )
             },
-        val directCheck: suspend (Context, UnderlyingNetworkProber.ProbeResult?, Boolean) -> CategoryResult =
-            { ctx, tunActiveProbeResult, tunInterfacePresent ->
+        val directCheck: suspend (Context, UnderlyingNetworkProber.ProbeResult?, Boolean, DirectSignsConfig) -> CategoryResult =
+            { ctx, tunActiveProbeResult, tunInterfacePresent, directConfig ->
                 DirectSignsChecker.check(
                     ctx,
                     tunActiveProbeResult = tunActiveProbeResult,
                     tunInterfacePresent = tunInterfacePresent,
+                    config = directConfig,
                 )
             },
         val tunInterfaceInfoCollector: (Context) -> TunInterfaceInfo =
             { ctx -> IndirectSignsChecker.collectTunInterfaceInfo(ctx) },
         val operatorWhitelistProbe: suspend () -> OperatorWhitelistProbeResult =
             { OperatorWhitelistProbe.probe() },
-        val indirectCheck: suspend (Context, Boolean, Boolean, DnsResolverConfig) -> CategoryResult =
-            { ctx, networkRequestsEnabled, callTransportProbeEnabled, resolverConfig ->
+        val indirectCheck: suspend (Context, Boolean, Boolean, DnsResolverConfig, IndirectSignsConfig, CallTransportConfig) -> CategoryResult =
+            { ctx, networkRequestsEnabled, callTransportProbeEnabled, resolverConfig, indirectConfig, callTransportConfig ->
                 IndirectSignsChecker.check(
                     context = ctx,
                     networkRequestsEnabled = networkRequestsEnabled,
                     callTransportProbeEnabled = callTransportProbeEnabled,
                     resolverConfig = resolverConfig,
+                    config = indirectConfig,
+                    callTransportConfig = callTransportConfig,
                 )
             },
-        val locationCheck: suspend (Context, Boolean, DnsResolverConfig) -> CategoryResult =
-            { ctx, networkRequestsEnabled, resolverConfig ->
+        val locationCheck: suspend (Context, Boolean, DnsResolverConfig, LocationSignalsConfig) -> CategoryResult =
+            { ctx, networkRequestsEnabled, resolverConfig, locationConfig ->
                 LocationSignalsChecker.check(
                     ctx,
                     networkRequestsEnabled = networkRequestsEnabled,
                     resolverConfig = resolverConfig,
+                    config = locationConfig,
                 )
             },
         val nativeCheck: suspend (Context) -> CategoryResult =
             { ctx -> NativeSignsChecker.check(ctx) },
+        val domainReachabilityCheck: suspend (Context, List<CustomDomain>, DnsResolverConfig) -> DomainReachabilityResult =
+            { ctx, domains, resolverConfig -> DomainReachabilityChecker.check(ctx, domains, resolverConfig) },
         val bypassCheck: suspend (
             Context,
             DnsResolverConfig,
@@ -141,10 +189,14 @@ object VpnCheckRunner {
             String,
             Int,
             Int,
+            Int,
+            Boolean,
+            Boolean,
+            Boolean,
             kotlinx.coroutines.Deferred<UnderlyingNetworkProber.ProbeResult>?,
             (suspend (BypassChecker.Progress) -> Unit)?,
         ) -> BypassResult =
-            { ctx, resolverConfig, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, portRange, portRangeStart, portRangeEnd, underlyingProbeDeferred, onProgress ->
+            { ctx, resolverConfig, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, portRange, portRangeStart, portRangeEnd, connectTimeoutMs, checkUnderlyingNetwork, checkVpnNetworkBinding, checkMtprotoViaProxy, underlyingProbeDeferred, onProgress ->
                 BypassChecker.check(
                     ctx,
                     resolverConfig,
@@ -154,6 +206,10 @@ object VpnCheckRunner {
                     portRange,
                     portRangeStart,
                     portRangeEnd,
+                    connectTimeoutMs,
+                    checkUnderlyingNetwork,
+                    checkVpnNetworkBinding,
+                    checkMtprotoViaProxy,
                     underlyingProbeDeferred,
                     onProgress,
                 )
@@ -254,6 +310,7 @@ object VpnCheckRunner {
             detected = false,
             findings = listOf(Finding(error.message ?: error::class.java.simpleName, isError = true)),
         )
+        fun domainReachability(error: Throwable): DomainReachabilityResult = DomainReachabilityResult.empty()
         fun native(error: Throwable): CategoryResult = CategoryResult(
             name = "Native",
             detected = false,
@@ -342,34 +399,39 @@ object VpnCheckRunner {
         executionContext.throwIfCancelled()
         supervisorScope {
         val dependencies = dependenciesOverride ?: Dependencies()
-        val geoIpDeferred = if (settings.networkRequestsEnabled) {
+        val geoIpDeferred = if (settings.networkRequestsEnabled && settings.geoIp.enabled) {
             safeAsync(fallback = { Fallbacks.geoIp(it) }) {
-                dependencies.geoIpCheck(context, settings.resolverConfig)
+                dependencies.geoIpCheck(context, settings.resolverConfig, settings.geoIp)
             }
         } else null
 
-        val ipComparisonDeferred = if (settings.networkRequestsEnabled) {
+        val ipComparisonDeferred = if (settings.networkRequestsEnabled && settings.ipComparison.enabled) {
             safeAsync(fallback = { Fallbacks.ipComparison(context, it) }) {
-                dependencies.ipComparisonCheck(context, settings.resolverConfig)
+                dependencies.ipComparisonCheck(context, settings.resolverConfig, settings.ipComparison)
             }
         } else null
 
         val cdnPullingDeferred = if (settings.networkRequestsEnabled && settings.cdnPullingEnabled) {
             safeAsync(fallback = { Fallbacks.cdn(it) }) {
-                dependencies.cdnPullingCheck(context, settings.resolverConfig, settings.cdnPullingMeduzaEnabled)
+                // Project meduzaEnabled toggle from settings into cdnPulling config
+                val effectiveCdnConfig = settings.cdnPulling.copy(
+                    enabled = true,
+                    meduzaEnabled = settings.cdnPullingMeduzaEnabled,
+                )
+                dependencies.cdnPullingCheck(context, settings.resolverConfig, effectiveCdnConfig)
             }
         } else null
 
         val icmpSpoofingDeferred = if (settings.networkRequestsEnabled && settings.icmpSpoofingEnabled) {
             safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.icmp(context, it) }) {
-                dependencies.icmpSpoofingCheck(context, settings.resolverConfig)
+                dependencies.icmpSpoofingCheck(context, settings.resolverConfig, settings.icmpSpoofing)
             }
         } else null
 
         val rttTriangulationDeferred = if (settings.networkRequestsEnabled && settings.rttTriangulationEnabled) {
             safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.rtt(it) }) {
                 val geoFacts = geoIpDeferred?.await()?.geoFacts
-                dependencies.rttTriangulationCheck(context, settings.resolverConfig, geoFacts)
+                dependencies.rttTriangulationCheck(context, settings.resolverConfig, geoFacts, settings.rttTriangulation)
             }
         } else null
 
@@ -403,27 +465,43 @@ object VpnCheckRunner {
             }
         } else null
 
-        val directDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.direct(context, it) }) {
-            dependencies.directCheck(
-                context,
-                tunActiveProbeDeferred?.await(),
-                tunInterfaceInfo.tunInterfacePresent,
-            )
-        }
-        val indirectDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.indirect(it) }) {
-            dependencies.indirectCheck(
-                context,
-                settings.networkRequestsEnabled,
-                settings.callTransportProbeEnabled,
-                settings.resolverConfig,
-            )
-        }
-        val locationDeferred = safeAsync(fallback = { Fallbacks.location(it) }) {
-            dependencies.locationCheck(context, settings.networkRequestsEnabled, settings.resolverConfig)
-        }
-        val nativeDeferred = safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.native(it) }) {
-            dependencies.nativeCheck(context)
-        }
+        val directDeferred = if (settings.directSigns.enabled) {
+            safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.direct(context, it) }) {
+                dependencies.directCheck(
+                    context,
+                    tunActiveProbeDeferred?.await(),
+                    tunInterfaceInfo.tunInterfacePresent,
+                    settings.directSigns,
+                )
+            }
+        } else null
+        val indirectDeferred = if (settings.indirectSigns.enabled) {
+            safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.indirect(it) }) {
+                dependencies.indirectCheck(
+                    context,
+                    settings.networkRequestsEnabled,
+                    settings.callTransportProbeEnabled,
+                    settings.resolverConfig,
+                    settings.indirectSigns,
+                    settings.callTransport,
+                )
+            }
+        } else null
+        val locationDeferred = if (settings.locationSignals.enabled) {
+            safeAsync(fallback = { Fallbacks.location(it) }) {
+                dependencies.locationCheck(context, settings.networkRequestsEnabled, settings.resolverConfig, settings.locationSignals)
+            }
+        } else null
+        val nativeDeferred = if (settings.nativeSignsEnabled) {
+            safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.native(it) }) {
+                dependencies.nativeCheck(context)
+            }
+        } else null
+        val domainReachabilityDeferred = if (settings.domainReachabilityEnabled && settings.reachabilityDomains.isNotEmpty()) {
+            safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.domainReachability(it) }) {
+                dependencies.domainReachabilityCheck(context, settings.reachabilityDomains, settings.resolverConfig)
+            }
+        } else null
         val bypassEnabled = settings.splitTunnelEnabled
         val bypassDeferred = if (bypassEnabled) {
             safeAsync(fallback = { Fallbacks.bypass(it) }) {
@@ -436,6 +514,10 @@ object VpnCheckRunner {
                     settings.portRange,
                     settings.portRangeStart,
                     settings.portRangeEnd,
+                    settings.splitTunnelConnectTimeoutMs,
+                    settings.splitTunnelCheckUnderlyingNetwork,
+                    settings.splitTunnelCheckVpnNetworkBinding,
+                    settings.splitTunnelCheckMtprotoViaProxy,
                     tunActiveProbeDeferred,
                     { progress ->
                         executionContext.throwIfCancelled()
@@ -485,28 +567,44 @@ object VpnCheckRunner {
                 }
             }
         }
-        val directReadyDeferred = async {
-            directDeferred.await().also { result ->
-                executionContext.throwIfCancelled()
-                onUpdate?.invoke(CheckUpdate.DirectSignsReady(result))
+        val directReadyDeferred = directDeferred?.let { deferred ->
+            async {
+                deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
+                    onUpdate?.invoke(CheckUpdate.DirectSignsReady(result))
+                }
             }
         }
-        val indirectReadyDeferred = async {
-            indirectDeferred.await().also { result ->
-                executionContext.throwIfCancelled()
-                onUpdate?.invoke(CheckUpdate.IndirectSignsReady(result))
+        val indirectReadyDeferred = indirectDeferred?.let { deferred ->
+            async {
+                deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
+                    onUpdate?.invoke(CheckUpdate.IndirectSignsReady(result))
+                }
             }
         }
-        val locationReadyDeferred = async {
-            locationDeferred.await().also { result ->
-                executionContext.throwIfCancelled()
-                onUpdate?.invoke(CheckUpdate.LocationSignalsReady(result))
+        val locationReadyDeferred = locationDeferred?.let { deferred ->
+            async {
+                deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
+                    onUpdate?.invoke(CheckUpdate.LocationSignalsReady(result))
+                }
             }
         }
-        val nativeReadyDeferred = async {
-            nativeDeferred.await().also { result ->
-                executionContext.throwIfCancelled()
-                onUpdate?.invoke(CheckUpdate.NativeSignsReady(result))
+        val nativeReadyDeferred = nativeDeferred?.let { deferred ->
+            async {
+                deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
+                    onUpdate?.invoke(CheckUpdate.NativeSignsReady(result))
+                }
+            }
+        }
+        val domainReachabilityReadyDeferred = domainReachabilityDeferred?.let { deferred ->
+            async {
+                deferred.await().also { result ->
+                    executionContext.throwIfCancelled()
+                    onUpdate?.invoke(CheckUpdate.DomainReachabilityReady(result))
+                }
             }
         }
         val bypassReadyDeferred = bypassDeferred?.let { deferred ->
@@ -560,16 +658,38 @@ object VpnCheckRunner {
             detected = false,
         )
 
+        val emptyDirect = CategoryResult(
+            name = context.getString(R.string.checker_direct_category_name),
+            detected = false,
+            findings = emptyList(),
+        )
+        val emptyIndirect = CategoryResult(
+            name = "Indirect",
+            detected = false,
+            findings = emptyList(),
+        )
+        val emptyLocation = CategoryResult(
+            name = "Location",
+            detected = false,
+            findings = emptyList(),
+        )
+        val emptyNative = CategoryResult(
+            name = "Native",
+            detected = false,
+            findings = emptyList(),
+        )
+
         val rawGeoIp = geoIpReadyDeferred?.await() ?: emptyGeoIpCategory
         val ipComparison = ipComparisonReadyDeferred?.await() ?: emptyIpComparison
         val rawCdnPulling = cdnPullingReadyDeferred?.await() ?: emptyCdnPulling
         val rawIcmpSpoofing = icmpSpoofingReadyDeferred?.await() ?: emptyIcmpSpoofing
         val rttTriangulation = rttTriangulationReadyDeferred?.await() ?: emptyRttTriangulation
-        val directSigns = directReadyDeferred.await()
-        val indirectSigns = indirectReadyDeferred.await()
-        val locationSignals = locationReadyDeferred.await()
-        val nativeSigns = nativeReadyDeferred.await()
+        val directSigns = directReadyDeferred?.await() ?: emptyDirect
+        val indirectSigns = indirectReadyDeferred?.await() ?: emptyIndirect
+        val locationSignals = locationReadyDeferred?.await() ?: emptyLocation
+        val nativeSigns = nativeReadyDeferred?.await() ?: emptyNative
         val bypassResult = bypassReadyDeferred?.await() ?: emptyBypass
+        val domainReachability = domainReachabilityReadyDeferred?.await() ?: DomainReachabilityResult.empty()
         val tunProbeResult = tunActiveProbeDeferred?.await()
 
         // Cross-checker reconciliation: when the SIM home network is foreign
@@ -632,6 +752,7 @@ object VpnCheckRunner {
             rttTriangulation = rttTriangulation,
             ipConsensus = ipConsensus,
             operatorWhitelistProbe = operatorWhitelistResult,
+            domainReachability = domainReachability,
         )
     }
 }

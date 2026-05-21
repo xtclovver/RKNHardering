@@ -3,6 +3,10 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.customcheck.CdnPullingConfig
+import com.notcvnt.rknhardering.customcheck.CustomCdnTarget
+import com.notcvnt.rknhardering.customcheck.mapper.EndpointResponseMapper
+import com.notcvnt.rknhardering.customcheck.mapper.MappingField
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
@@ -38,6 +42,13 @@ object CdnPullingChecker {
         val kind: CdnPullingClient.TargetKind,
     )
 
+    internal data class Dependencies(
+        val fetchEndpoint: (suspend (Context, EndpointSpec, Int, DnsResolverConfig) -> com.notcvnt.rknhardering.model.CdnPullingResponse)? = null,
+    )
+
+    @Volatile
+    internal var dependenciesOverride: Dependencies? = null
+
     internal val ENDPOINTS = listOf(
         EndpointSpec(
             label = "redirector.googlevideo.com",
@@ -71,90 +82,214 @@ object CdnPullingChecker {
         timeoutMs: Int = 5_000,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         meduzaEnabled: Boolean = true,
-    ): CdnPullingResult = withContext(Dispatchers.IO) {
-        coroutineScope {
-            val activeEndpoints = if (meduzaEnabled) ENDPOINTS else ENDPOINTS.filter { it.label != "meduza.io" }
-            val responses = activeEndpoints.map { endpoint ->
-                async {
-                    val ipv4Deferred = async {
-                        fetchBodyWithRetries(
-                            endpoint = endpoint.url,
-                            timeoutMs = timeoutMs,
-                            resolverConfig = resolverConfig,
-                            addressFamily = Inet4Address::class.java,
-                        )
+        config: CdnPullingConfig = CdnPullingConfig(enabled = false),
+    ): CdnPullingResult {
+        if (!config.enabled) return CdnPullingResult.empty()
+        val effectiveTimeoutMs = config.timeoutMs
+        val dependencies = dependenciesOverride ?: Dependencies()
+        return withContext(Dispatchers.IO) {
+            coroutineScope {
+                val activeEndpoints = buildList {
+                    if (config.builtinTargetsEnabled) {
+                        for (endpoint in ENDPOINTS) {
+                            if (endpoint.label == "meduza.io" && !config.meduzaEnabled) continue
+                            if (endpoint.label == "rutracker.org" && !config.rutrackerEnabled) continue
+                            add(endpoint)
+                        }
                     }
-                    val ipv6Deferred = async {
-                        fetchBodyWithRetries(
-                            endpoint = endpoint.url,
-                            timeoutMs = timeoutMs,
-                            resolverConfig = resolverConfig,
-                            addressFamily = Inet6Address::class.java,
-                        )
-                    }
-
-                    val ipv4Result = ipv4Deferred.await()
-                    val ipv6Result = ipv6Deferred.await()
-
-                    val ipv4Raw = ipv4Result.getOrNull()
-                    val ipv6Raw = ipv6Result.getOrNull()
-                    val ipv4Parsed = ipv4Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
-                    val ipv6Parsed = ipv6Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
-
-                    val ipv4 = ipv4Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv4(it) }
-                    val ipv6 = ipv6Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv6(it) }
-
-                    val representativeParsed = ipv4Parsed?.takeIf { it.hasUsefulData }
-                        ?: ipv6Parsed?.takeIf { it.hasUsefulData }
-                    val representativeIp = ipv4 ?: ipv6 ?: representativeParsed?.ip
-                    val rawBody = ipv4Raw ?: ipv6Raw
-                    val ipv4Unavailable = ipv4 == null && ipv6 != null
-
-                    val hasAnyBody = rawBody != null
-                    val hasUsefulData = representativeParsed?.hasUsefulData == true
-                    val error = when {
-                        !hasAnyBody -> formatError(
-                            context,
-                            ipv4Result.exceptionOrNull() ?: ipv6Result.exceptionOrNull(),
-                        )
-                        hasUsefulData -> null
-                        else -> context.getString(R.string.checker_cdn_pulling_error_unrecognized)
-                    }
-
-                    val ipv4ErrorMessage = when {
-                        ipv4Result.isFailure -> ipv4Result.exceptionOrNull()?.let { formatError(context, it) }
-                        ipv4 == null && ipv4Parsed?.ip != null ->
-                            "server returned non-IPv4 address: ${ipv4Parsed.ip}"
-                        ipv4 == null && ipv4Raw != null ->
-                            "response did not contain an IPv4 address"
-                        else -> null
-                    }
-                    val ipv6ErrorMessage = when {
-                        ipv6Result.isFailure -> ipv6Result.exceptionOrNull()?.let { formatError(context, it) }
-                        ipv6 == null && ipv6Parsed?.ip != null ->
-                            "server returned non-IPv6 address: ${ipv6Parsed.ip}"
-                        ipv6 == null && ipv6Raw != null ->
-                            "response did not contain an IPv6 address"
-                        else -> null
-                    }
-
-                    CdnPullingResponse(
-                        targetLabel = endpoint.label,
-                        url = endpoint.url,
-                        ip = representativeIp,
-                        ipv4 = ipv4,
-                        ipv6 = ipv6,
-                        ipv4Unavailable = ipv4Unavailable,
-                        ipv4Error = ipv4ErrorMessage,
-                        ipv6Error = ipv6ErrorMessage,
-                        importantFields = representativeParsed?.importantFields.orEmpty(),
-                        rawBody = rawBody,
-                        error = error,
-                    )
                 }
-            }.map { it.await() }
-            evaluate(context, responses)
+
+                val builtinResponses = activeEndpoints.map { endpoint ->
+                    async {
+                        val override = dependencies.fetchEndpoint
+                        if (override != null) {
+                            override(context, endpoint, effectiveTimeoutMs, resolverConfig)
+                        } else {
+                            fetchBuiltinEndpoint(context, endpoint, effectiveTimeoutMs, resolverConfig)
+                        }
+                    }
+                }.map { it.await() }
+
+                val customResponses = config.customTargets
+                    .filter { it.enabled }
+                    .map { target ->
+                        async {
+                            fetchCustomEndpoint(context, target, effectiveTimeoutMs, resolverConfig)
+                        }
+                    }.map { it.await() }
+
+                evaluate(context, builtinResponses + customResponses)
+            }
         }
+    }
+
+    private suspend fun fetchBuiltinEndpoint(
+        context: Context,
+        endpoint: EndpointSpec,
+        timeoutMs: Int,
+        resolverConfig: DnsResolverConfig,
+    ): CdnPullingResponse = coroutineScope {
+        val ipv4Deferred = async {
+            fetchBodyWithRetries(
+                endpoint = endpoint.url,
+                timeoutMs = timeoutMs,
+                resolverConfig = resolverConfig,
+                addressFamily = Inet4Address::class.java,
+            )
+        }
+        val ipv6Deferred = async {
+            fetchBodyWithRetries(
+                endpoint = endpoint.url,
+                timeoutMs = timeoutMs,
+                resolverConfig = resolverConfig,
+                addressFamily = Inet6Address::class.java,
+            )
+        }
+
+        val ipv4Result = ipv4Deferred.await()
+        val ipv6Result = ipv6Deferred.await()
+
+        val ipv4Raw = ipv4Result.getOrNull()
+        val ipv6Raw = ipv6Result.getOrNull()
+        val ipv4Parsed = ipv4Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
+        val ipv6Parsed = ipv6Raw?.let { CdnPullingClient.parseBody(endpoint.kind, it) }
+
+        val ipv4 = ipv4Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv4(it) }
+        val ipv6 = ipv6Parsed?.ip?.takeIf { CdnPullingClient.looksLikeIpv6(it) }
+
+        val representativeParsed = ipv4Parsed?.takeIf { it.hasUsefulData }
+            ?: ipv6Parsed?.takeIf { it.hasUsefulData }
+        val representativeIp = ipv4 ?: ipv6 ?: representativeParsed?.ip
+        val rawBody = ipv4Raw ?: ipv6Raw
+        val ipv4Unavailable = ipv4 == null && ipv6 != null
+
+        val hasAnyBody = rawBody != null
+        val hasUsefulData = representativeParsed?.hasUsefulData == true
+        val error = when {
+            !hasAnyBody -> formatError(
+                context,
+                ipv4Result.exceptionOrNull() ?: ipv6Result.exceptionOrNull(),
+            )
+            hasUsefulData -> null
+            else -> context.getString(R.string.checker_cdn_pulling_error_unrecognized)
+        }
+
+        val ipv4ErrorMessage = when {
+            ipv4Result.isFailure -> ipv4Result.exceptionOrNull()?.let { formatError(context, it) }
+            ipv4 == null && ipv4Parsed?.ip != null ->
+                "server returned non-IPv4 address: ${ipv4Parsed.ip}"
+            ipv4 == null && ipv4Raw != null ->
+                "response did not contain an IPv4 address"
+            else -> null
+        }
+        val ipv6ErrorMessage = when {
+            ipv6Result.isFailure -> ipv6Result.exceptionOrNull()?.let { formatError(context, it) }
+            ipv6 == null && ipv6Parsed?.ip != null ->
+                "server returned non-IPv6 address: ${ipv6Parsed.ip}"
+            ipv6 == null && ipv6Raw != null ->
+                "response did not contain an IPv6 address"
+            else -> null
+        }
+
+        CdnPullingResponse(
+            targetLabel = endpoint.label,
+            url = endpoint.url,
+            ip = representativeIp,
+            ipv4 = ipv4,
+            ipv6 = ipv6,
+            ipv4Unavailable = ipv4Unavailable,
+            ipv4Error = ipv4ErrorMessage,
+            ipv6Error = ipv6ErrorMessage,
+            importantFields = representativeParsed?.importantFields.orEmpty(),
+            rawBody = rawBody,
+            error = error,
+        )
+    }
+
+    private suspend fun fetchCustomEndpoint(
+        context: Context,
+        target: CustomCdnTarget,
+        timeoutMs: Int,
+        resolverConfig: DnsResolverConfig,
+    ): CdnPullingResponse = coroutineScope {
+        val ipv4Deferred = async {
+            fetchBodyWithRetries(
+                endpoint = target.url,
+                timeoutMs = timeoutMs,
+                resolverConfig = resolverConfig,
+                addressFamily = Inet4Address::class.java,
+            )
+        }
+        val ipv6Deferred = async {
+            fetchBodyWithRetries(
+                endpoint = target.url,
+                timeoutMs = timeoutMs,
+                resolverConfig = resolverConfig,
+                addressFamily = Inet6Address::class.java,
+            )
+        }
+
+        val ipv4Result = ipv4Deferred.await()
+        val ipv6Result = ipv6Deferred.await()
+
+        val ipv4Raw = ipv4Result.getOrNull()
+        val ipv6Raw = ipv6Result.getOrNull()
+
+        val ipv4ExtractedIp = ipv4Raw?.let {
+            EndpointResponseMapper.extractField(it, target.responseMapping, MappingField.IP)
+        }
+        val ipv6ExtractedIp = ipv6Raw?.let {
+            EndpointResponseMapper.extractField(it, target.responseMapping, MappingField.IP)
+        }
+
+        val ipv4 = ipv4ExtractedIp?.takeIf { CdnPullingClient.looksLikeIpv4(it) }
+        val ipv6 = ipv6ExtractedIp?.takeIf { CdnPullingClient.looksLikeIpv6(it) }
+
+        val representativeIp = ipv4 ?: ipv6 ?: ipv4ExtractedIp ?: ipv6ExtractedIp
+        val rawBody = ipv4Raw ?: ipv6Raw
+        val ipv4Unavailable = ipv4 == null && ipv6 != null
+
+        val hasAnyBody = rawBody != null
+        val hasUsefulData = representativeIp != null
+        val error = when {
+            !hasAnyBody -> formatError(
+                context,
+                ipv4Result.exceptionOrNull() ?: ipv6Result.exceptionOrNull(),
+            )
+            hasUsefulData -> null
+            else -> context.getString(R.string.checker_cdn_pulling_error_unrecognized)
+        }
+
+        val ipv4ErrorMessage = when {
+            ipv4Result.isFailure -> ipv4Result.exceptionOrNull()?.let { formatError(context, it) }
+            ipv4 == null && ipv4ExtractedIp != null ->
+                "server returned non-IPv4 address: $ipv4ExtractedIp"
+            ipv4 == null && ipv4Raw != null ->
+                "response did not contain an IPv4 address"
+            else -> null
+        }
+        val ipv6ErrorMessage = when {
+            ipv6Result.isFailure -> ipv6Result.exceptionOrNull()?.let { formatError(context, it) }
+            ipv6 == null && ipv6ExtractedIp != null ->
+                "server returned non-IPv6 address: $ipv6ExtractedIp"
+            ipv6 == null && ipv6Raw != null ->
+                "response did not contain an IPv6 address"
+            else -> null
+        }
+
+        CdnPullingResponse(
+            targetLabel = target.label,
+            url = target.url,
+            ip = representativeIp,
+            ipv4 = ipv4,
+            ipv6 = ipv6,
+            ipv4Unavailable = ipv4Unavailable,
+            ipv4Error = ipv4ErrorMessage,
+            ipv6Error = ipv6ErrorMessage,
+            importantFields = emptyMap(),
+            rawBody = rawBody,
+            error = error,
+        )
     }
 
     internal suspend fun fetchBodyWithRetries(

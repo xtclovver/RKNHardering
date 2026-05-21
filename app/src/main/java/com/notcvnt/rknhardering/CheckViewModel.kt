@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.VpnCheckRunner
+import com.notcvnt.rknhardering.customcheck.CustomCheckRunner
 import com.notcvnt.rknhardering.model.CheckResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,7 +82,15 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 if (isCurrentScan(scanId, executionContext)) {
-                    appendScanEvent(scanId, ScanEvent.Completed(result, privacyMode))
+                    val app: Application = getApplication()
+                    val customEnabled = AppUiSettings.prefs(app)
+                        .getBoolean(SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED, false)
+                    val profile = if (customEnabled) CustomCheckRunner.getActiveProfile(app) else null
+                    val enrichedResult = result.copy(
+                        customProfileId = profile?.id,
+                        customProfileName = profile?.name,
+                    )
+                    appendScanEvent(scanId, ScanEvent.Completed(enrichedResult, privacyMode))
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 if (isCurrentScan(scanId, executionContext)) {

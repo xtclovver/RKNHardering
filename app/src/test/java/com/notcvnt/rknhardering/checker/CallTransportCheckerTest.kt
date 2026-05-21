@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import android.net.Network
 import androidx.test.core.app.ApplicationProvider
+import com.notcvnt.rknhardering.customcheck.CallTransportConfig
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportProbeKind
@@ -168,7 +169,7 @@ class CallTransportCheckerTest {
                 Thread.sleep(500)
                 successDualStackResult()
             },
-            publicIpFetcher = { _, _ -> Result.success("203.0.113.10") },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
             proxyProbe = {
                 delay(500)
                 CallTransportChecker.ProxyProbeOutcome(reachable = false)
@@ -208,7 +209,7 @@ class CallTransportCheckerTest {
                 )
             },
             stunDualStackProbe = { _, _, _ -> successDualStackResult() },
-            publicIpFetcher = { _, _ -> Result.success("203.0.113.10") },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
         )
 
         val results = kotlinx.coroutines.runBlocking {
@@ -251,7 +252,7 @@ class CallTransportCheckerTest {
             stunDualStackProbe = { _, _, _ ->
                 error("active path STUN probe should be reused from sweep")
             },
-            publicIpFetcher = { _, _ -> Result.success("203.0.113.10") },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
         )
 
         val results = kotlinx.coroutines.runBlocking {
@@ -319,7 +320,7 @@ class CallTransportCheckerTest {
                     else -> error("low priority target should not be probed before successful priority target")
                 }
             },
-            publicIpFetcher = { _, _ -> Result.success("203.0.113.10") },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
         )
 
         val results = runBlockingProbeDirect()
@@ -501,4 +502,74 @@ class CallTransportCheckerTest {
         inode = 0L,
         owner = owner,
     )
+
+    @Test
+    fun `when builtinGlobalStunEnabled=false then sweep produces no global stun results`() {
+        CallTransportChecker.dependenciesOverride = CallTransportChecker.Dependencies(
+            loadCatalog = {
+                CallTransportTargetCatalog.Catalog(
+                    stunTargets = listOf(
+                        CallTransportTargetCatalog.StunTarget(
+                            host = "stun.example.com",
+                            port = 3478,
+                            scope = StunScope.GLOBAL,
+                            enabled = true,
+                        ),
+                    ),
+                )
+            },
+            loadPaths = {
+                listOf(CallTransportChecker.PathDescriptor(path = CallTransportNetworkPath.ACTIVE))
+            },
+            stunDualStackProbe = { _, _, _ -> successDualStackResult() },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
+            findLocalProxyEndpoint = { null },
+        )
+
+        val evaluation = kotlinx.coroutines.runBlocking {
+            CallTransportChecker.check(
+                context = context,
+                resolverConfig = DnsResolverConfig.system(),
+                callTransportEnabled = true,
+                config = CallTransportConfig(enabled = true, builtinGlobalStunEnabled = false),
+            )
+        }
+
+        // The sweep filters out GLOBAL-scope builtin targets; the group must be present but empty.
+        val globalGroup = evaluation.stunGroups.find { it.scope == StunScope.GLOBAL }
+        assertTrue(
+            "GLOBAL sweep group should be present but contain no results when builtinGlobalStunEnabled=false",
+            globalGroup != null && globalGroup.results.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `when checkMtproto=false then mtproto check is skipped`() {
+        val proxyProbeCalled = mutableListOf<ProxyEndpoint>()
+        CallTransportChecker.dependenciesOverride = CallTransportChecker.Dependencies(
+            loadCatalog = { catalogWithStunTarget() },
+            loadPaths = { emptyList() },
+            findLocalProxyEndpoint = {
+                ProxyEndpoint(host = "127.0.0.1", port = 1080, type = ProxyType.SOCKS5)
+            },
+            proxyProbe = { endpoint ->
+                proxyProbeCalled += endpoint
+                CallTransportChecker.ProxyProbeOutcome(reachable = false)
+            },
+            proxyUdpStunProbe = { _, _, _, _ ->
+                Result.failure(IllegalStateException("not reached"))
+            },
+        )
+
+        kotlinx.coroutines.runBlocking {
+            CallTransportChecker.check(
+                context = context,
+                resolverConfig = DnsResolverConfig.system(),
+                callTransportEnabled = true,
+                config = CallTransportConfig(enabled = true, checkMtproto = false),
+            )
+        }
+
+        assertTrue("proxyProbe must not be called when checkMtproto=false", proxyProbeCalled.isEmpty())
+    }
 }

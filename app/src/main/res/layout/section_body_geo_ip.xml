@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/settings_custom_check_timeout_ms">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/editGeoIpTimeout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:text="10000" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGeoIpBuiltinIpapiIs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/settings_custom_check_geoip_provider_ipapi_is"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGeoIpBuiltinIplocate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_geoip_provider_iplocate"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGeoIpBuiltinIpquery"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_geoip_provider_ipquery"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGeoIpBuiltinIplookup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_geoip_provider_iplookup"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchGeoIpBuiltinIpbot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_geoip_provider_ipbot"
+        android:checked="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/inline_editor_custom_providers"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textAllCaps="true"
+        android:letterSpacing="0.05" />
+
+    <LinearLayout
+        android:id="@+id/containerGeoIpEndpoints"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAddGeoIpEndpoint"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_custom_check_add_endpoint"
+        app:icon="@drawable/ic_add_circle" />
+
+    <FrameLayout
+        android:id="@+id/inlineEditorSlotGeoIp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</LinearLayout>

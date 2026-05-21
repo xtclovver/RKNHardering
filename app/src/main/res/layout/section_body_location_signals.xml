@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchLocationBeacondb"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_custom_check_location_beacondb"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchLocationCellTowers"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_location_cell_towers"
+        android:checked="true" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchLocationWifiSignals"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_custom_check_location_wifi_signals"
+        android:checked="true" />
+</LinearLayout>

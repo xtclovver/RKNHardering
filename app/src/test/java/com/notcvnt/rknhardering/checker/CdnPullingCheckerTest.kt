@@ -3,12 +3,17 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.customcheck.CdnPullingConfig
+import com.notcvnt.rknhardering.customcheck.CustomCdnTarget
+import com.notcvnt.rknhardering.customcheck.ResponseMapping
+import com.notcvnt.rknhardering.customcheck.ResponseType
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import java.io.IOException
 import java.security.cert.CertPathValidatorException
 import javax.net.ssl.SSLHandshakeException
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -215,5 +220,71 @@ class CdnPullingCheckerTest {
 
         assertTrue(message.contains(context.getString(R.string.checker_cdn_pulling_error_tls_certificate)))
         assertTrue(message.contains("Trust anchor for certification path not found"))
+    }
+
+    @After
+    fun tearDown() {
+        CdnPullingChecker.dependenciesOverride = null
+    }
+
+    @Test
+    fun `when builtinTargetsEnabled=false then only custom targets are fetched`() = runBlocking {
+        val fetchedLabels = mutableListOf<String>()
+        CdnPullingChecker.dependenciesOverride = CdnPullingChecker.Dependencies(
+            fetchEndpoint = { _, endpoint, _, _ ->
+                fetchedLabels.add(endpoint.label)
+                CdnPullingResponse(
+                    targetLabel = endpoint.label,
+                    url = endpoint.url,
+                    error = "stub",
+                )
+            },
+        )
+
+        val customTarget = CustomCdnTarget(
+            label = "custom.example.com",
+            url = "https://custom.example.com/trace",
+            enabled = true,
+            responseMapping = ResponseMapping(responseType = ResponseType.KEY_VALUE),
+        )
+        CdnPullingChecker.check(
+            context = context,
+            config = CdnPullingConfig(
+                enabled = true,
+                builtinTargetsEnabled = false,
+                customTargets = listOf(customTarget),
+            ),
+        )
+
+        // The dependenciesOverride only intercepts builtin endpoint fetches.
+        // With builtinTargetsEnabled=false, the override should never be called.
+        assertTrue("No builtin endpoints should be fetched when toggle is off", fetchedLabels.isEmpty())
+    }
+
+    @Test
+    fun `when meduzaEnabled=false the meduza domain is skipped`() = runBlocking {
+        val fetchedLabels = mutableListOf<String>()
+        CdnPullingChecker.dependenciesOverride = CdnPullingChecker.Dependencies(
+            fetchEndpoint = { _, endpoint, _, _ ->
+                fetchedLabels.add(endpoint.label)
+                CdnPullingResponse(
+                    targetLabel = endpoint.label,
+                    url = endpoint.url,
+                    error = "stub",
+                )
+            },
+        )
+
+        CdnPullingChecker.check(
+            context = context,
+            config = CdnPullingConfig(
+                enabled = true,
+                builtinTargetsEnabled = true,
+                meduzaEnabled = false,
+            ),
+        )
+
+        assertFalse("meduza.io must not be fetched when meduzaEnabled=false", fetchedLabels.contains("meduza.io"))
+        assertTrue("other builtin targets should still be fetched", fetchedLabels.isNotEmpty())
     }
 }

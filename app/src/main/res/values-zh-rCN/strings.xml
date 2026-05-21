@@ -212,6 +212,7 @@
     <string name="main_preview_rtt_triangulation">将 ping 本地和境外服务以比较往返延迟。</string>
     <string name="main_preview_location">将收集运营商、基站和附近 Wi-Fi 的迹象。</string>
     <string name="main_preview_bypass">将搜索本地 split tunnel bypass 和可用的 proxy endpoint。</string>
+    <string name="main_preview_domain_reachability">将通过 DNS、TCP 和 TLS handshake 对配置域名进行 DPI 级封锁检测。</string>
 
     <string name="main_loading_geo_ip">正在检查国家、ASN 和托管迹象。</string>
     <string name="main_loading_ip_comparison">正在通过多个独立服务比较公网 IP。</string>
@@ -626,4 +627,269 @@
     <string name="auto_update_onboarding_message">首次启动时，应用可以连接 api.github.com 来检查 GitHub Releases 是否有更新的 APK。如果你现在禁用它，在你手动到网络设置中重新开启之前，应用不会执行这项检查。</string>
     <string name="auto_update_onboarding_enable">启用</string>
     <string name="auto_update_onboarding_disable">不要启用</string>
+
+    <!-- Custom Checks -->
+    <string name="settings_cat_custom_checks">自定义检查</string>
+    <string name="settings_custom_checks_enabled">使用自定义检查配置文件</string>
+    <string name="settings_custom_checks_active_label">当前配置文件</string>
+    <string name="settings_custom_checks_no_active">标准（内置）</string>
+    <string name="settings_custom_check_create">创建新配置文件</string>
+    <string name="settings_custom_check_import">从文件导入</string>
+    <string name="settings_custom_check_marketplace">市场</string>
+    <string name="settings_custom_check_instructions">说明</string>
+    <string name="settings_custom_check_profiles_label">我的配置文件</string>
+    <string name="settings_custom_check_export_done">配置文件已导出</string>
+    <string name="settings_custom_check_export_failed">导出配置文件失败</string>
+    <string name="settings_custom_check_import_done">配置文件已导入</string>
+    <string name="settings_custom_check_import_failed">导入配置文件失败</string>
+
+    <!-- Custom Check Editor -->
+    <string name="settings_custom_check_editor_title">编辑配置文件</string>
+    <string name="settings_custom_check_name">配置文件名称</string>
+    <string name="settings_custom_check_description">描述</string>
+    <string name="settings_custom_check_author">作者</string>
+    <string name="settings_custom_check_version">版本</string>
+    <string name="settings_custom_check_save">保存</string>
+    <string name="settings_custom_check_cancel">取消</string>
+    <string name="settings_custom_check_add_endpoint">添加自定义端点</string>
+    <string name="settings_custom_check_name_required">配置文件名称为必填项</string>
+    <string name="settings_custom_check_no_checks_enabled">请至少启用一项检查后再保存配置</string>
+    <string name="settings_custom_check_dependency_required">“%1$s” 需要 “%2$s” — 已自动启用</string>
+    <string name="settings_custom_check_timeout_ms">超时（毫秒）</string>
+    <string name="settings_custom_check_ping_count">Ping 次数</string>
+
+    <!-- Custom Check Editor: sub-toggles -->
+    <string name="settings_custom_check_ip_builtin_ru">使用内置 RU 检测器</string>
+    <string name="settings_custom_check_ip_builtin_non_ru">使用内置非 RU 检测器</string>
+    <string name="settings_custom_check_cdn_builtin_targets">使用内置 CDN 目标</string>
+    <string name="settings_custom_check_cdn_meduza">包含 meduza.io</string>
+    <string name="settings_custom_check_cdn_rutracker">包含 rutracker.org</string>
+    <string name="settings_custom_check_direct_check_transport_vpn">检测 VPN 传输能力</string>
+    <string name="settings_custom_check_direct_check_http_proxy">检测 HTTP 代理</string>
+    <string name="settings_custom_check_direct_check_socks_proxy">检测 SOCKS 代理</string>
+    <string name="settings_custom_check_direct_check_proxy_info">检测 ProxyInfo（每网络）</string>
+    <string name="settings_custom_check_direct_check_vpn_service">检测已安装的 VPN 应用</string>
+    <string name="settings_custom_check_indirect_not_vpn_cap">检测 NOT_VPN 能力</string>
+    <string name="settings_custom_check_indirect_vpn_interfaces">检测 VPN 类接口</string>
+    <string name="settings_custom_check_indirect_mtu_anomaly">检测 MTU 异常</string>
+    <string name="settings_custom_check_indirect_ipsec">检测 IPsec 接口</string>
+    <string name="settings_custom_check_indirect_routing">检测路由表</string>
+    <string name="settings_custom_check_indirect_dns">检测 DNS 配置</string>
+    <string name="settings_custom_check_indirect_proxy_tools">检测代理工具</string>
+    <string name="settings_custom_check_indirect_local_listeners">检测本地监听器</string>
+    <string name="settings_custom_check_indirect_dumpsys">检测 dumpsys VPN</string>
+    <string name="settings_custom_check_indirect_listener_port_threshold">监听器端口阈值（默认：5）</string>
+    <string name="settings_custom_check_location_beacondb">使用 BeaconDB 查询</string>
+    <string name="settings_custom_check_location_cell_towers">收集基站数据</string>
+    <string name="settings_custom_check_location_wifi_signals">收集 WiFi 信号</string>
+    <string name="settings_custom_check_icmp_builtin_targets">使用内置目标</string>
+    <string name="settings_custom_check_add_icmp_target">添加自定义 ICMP 目标</string>
+    <string name="settings_custom_check_icmp_target_is_control">控制目标</string>
+    <string name="settings_custom_check_rtt_builtin_targets">使用内置目标</string>
+    <string name="settings_custom_check_add_rtt_target">添加自定义 RTT 目标</string>
+    <string name="settings_custom_check_rtt_expected_location">预期位置（如 RU）</string>
+    <string name="settings_custom_check_call_builtin_global_stun">使用内置全球 STUN</string>
+    <string name="settings_custom_check_call_builtin_ru_stun">使用内置俄罗斯 STUN</string>
+    <string name="settings_custom_check_call_mtproto">检测 MTProto</string>
+    <string name="settings_custom_check_add_stun_server">添加自定义 STUN 服务器</string>
+    <string name="settings_custom_check_stun_port">端口（默认：3478）</string>
+    <string name="settings_custom_check_split_proxy_scan">启用代理扫描</string>
+    <string name="settings_custom_check_split_xray_api_scan">启用 Xray API 扫描</string>
+    <string name="settings_custom_check_split_connect_timeout">连接超时（毫秒，默认：300）</string>
+    <string name="settings_custom_check_split_check_underlying_network">检测底层网络</string>
+    <string name="settings_custom_check_split_check_vpn_network_binding">检测 VPN 网络绑定</string>
+    <string name="settings_custom_check_split_check_mtproto_via_proxy">通过代理检测 MTProto</string>
+    <string name="settings_custom_check_split_port_range_label">端口范围</string>
+
+    <!-- Custom domains section -->
+    <string name="settings_custom_check_section_custom_domains">自定义域名</string>
+    <string name="settings_custom_check_add_custom_domain">添加域名</string>
+    <string name="settings_custom_check_domain_field">域名 (example.com)</string>
+    <string name="settings_custom_check_check_type_field">检查类型 (http/dns/tcp)</string>
+    <string name="settings_custom_check_description_field">描述</string>
+
+    <!-- Network configuration section -->
+    <string name="settings_custom_check_section_network_config">网络配置</string>
+    <string name="settings_custom_check_network_requests">网络请求</string>
+    <string name="settings_custom_check_dns_mode">DNS 模式</string>
+    <string name="settings_custom_check_dns_mode_system">系统</string>
+    <string name="settings_custom_check_dns_mode_direct">直接</string>
+    <string name="settings_custom_check_dns_mode_doh">DoH</string>
+    <string name="settings_custom_check_dns_preset">DNS 预设</string>
+    <string name="settings_custom_check_dns_preset_custom">自定义</string>
+    <string name="settings_custom_check_dns_preset_cloudflare">Cloudflare</string>
+    <string name="settings_custom_check_dns_preset_google">Google</string>
+    <string name="settings_custom_check_dns_preset_yandex">Yandex</string>
+    <string name="settings_custom_check_dns_servers">DNS 服务器（逗号分隔）</string>
+    <string name="settings_custom_check_doh_url">DoH URL</string>
+    <string name="settings_custom_check_doh_bootstrap">Bootstrap IP（逗号分隔）</string>
+
+    <!-- GeoIP builtin providers -->
+    <string name="settings_custom_check_geoip_provider_ipapi_is">ipapi.is（内置）</string>
+    <string name="settings_custom_check_geoip_provider_iplocate">iplocate.io（内置）</string>
+    <string name="settings_custom_check_geoip_provider_ipquery">ipquery.io（内置）</string>
+    <string name="settings_custom_check_geoip_provider_iplookup">iplookup.it（内置）</string>
+    <string name="settings_custom_check_geoip_provider_ipbot">ipbot.com（内置）</string>
+
+    <string name="settings_custom_check_target_host">主机</string>
+    <string name="settings_custom_check_target_label">标签（可选）</string>
+
+    <!-- Check sections -->
+    <string name="settings_custom_check_section_geo_ip">GeoIP</string>
+    <string name="settings_custom_check_section_ip_comparison">IP 比对</string>
+    <string name="settings_custom_check_section_cdn_pulling">CDN 拉取</string>
+    <string name="settings_custom_check_section_direct_signs">直接特征</string>
+    <string name="settings_custom_check_section_indirect_signs">间接特征</string>
+    <string name="settings_custom_check_section_native_signs">原生特征</string>
+    <string name="settings_custom_check_section_location_signals">位置信号</string>
+    <string name="settings_custom_check_section_icmp_spoofing">ICMP 欺骗</string>
+    <string name="settings_custom_check_section_rtt_triangulation">RTT 三角测量</string>
+    <string name="settings_custom_check_section_call_transport">通话传输</string>
+    <string name="settings_custom_check_section_split_tunnel">分流隧道</string>
+    <string name="settings_custom_check_section_domain_reachability">域名可达性</string>
+    <string name="settings_custom_check_section_domain_reachability_desc">配置的域名将通过 DNS、TCP 与 TLS 握手测试是否遭到 DPI 级别封锁。</string>
+    <string name="settings_custom_check_add_reachability_domain">添加域名</string>
+    <string name="settings_custom_check_reachability_blocked_in_generic">此类型请使用「域名可达性」分区。</string>
+    <string name="editor_summary_domain_reachability">%1$d 个域名</string>
+
+    <!-- Endpoint Mapper -->
+    <string name="endpoint_mapper_title">端点映射器</string>
+    <string name="endpoint_mapper_scope_ru">RU</string>
+    <string name="endpoint_mapper_scope_non_ru">NON_RU</string>
+    <string name="endpoint_mapper_url_hint">端点 URL</string>
+    <string name="endpoint_mapper_label_hint">标签（可选）</string>
+    <string name="endpoint_mapper_test_button">测试请求</string>
+    <string name="endpoint_mapper_response_label">响应</string>
+    <string name="endpoint_mapper_detected_type">检测到的类型：%1$s</string>
+    <string name="endpoint_mapper_mapping_section">字段映射（JSONPath / 键 / 正则）</string>
+    <string name="endpoint_mapper_field_ip">IP 地址路径</string>
+    <string name="endpoint_mapper_field_country_code">国家代码路径</string>
+    <string name="endpoint_mapper_field_country_name">国家名称路径</string>
+    <string name="endpoint_mapper_field_isp">ISP 路径</string>
+    <string name="endpoint_mapper_field_org">组织路径</string>
+    <string name="endpoint_mapper_field_asn">ASN 路径</string>
+    <string name="endpoint_mapper_field_is_hosting">托管标志路径</string>
+    <string name="endpoint_mapper_field_is_proxy">代理标志路径</string>
+    <string name="endpoint_mapper_error_network">网络错误</string>
+
+    <!-- Badges -->
+    <string name="badge_official">官方</string>
+    <string name="badge_verified">已验证</string>
+
+    <!-- Actions -->
+    <string name="action_activate">激活</string>
+    <string name="action_deactivate">停用</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_clone">克隆</string>
+    <string name="action_export">导出</string>
+    <string name="action_delete">删除</string>
+
+    <!-- Import intent label -->
+    <string name="import_rkncheck_label">使用 RKNHardering 打开</string>
+    <string name="import_rkncheck_hint">前往设置 → 自定义检查 → 导入 以加载配置文件</string>
+
+    <!-- Marketplace -->
+    <string name="marketplace_search_hint">按名称、作者或描述搜索…</string>
+    <string name="marketplace_retry">重试</string>
+    <string name="marketplace_empty">未找到配置文件</string>
+    <string name="marketplace_error_unknown">未知错误</string>
+    <string name="marketplace_meta_format">作者：%1$s · v%2$s</string>
+    <string name="marketplace_install_count">%1$d 次安装</string>
+    <string name="marketplace_action_install">安装</string>
+    <string name="marketplace_action_clone_edit">克隆并编辑</string>
+    <string name="marketplace_preview_author">作者：%1$s</string>
+    <string name="marketplace_preview_version">版本：%1$s</string>
+    <string name="marketplace_install_done">配置文件"%1$s"已安装</string>
+    <string name="marketplace_install_failed">安装配置文件失败</string>
+
+    <!-- Security warning -->
+    <string name="security_warning_title">⚠️ 配置文件未经验证</string>
+    <string name="security_warning_message">配置文件"%1$s"未经仓库维护者验证，其中包含以下自定义网络端点：\n\n%2$s\n\n仅在信任作者的情况下安装。</string>
+    <string name="security_warning_no_custom_urls">未声明任何自定义端点。</string>
+    <string name="security_warning_install_anyway">仍然安装</string>
+    <string name="security_warning_cancel">取消</string>
+
+    <!-- Domain Reachability -->
+    <string name="main_loading_domain_reachability">通过 DNS、TCP 和 TLS 握手测试域名可访问性。</string>
+    <string name="main_card_domain_reachability">域名可达性</string>
+    <string name="main_card_domain_reachability_description">检测域名是否受 DPI 阻断（DNS、TCP、TLS）</string>
+    <string name="domain_reachability_hint_all_ok">%2$d 个中可达 %1$d 个</string>
+    <string name="domain_reachability_hint_blocked">%2$d 个中阻断 %1$d 个</string>
+
+    <!-- Marketplace stub -->
+    <string name="settings_marketplace_stub">市场即将上线。\n\n社区检查配置文件将在此提供。</string>
+
+    <!-- Profile list redesign -->
+    <string name="profiles_section_active">活动配置文件</string>
+    <string name="profiles_create_new">创建新配置</string>
+    <string name="profiles_import">导入</string>
+    <string name="profiles_installed_marker_cd">已从市场安装</string>
+    <string name="profile_row_menu_cd">配置操作</string>
+    <string name="profile_builtin_standard_name">标准</string>
+    <string name="profile_builtin_standard_desc">内置默认检查配置</string>
+    <string name="profile_subtitle_all_enabled">%1$d 项检查 · 全部启用</string>
+    <string name="profile_subtitle_enabled_of">已启用 %1$d / %2$d</string>
+    <string name="profile_subtitle_from_marketplace">来自市场</string>
+    <string name="profile_name_edited_suffix">（已编辑）</string>
+    <string name="settings_custom_check_delete_confirm">删除此配置文件？</string>
+
+    <!-- Discover card -->
+    <string name="discover_profiles_title">发现配置</string>
+    <string name="discover_profiles_subtitle">市场精选</string>
+    <string name="discover_profiles_see_all">查看全部 ›</string>
+    <string name="discover_profiles_empty">暂无精选配置</string>
+
+    <!-- Editor: checker section accordion -->
+    <string name="editor_checkers_section">检查项</string>
+    <string name="editor_checkers_section_count">检查项 · %1$d</string>
+    <string name="checker_section_disabled_note">启用此检查以编辑参数</string>
+    <string name="checker_section_summary_disabled">已禁用</string>
+    <string name="editor_summary_geoip">内置 %1$d/%2$d · 自定义 %3$d</string>
+    <string name="editor_summary_ip_comparison">内置 %1$d/%2$d · 自定义 %3$d</string>
+    <string name="editor_summary_cdn">内置 %1$d/%2$d · 自定义 %3$d</string>
+    <string name="editor_summary_x_of_y_active">已激活 %1$d/%2$d</string>
+    <string name="editor_summary_targets">%1$d 个目标</string>
+    <string name="section_native_signs_description">JNI 路由、接口、钩子标识和 root 标识检查。无额外参数。</string>
+
+    <!-- Inline endpoint editor -->
+    <string name="inline_editor_title_new">新建端点</string>
+    <string name="inline_editor_close_cd">关闭编辑器</string>
+    <string name="inline_editor_url_hint">URL</string>
+    <string name="inline_editor_label_hint">标签（可选）</string>
+    <string name="inline_editor_test">测试请求</string>
+    <string name="inline_editor_testing">测试中…</string>
+    <string name="inline_editor_retest">重新测试</string>
+    <string name="inline_editor_field_mapping">字段映射</string>
+    <string name="inline_editor_not_detected">未检测到</string>
+    <string name="inline_editor_path_hint">JSONPath / 键 / 正则</string>
+    <string name="inline_editor_save">保存端点</string>
+    <string name="inline_editor_custom_providers">自定义提供者</string>
+    <string name="inline_editor_custom_endpoints">自定义端点</string>
+    <string name="inline_editor_custom_targets">自定义目标</string>
+    <string name="inline_editor_url_required">需要 URL</string>
+    <string name="inline_editor_test_failed">测试失败：%1$s</string>
+    <string name="inline_editor_unknown_error">未知错误</string>
+    <string name="inline_editor_result_status">%1$d · %2$d 毫秒</string>
+
+    <!-- Marketplace redesign -->
+    <string name="marketplace_by_author">作者 %1$s</string>
+    <string name="marketplace_action_installed">已安装</string>
+    <string name="marketplace_filter_all">全部</string>
+    <string name="marketplace_filter_official">官方</string>
+    <string name="marketplace_filter_verified">已验证</string>
+    <string name="marketplace_filter_privacy">隐私</string>
+    <string name="marketplace_filter_mobile">移动</string>
+
+    <!-- Install dialog redesign -->
+    <string name="install_verified_title">安装已验证的配置</string>
+    <string name="install_subtitle_format">%1$s · 作者 %2$s</string>
+    <string name="security_warning_intro">安装后，此配置将向以下 URL 发起请求：</string>
+
+    <!-- Domain reachability expected booleans -->
+    <string name="editor_expected_availability">预期可达性</string>
+    <string name="domain_reachability_hint_mismatch">%1$d / %2$d 不匹配</string>
+    <string name="domain_reachability_hint_all_match">%1$d / %2$d 符合预期</string>
+    <string name="domain_reachability_expected_prefix">预期：</string>
+    <string name="domain_reachability_test_running">正在测试 DNS → TCP → TLS…</string>
+    <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
 </resources>

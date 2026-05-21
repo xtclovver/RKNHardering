@@ -4,12 +4,17 @@ import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.rethrowIfCancellation
+import com.notcvnt.rknhardering.customcheck.CustomGeoIpProvider
+import com.notcvnt.rknhardering.customcheck.GeoIpConfig
+import com.notcvnt.rknhardering.customcheck.mapper.EndpointResponseMapper
+import com.notcvnt.rknhardering.customcheck.mapper.MappingField
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.GeoIpFacts
+import com.notcvnt.rknhardering.model.GeoIpResponse
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +31,14 @@ object GeoIpChecker {
     private const val MAX_FETCH_ATTEMPTS = 1
     private const val RETRY_DELAY_MS = 250L
     private const val GEOIP_TIMEOUT_MS = 10_000
+
+    private fun isBuiltinEnabled(config: GeoIpConfig, providerName: String): Boolean {
+        return config.builtinProviders[providerName] != false
+    }
+
+    private fun parseBooleanString(value: String?): Boolean {
+        return value?.trim()?.lowercase() in setOf("true", "1", "yes")
+    }
 
     internal data class GeoIpSnapshot(
         val ip: String,
@@ -46,8 +59,20 @@ object GeoIpChecker {
 
     internal data class ProviderSnapshot(
         val provider: String,
-        val snapshot: GeoIpSnapshot,
-    )
+        val isCustom: Boolean,
+        val snapshot: GeoIpSnapshot?,
+        val error: String? = null,
+        val rawBody: String? = null,
+    ) {
+        val isSuccess: Boolean get() = snapshot != null
+        fun toGeoIpResponse(): GeoIpResponse = GeoIpResponse(
+            provider = provider,
+            isCustom = isCustom,
+            ip = snapshot?.ip,
+            error = error,
+            rawBody = rawBody,
+        )
+    }
 
     private const val IPAPIIS_PROVIDER = "ipapi.is"
     private const val IPLOCATE_PROVIDER = "iplocate.io"
@@ -65,21 +90,40 @@ object GeoIpChecker {
     suspend fun check(
         context: Context,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        config: GeoIpConfig = GeoIpConfig(),
     ): CategoryResult = withContext(Dispatchers.IO) {
+        if (!config.enabled) {
+            return@withContext CategoryResult(
+                name = "GeoIP",
+                detected = false,
+                findings = emptyList(),
+                geoFacts = GeoIpFacts(fetchError = false),
+            )
+        }
         val executionContext = ScanExecutionContext.currentOrDefault()
         try {
             coroutineScope {
-                val ipapiIsDeferred = async { fetchWithRetries { fetchIpapiIs(resolverConfig) } }
-                val iplocateDeferred = async { fetchWithRetries { fetchIplocate(resolverConfig) } }
-                val ipqueryDeferred = async { fetchWithRetries { fetchIpquery(resolverConfig) } }
-                val iplookupDeferred = async { fetchWithRetries { fetchIplookup(resolverConfig) } }
-                val ipbotDeferred = async { fetchWithRetries { fetchIpbot(resolverConfig) } }
+                val ipapiIsDeferred = if (isBuiltinEnabled(config, IPAPIIS_PROVIDER)) {
+                    async { fetchWithRetries { fetchIpapiIs(resolverConfig, timeoutMs = config.timeoutMs) } }
+                } else null
+                val iplocateDeferred = if (isBuiltinEnabled(config, IPLOCATE_PROVIDER)) {
+                    async { fetchWithRetries { fetchIplocate(resolverConfig, timeoutMs = config.timeoutMs) } }
+                } else null
+                val ipqueryDeferred = if (isBuiltinEnabled(config, IPQUERY_PROVIDER)) {
+                    async { fetchWithRetries { fetchIpquery(resolverConfig, timeoutMs = config.timeoutMs) } }
+                } else null
+                val iplookupDeferred = if (isBuiltinEnabled(config, IPLOOKUP_PROVIDER)) {
+                    async { fetchWithRetries { fetchIplookup(resolverConfig, timeoutMs = config.timeoutMs) } }
+                } else null
+                val ipbotDeferred = if (isBuiltinEnabled(config, IPBOT_PROVIDER)) {
+                    async { fetchWithRetries { fetchIpbot(resolverConfig, timeoutMs = config.timeoutMs) } }
+                } else null
 
-                val ipapiIsResult = ipapiIsDeferred.await()
-                val iplocateResult = iplocateDeferred.await()
-                val ipqueryResult = ipqueryDeferred.await()
-                val iplookupResult = iplookupDeferred.await()
-                val ipbotResult = ipbotDeferred.await()
+                val ipapiIsResult = ipapiIsDeferred?.await()
+                val iplocateResult = iplocateDeferred?.await()
+                val ipqueryResult = ipqueryDeferred?.await()
+                val iplookupResult = iplookupDeferred?.await()
+                val ipbotResult = ipbotDeferred?.await()
 
                 val seedProviders = listOfNotNull(
                     ipapiIsResult,
@@ -88,15 +132,27 @@ object GeoIpChecker {
                     iplookupResult,
                     ipbotResult,
                 )
-                val seedProvider = seedProviders.firstOrNull()
+                val seedProvider = seedProviders.firstOrNull { it.isSuccess }
                     ?: return@coroutineScope noProviderResult(
                         context.getString(R.string.checker_geo_error_no_provider),
+                        responses = seedProviders
                     )
                 val explicitProviders = fetchSpecificIpProviders(
                     resolverConfig = resolverConfig,
-                    ip = seedProvider.snapshot.ip,
+                    ip = seedProvider.snapshot!!.ip,
+                    config = config,
                 )
-                val providers = mergeProviderLists(explicitProviders.ifEmpty { seedProviders }, seedProviders)
+                val customSnapshots = fetchCustomProviders(
+                    resolverConfig = resolverConfig,
+                    ip = seedProvider.snapshot.ip,
+                    config = config,
+                )
+                val mergedSeed = seedProviders + customSnapshots
+                val mergedExplicit = explicitProviders + customSnapshots
+                val providers = mergeProviderLists(
+                    mergedExplicit.ifEmpty { mergedSeed },
+                    mergedSeed,
+                )
                 val baseProvider = providers.firstOrNull { it.provider == seedProvider.provider }
                     ?: seedProvider
 
@@ -106,6 +162,7 @@ object GeoIpChecker {
                         baseProvider = baseProvider,
                         providers = providers,
                     ),
+                    responses = listOf(baseProvider) + providers.filter { it.provider != baseProvider.provider }
                 )
             }
         } catch (e: Exception) {
@@ -117,50 +174,159 @@ object GeoIpChecker {
     private suspend fun fetchSpecificIpProviders(
         resolverConfig: DnsResolverConfig,
         ip: String,
+        config: GeoIpConfig = GeoIpConfig(),
     ): List<ProviderSnapshot> {
         if (!isMeaningfulField(ip)) return emptyList()
         return coroutineScope {
-            listOf(
-                async { fetchWithRetries { fetchIpapiIs(resolverConfig, ip) } },
-                async { fetchWithRetries { fetchIplocate(resolverConfig, ip) } },
-                async { fetchWithRetries { fetchIpquery(resolverConfig, ip) } },
-                async { fetchWithRetries { fetchIplookup(resolverConfig, ip) } },
-                async { fetchWithRetries { fetchIpbot(resolverConfig, ip) } },
-            )
+            buildList {
+                if (isBuiltinEnabled(config, IPAPIIS_PROVIDER)) {
+                    add(async { fetchWithRetries { fetchIpapiIs(resolverConfig, ip, config.timeoutMs) } })
+                }
+                if (isBuiltinEnabled(config, IPLOCATE_PROVIDER)) {
+                    add(async { fetchWithRetries { fetchIplocate(resolverConfig, ip, config.timeoutMs) } })
+                }
+                if (isBuiltinEnabled(config, IPQUERY_PROVIDER)) {
+                    add(async { fetchWithRetries { fetchIpquery(resolverConfig, ip, config.timeoutMs) } })
+                }
+                if (isBuiltinEnabled(config, IPLOOKUP_PROVIDER)) {
+                    add(async { fetchWithRetries { fetchIplookup(resolverConfig, ip, config.timeoutMs) } })
+                }
+                if (isBuiltinEnabled(config, IPBOT_PROVIDER)) {
+                    add(async { fetchWithRetries { fetchIpbot(resolverConfig, ip, config.timeoutMs) } })
+                }
+            }
                 .awaitAll()
-                .filterNotNull()
         }
     }
 
-    internal suspend fun <T> fetchWithRetries(
+    private suspend fun fetchCustomProviders(
+        resolverConfig: DnsResolverConfig,
+        ip: String,
+        config: GeoIpConfig,
+    ): List<ProviderSnapshot> {
+        val enabled = config.customProviders.filter { it.enabled }
+        if (enabled.isEmpty()) return emptyList()
+        return coroutineScope {
+            enabled
+                .map { provider ->
+                    async {
+                        fetchWithRetries {
+                            fetchCustomProvider(resolverConfig, ip, provider, config.timeoutMs)
+                        }
+                    }
+                }
+                .awaitAll()
+        }
+    }
+
+    private fun fetchCustomProvider(
+        resolverConfig: DnsResolverConfig,
+        ip: String,
+        provider: CustomGeoIpProvider,
+        timeoutMs: Int,
+    ): ProviderSnapshot {
+        return try {
+            val resolvedUrl = when {
+                provider.url.contains("{ip}") -> provider.url.replace("{ip}", urlEncode(ip))
+                provider.url.endsWith("?q=") -> "${provider.url}${urlEncode(ip)}"
+                else -> provider.url
+            }
+            val acceptHeaders = when (provider.responseMapping.responseType) {
+                com.notcvnt.rknhardering.customcheck.ResponseType.JSON -> mapOf("Accept" to "application/json")
+                else -> mapOf("Accept" to "*/*")
+            }
+            val rawBody = fetchRawBody(resolvedUrl, resolverConfig, timeoutMs, acceptHeaders)
+                ?: return ProviderSnapshot(provider.name, true, null, "HTTP Request failed (non-2xx code)")
+            val mapping = provider.responseMapping
+
+            val ipVal = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.IP)
+                ?.takeIf { it.isNotBlank() } ?: ip
+            val countryCode = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.COUNTRY_CODE)
+                ?.trim() ?: ""
+            val countryName = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.COUNTRY_NAME)
+                ?.trim() ?: "N/A"
+            val isp = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.ISP)
+                ?.trim() ?: "N/A"
+            val org = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.ORG)
+                ?.trim() ?: "N/A"
+            val asn = EndpointResponseMapper.extractField(rawBody, mapping, MappingField.ASN)
+                ?.trim() ?: "N/A"
+            val isHosting = parseBooleanString(
+                EndpointResponseMapper.extractField(rawBody, mapping, MappingField.IS_HOSTING)
+            )
+            val isProxy = parseBooleanString(
+                EndpointResponseMapper.extractField(rawBody, mapping, MappingField.IS_PROXY)
+            )
+
+            ProviderSnapshot(
+                provider = provider.name,
+                isCustom = true,
+                snapshot = GeoIpSnapshot(
+                    ip = ipVal,
+                    country = countryName,
+                    countryCode = countryCode,
+                    isp = isp,
+                    org = org,
+                    asn = asn,
+                    isProxy = isProxy,
+                    isHosting = isHosting,
+                    hostingVotes = 0,
+                    hostingChecks = 0,
+                    hostingSources = emptyList(),
+                ),
+                rawBody = rawBody,
+            )
+        } catch (e: Exception) {
+            rethrowIfCancellation(e)
+            ProviderSnapshot(provider.name, true, null, e.message)
+        }
+    }
+
+    private fun fetchRawBody(url: String, resolverConfig: DnsResolverConfig, timeoutMs: Int = GEOIP_TIMEOUT_MS, headers: Map<String, String> = mapOf("Accept" to "*/*")): String? {
+        val executionContext = ScanExecutionContext.currentOrDefault()
+        val response = ResolverNetworkStack.execute(
+            url = url,
+            method = "GET",
+            headers = headers,
+            timeoutMs = timeoutMs,
+            config = resolverConfig,
+            cancellationSignal = executionContext.cancellationSignal,
+        )
+        if (response.code !in 200..299) return null
+        return response.body
+    }
+
+    internal suspend fun fetchWithRetries(
         maxAttempts: Int = MAX_FETCH_ATTEMPTS,
         retryDelayMs: Long = RETRY_DELAY_MS,
-        fetcher: suspend () -> T?,
-    ): T? {
+        fetcher: suspend () -> ProviderSnapshot,
+    ): ProviderSnapshot {
+        var lastResult: ProviderSnapshot? = null
         repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
             try {
                 val result = fetcher()
-                if (result != null) {
+                lastResult = result
+                if (result.isSuccess) {
                     return result
                 }
             } catch (error: Exception) {
                 rethrowIfCancellation(error)
-                // Ignore transient provider errors and retry the next attempt.
             }
             if (attempt < maxAttempts - 1 && retryDelayMs > 0) {
                 delay(retryDelayMs)
             }
         }
-        return null
+        return lastResult ?: fetcher() // fallback if maxAttempts=0
     }
 
-    private fun fetchIpapiIs(resolverConfig: DnsResolverConfig, ip: String? = null): ProviderSnapshot? {
+    private fun fetchIpapiIs(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
         return try {
             val json = fetchJson(
                 url = ip?.let { "$IPAPIIS_URL?q=${urlEncode(it)}" } ?: IPAPIIS_URL,
                 resolverConfig = resolverConfig,
+                timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return null
+            if (!json.has("ip")) return ProviderSnapshot(IPAPIIS_PROVIDER, false, null, "Missing ip field", json.toString())
 
             val location = json.optJSONObject("location")
             val company = json.optJSONObject("company")
@@ -169,6 +335,7 @@ object GeoIpChecker {
 
             ProviderSnapshot(
                 provider = IPAPIIS_PROVIDER,
+                isCustom = false,
                 snapshot = GeoIpSnapshot(
                     ip = firstMeaningful(json.optString("ip"), default = "N/A"),
                     country = firstMeaningful(location?.optString("country"), default = "N/A"),
@@ -203,20 +370,22 @@ object GeoIpChecker {
                     hostingChecks = 0,
                     hostingSources = emptyList(),
                 ),
+                rawBody = json.toString(),
             )
         } catch (error: Exception) {
             rethrowIfCancellation(error)
-            null
+            ProviderSnapshot(IPAPIIS_PROVIDER, false, null, error.message)
         }
     }
 
-    private fun fetchIplocate(resolverConfig: DnsResolverConfig, ip: String? = null): ProviderSnapshot? {
+    private fun fetchIplocate(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
         return try {
             val json = fetchJson(
                 url = ip?.let { "$IPLOCATE_URL/${urlEncode(it)}" } ?: IPLOCATE_URL,
                 resolverConfig = resolverConfig,
+                timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return null
+            if (!json.has("ip")) return ProviderSnapshot(IPLOCATE_PROVIDER, false, null, "Missing ip field", json.toString())
 
             val privacy = json.optJSONObject("privacy")
             val company = json.optJSONObject("company")
@@ -225,6 +394,7 @@ object GeoIpChecker {
 
             ProviderSnapshot(
                 provider = IPLOCATE_PROVIDER,
+                isCustom = false,
                 snapshot = GeoIpSnapshot(
                     ip = firstMeaningful(json.optString("ip"), default = "N/A"),
                     country = firstMeaningful(json.optString("country"), default = "N/A"),
@@ -253,20 +423,22 @@ object GeoIpChecker {
                     hostingChecks = 0,
                     hostingSources = emptyList(),
                 ),
+                rawBody = json.toString(),
             )
         } catch (error: Exception) {
             rethrowIfCancellation(error)
-            null
+            ProviderSnapshot(IPLOCATE_PROVIDER, false, null, error.message)
         }
     }
 
-    private fun fetchIpquery(resolverConfig: DnsResolverConfig, ip: String? = null): ProviderSnapshot? {
+    private fun fetchIpquery(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
         return try {
             val json = fetchJson(
                 url = ip?.let { "$IPQUERY_URL${urlEncode(it)}" } ?: "${IPQUERY_URL}?format=json",
                 resolverConfig = resolverConfig,
+                timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return null
+            if (!json.has("ip")) return ProviderSnapshot(IPQUERY_PROVIDER, false, null, "Missing ip field", json.toString())
 
             val location = json.optJSONObject("location")
             val isp = json.optJSONObject("isp")
@@ -274,6 +446,7 @@ object GeoIpChecker {
 
             ProviderSnapshot(
                 provider = IPQUERY_PROVIDER,
+                isCustom = false,
                 snapshot = GeoIpSnapshot(
                     ip = firstMeaningful(json.optString("ip"), default = "N/A"),
                     country = firstMeaningful(location?.optString("country"), default = "N/A"),
@@ -304,20 +477,22 @@ object GeoIpChecker {
                     hostingChecks = 0,
                     hostingSources = emptyList(),
                 ),
+                rawBody = json.toString(),
             )
         } catch (error: Exception) {
             rethrowIfCancellation(error)
-            null
+            ProviderSnapshot(IPQUERY_PROVIDER, false, null, error.message)
         }
     }
 
-    private fun fetchIplookup(resolverConfig: DnsResolverConfig, ip: String? = null): ProviderSnapshot? {
+    private fun fetchIplookup(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
         return try {
             val json = fetchJson(
                 url = ip?.let { "$IPLOOKUP_URL/ip/${urlEncode(it)}" } ?: "$IPLOOKUP_URL/json",
                 resolverConfig = resolverConfig,
+                timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return null
+            if (!json.has("ip")) return ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, "Missing ip field", json.toString())
 
             val geo = json.optJSONObject("geo")
             val network = json.optJSONObject("network")
@@ -325,6 +500,7 @@ object GeoIpChecker {
 
             ProviderSnapshot(
                 provider = IPLOOKUP_PROVIDER,
+                isCustom = false,
                 snapshot = GeoIpSnapshot(
                     ip = firstMeaningful(json.optString("ip"), default = "N/A"),
                     country = firstMeaningful(geo?.optString("country"), default = "N/A"),
@@ -355,20 +531,22 @@ object GeoIpChecker {
                     hostingChecks = 0,
                     hostingSources = emptyList(),
                 ),
+                rawBody = json.toString(),
             )
         } catch (error: Exception) {
             rethrowIfCancellation(error)
-            null
+            ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, error.message)
         }
     }
 
-    private fun fetchIpbot(resolverConfig: DnsResolverConfig, ip: String? = null): ProviderSnapshot? {
+    private fun fetchIpbot(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
         return try {
             val json = fetchJson(
                 url = ip?.let { "$IPBOT_URL${urlEncode(it)}" } ?: IPBOT_URL,
                 resolverConfig = resolverConfig,
+                timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return null
+            if (!json.has("ip")) return ProviderSnapshot(IPBOT_PROVIDER, false, null, "Missing ip field", json.toString())
 
             val location = json.optJSONObject("location")
             val network = json.optJSONObject("network")
@@ -380,6 +558,7 @@ object GeoIpChecker {
 
             ProviderSnapshot(
                 provider = IPBOT_PROVIDER,
+                isCustom = false,
                 snapshot = GeoIpSnapshot(
                     ip = firstMeaningful(json.optString("ip"), default = "N/A"),
                     country = firstMeaningful(location?.optString("country"), default = "N/A"),
@@ -408,20 +587,21 @@ object GeoIpChecker {
                     hostingChecks = 0,
                     hostingSources = emptyList(),
                 ),
+                rawBody = json.toString(),
             )
         } catch (error: Exception) {
             rethrowIfCancellation(error)
-            null
+            ProviderSnapshot(IPBOT_PROVIDER, false, null, error.message)
         }
     }
 
-    private fun fetchJson(url: String, resolverConfig: DnsResolverConfig): JSONObject {
+    private fun fetchJson(url: String, resolverConfig: DnsResolverConfig, timeoutMs: Int = GEOIP_TIMEOUT_MS): JSONObject {
         val executionContext = ScanExecutionContext.currentOrDefault()
         val response = ResolverNetworkStack.execute(
             url = url,
             method = "GET",
             headers = mapOf("Accept" to "application/json"),
-            timeoutMs = GEOIP_TIMEOUT_MS,
+            timeoutMs = timeoutMs,
             config = resolverConfig,
             cancellationSignal = executionContext.cancellationSignal,
         )
@@ -436,37 +616,37 @@ object GeoIpChecker {
         providers: List<ProviderSnapshot>,
     ): GeoIpSnapshot {
         val compatibleProviders = providers.filter {
-            isCompatibleIp(
-                expectedIp = baseProvider.snapshot.ip,
-                candidateIp = it.snapshot.ip,
+            it.isSuccess && isCompatibleIp(
+                expectedIp = baseProvider.snapshot?.ip ?: "",
+                candidateIp = it.snapshot?.ip ?: "",
             )
         }
 
         val orderedForFill = buildList {
-            add(baseProvider)
+            if (baseProvider.isSuccess) add(baseProvider)
             compatibleProviders
                 .filterNot { it.provider == baseProvider.provider }
                 .forEach(::add)
         }
 
-        val hostingVotes = compatibleProviders.count { it.snapshot.isHosting }
+        val hostingVotes = compatibleProviders.count { it.snapshot!!.isHosting }
         val hostingChecks = compatibleProviders.size
         val hostingSources = compatibleProviders
-            .filter { it.snapshot.isHosting }
+            .filter { it.snapshot!!.isHosting }
             .map { it.provider }
-        val proxyVotes = compatibleProviders.count { it.snapshot.isProxy }
+        val proxyVotes = compatibleProviders.count { it.snapshot!!.isProxy }
         val proxyChecks = compatibleProviders.size
         val proxySources = compatibleProviders
-            .filter { it.snapshot.isProxy }
+            .filter { it.snapshot!!.isProxy }
             .map { it.provider }
 
         return GeoIpSnapshot(
-            ip = pickField(orderedForFill) { it.snapshot.ip },
-            country = pickField(orderedForFill) { it.snapshot.country },
-            countryCode = pickField(orderedForFill, default = "") { it.snapshot.countryCode },
-            isp = pickField(orderedForFill) { it.snapshot.isp },
-            org = pickField(orderedForFill) { it.snapshot.org },
-            asn = pickField(orderedForFill) { it.snapshot.asn },
+            ip = pickField(orderedForFill) { it.snapshot!!.ip },
+            country = pickField(orderedForFill) { it.snapshot!!.country },
+            countryCode = pickField(orderedForFill, default = "") { it.snapshot!!.countryCode },
+            isp = pickField(orderedForFill) { it.snapshot!!.isp },
+            org = pickField(orderedForFill) { it.snapshot!!.org },
+            asn = pickField(orderedForFill) { it.snapshot!!.asn },
             isProxy = resolveProxy(
                 compatibleProviders = compatibleProviders,
             ),
@@ -480,7 +660,7 @@ object GeoIpChecker {
         )
     }
 
-    internal fun evaluate(context: Context, snapshot: GeoIpSnapshot): CategoryResult {
+    internal fun evaluate(context: Context, snapshot: GeoIpSnapshot, responses: List<ProviderSnapshot>): CategoryResult {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
 
@@ -559,24 +739,27 @@ object GeoIpChecker {
             needsReview = needsReview,
             evidence = evidence,
             geoFacts = geoFacts,
+            geoIpResponses = responses.map { it.toGeoIpResponse() },
         )
     }
 
-    private fun errorResult(message: String): CategoryResult {
+    private fun errorResult(message: String, responses: List<ProviderSnapshot> = emptyList()): CategoryResult {
         return CategoryResult(
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message, isError = true)),
             geoFacts = GeoIpFacts(fetchError = true),
+            geoIpResponses = responses.map { it.toGeoIpResponse() },
         )
     }
 
-    internal fun noProviderResult(message: String): CategoryResult {
+    internal fun noProviderResult(message: String, responses: List<ProviderSnapshot> = emptyList()): CategoryResult {
         return CategoryResult(
             name = "GeoIP",
             detected = false,
             findings = listOf(Finding(message)),
             geoFacts = GeoIpFacts(fetchError = true),
+            geoIpResponses = responses.map { it.toGeoIpResponse() },
         )
     }
 
@@ -607,7 +790,7 @@ object GeoIpChecker {
     }
 
     private fun resolveProxy(compatibleProviders: List<ProviderSnapshot>): Boolean {
-        return compatibleProviders.any { it.snapshot.isProxy }
+        return compatibleProviders.any { it.snapshot!!.isProxy }
     }
 
     private fun mergeProviderLists(

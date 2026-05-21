@@ -99,6 +99,10 @@ object BypassChecker {
         portRange: String = "full",
         portRangeStart: Int = 1024,
         portRangeEnd: Int = 65535,
+        connectTimeoutMs: Int = 80,
+        checkUnderlyingNetwork: Boolean = true,
+        checkVpnNetworkBinding: Boolean = true,
+        checkMtprotoViaProxy: Boolean = true,
         underlyingProbeDeferred: Deferred<UnderlyingNetworkProber.ProbeResult>? = null,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): BypassResult = coroutineScope {
@@ -116,19 +120,23 @@ object BypassChecker {
             null
         }
 
+        val effectiveConnectTimeoutMs = connectTimeoutMs.coerceAtLeast(1)
         val scanner = scanPlan?.let {
             ProxyScanner(
                 popularPorts = it.popularPorts,
                 scanRange = it.scanRange,
+                connectTimeoutMs = effectiveConnectTimeoutMs,
             )
         }
         val xrayScanner = scanPlan?.let {
             when (it.mode) {
                 ScanMode.POPULAR_ONLY -> XrayApiScanner(
                     scanPorts = XrayApiScanner.DEFAULT_POPULAR_PORTS,
+                    connectTimeoutMs = effectiveConnectTimeoutMs,
                 )
                 else -> XrayApiScanner(
                     scanRange = it.scanRange,
+                    connectTimeoutMs = effectiveConnectTimeoutMs,
                 )
             }
         }
@@ -214,7 +222,7 @@ object BypassChecker {
             null
         }
 
-        val underlyingDeferred = if (splitTunnelEnabled) {
+        val underlyingDeferred = if (splitTunnelEnabled && checkUnderlyingNetwork) {
             underlyingProbeDeferred ?: async {
                 onProgress?.invoke(
                     Progress(
@@ -239,6 +247,7 @@ object BypassChecker {
                     findings = findings,
                     evidence = evidence,
                     onProgress = onProgress,
+                    checkMtprotoViaProxy = checkMtprotoViaProxy,
                 )
             }
         } else {
@@ -254,7 +263,7 @@ object BypassChecker {
         if (splitTunnelEnabled && xrayApiScanEnabled) {
             reportXrayApiResult(context, xrayApiScanResult, findings, evidence)
         }
-        val underlyingEvaluation = if (splitTunnelEnabled) {
+        val underlyingEvaluation = if (splitTunnelEnabled && checkUnderlyingNetwork && checkVpnNetworkBinding) {
             reportUnderlyingNetworkResult(context, underlyingResult, findings, evidence)
         } else {
             UnderlyingEvaluation(detected = false, needsReview = false)
@@ -304,6 +313,7 @@ object BypassChecker {
         findings: MutableList<Finding>,
         evidence: MutableList<EvidenceItem>,
         onProgress: (suspend (Progress) -> Unit)? = null,
+        checkMtprotoViaProxy: Boolean = true,
         fetchDirectIp: suspend () -> Result<String> = {
             IfconfigClient.fetchDirectIp(resolverConfig = resolverConfig)
         },
@@ -345,6 +355,7 @@ object BypassChecker {
                         val isXrayPort = VpnAppCatalog.familiesForPort(proxyEndpoint.port)
                             .contains(VpnAppCatalog.FAMILY_XRAY)
                         val mtProtoResult = if (
+                            checkMtprotoViaProxy &&
                             proxyEndpoint.type == ProxyType.SOCKS5 &&
                             !proxyEndpoint.authRequired &&
                             proxyIp == null &&

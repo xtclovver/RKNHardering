@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.fragment.app.Fragment
+import com.notcvnt.rknhardering.customcheck.CustomCheckRepository
 import com.notcvnt.rknhardering.network.DnsResolverMode
 import java.util.Locale
 
@@ -36,6 +37,12 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
             iconRes = R.drawable.ic_public,
             title = getString(R.string.settings_cat_dns),
         ) { activity.navigateTo(SettingsDnsFragment(), R.string.settings_cat_dns) }
+
+        bindRow(
+            view, R.id.rowCustomChecks,
+            iconRes = R.drawable.ic_tune,
+            title = getString(R.string.settings_cat_custom_checks),
+        ) { activity.navigateTo(SettingsCustomChecksFragment(), R.string.settings_cat_custom_checks) }
 
         bindRow(
             view, R.id.rowPrivacy,
@@ -92,6 +99,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         setRowValue(root, R.id.rowSplitTunnel, if (splitTunnelEnabled()) R.string.settings_value_on else R.string.settings_value_off)
         setRowValue(root, R.id.rowNetwork, if (networkRequestsEnabled()) R.string.settings_value_network_all else R.string.settings_value_network_disabled)
         setRowValue(root, R.id.rowDns, dnsValue())
+        setRowValue(root, R.id.rowCustomChecks, customChecksValue())
         setRowValue(root, R.id.rowPrivacy, if (privacyModeEnabled()) R.string.settings_value_privacy_masking else R.string.settings_value_off)
         setRowValue(root, R.id.rowAppearance, appearanceValue())
         setRowValue(root, R.id.rowAccessibility, colorVisionValue())
@@ -161,6 +169,14 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         } else {
             "v${BuildConfig.VERSION_NAME}"
         }
+    }
+
+    private fun customChecksValue(): String {
+        val enabled = prefs.getBoolean(SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED, false)
+        if (!enabled) return getString(R.string.settings_value_off)
+        val activeId = CustomCheckRepository.getActiveProfileId(requireContext()) ?: return getString(R.string.settings_value_off)
+        val profile = CustomCheckRepository.getById(requireContext(), activeId)
+        return profile?.name ?: getString(R.string.settings_value_off)
     }
 
     private fun currentLocaleCode(): String {

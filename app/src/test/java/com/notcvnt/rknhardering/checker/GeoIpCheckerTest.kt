@@ -36,6 +36,7 @@ class GeoIpCheckerTest {
                 hostingChecks = 0,
                 hostingSources = emptyList(),
             ),
+            emptyList(),
         )
 
         assertFalse(result.detected)
@@ -61,6 +62,7 @@ class GeoIpCheckerTest {
                 hostingChecks = 0,
                 hostingSources = emptyList(),
             ),
+            emptyList(),
         )
 
         val infoFindings = result.findings.filter { it.isInformational }
@@ -90,6 +92,7 @@ class GeoIpCheckerTest {
                 hostingChecks = 0,
                 hostingSources = emptyList(),
             ),
+            emptyList(),
         )
 
         result.findings.filter { it.isInformational }.forEach { finding ->
@@ -115,6 +118,7 @@ class GeoIpCheckerTest {
                 hostingChecks = 2,
                 hostingSources = listOf("ipapi.is", "iplocate.io"),
             ),
+            emptyList(),
         )
 
         assertTrue(result.detected)
@@ -126,6 +130,7 @@ class GeoIpCheckerTest {
     fun `mergeSnapshots falls back to ipapi is when primary provider is unavailable`() {
         val fallback = GeoIpChecker.ProviderSnapshot(
             provider = "ipapi.is",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "203.0.113.101",
                 country = "Finland",
@@ -142,6 +147,7 @@ class GeoIpCheckerTest {
         )
         val secondFallback = GeoIpChecker.ProviderSnapshot(
             provider = "iplocate.io",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "203.0.113.101",
                 country = "Finland",
@@ -178,6 +184,7 @@ class GeoIpCheckerTest {
     fun `mergeSnapshots fills missing fields from compatible fallback`() {
         val baseProvider = GeoIpChecker.ProviderSnapshot(
             provider = "ipapi.is",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "203.0.113.101",
                 country = "Finland",
@@ -194,6 +201,7 @@ class GeoIpCheckerTest {
         )
         val fallback = GeoIpChecker.ProviderSnapshot(
             provider = "iplocate.io",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "203.0.113.101",
                 country = "Finland",
@@ -227,22 +235,27 @@ class GeoIpCheckerTest {
         val providers = listOf(
             GeoIpChecker.ProviderSnapshot(
                 provider = "ipapi.is",
+                isCustom = false,
                 snapshot = geoSnapshot(providerIp = "157.180.123.101", isHosting = true),
             ),
             GeoIpChecker.ProviderSnapshot(
                 provider = "iplocate.io",
+                isCustom = false,
                 snapshot = geoSnapshot(providerIp = "157.180.123.101", isHosting = true),
             ),
             GeoIpChecker.ProviderSnapshot(
                 provider = "ipquery.io",
+                isCustom = false,
                 snapshot = geoSnapshot(providerIp = "157.180.123.101", isHosting = true),
             ),
             GeoIpChecker.ProviderSnapshot(
                 provider = "iplookup.it",
+                isCustom = false,
                 snapshot = geoSnapshot(providerIp = "157.180.123.101", isHosting = true),
             ),
             GeoIpChecker.ProviderSnapshot(
                 provider = "ipbot.com",
+                isCustom = false,
                 snapshot = geoSnapshot(providerIp = "157.180.123.101", isHosting = true),
             ),
         )
@@ -265,6 +278,7 @@ class GeoIpCheckerTest {
     fun `mergeSnapshots ignores hosting votes from different ip versions`() {
         val baseProvider = GeoIpChecker.ProviderSnapshot(
             provider = "ipapi.is",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "203.0.113.101",
                 country = "Finland",
@@ -281,6 +295,7 @@ class GeoIpCheckerTest {
         )
         val ipv6Fallback = GeoIpChecker.ProviderSnapshot(
             provider = "iplocate.io",
+            isCustom = false,
             snapshot = GeoIpChecker.GeoIpSnapshot(
                 ip = "2a01:4f9:c013:d2ba::1",
                 country = "Finland",
@@ -324,6 +339,7 @@ class GeoIpCheckerTest {
                 hostingChecks = 2,
                 hostingSources = listOf("ipapi.is", "iplocate.io"),
             ),
+            emptyList(),
         )
 
         assertTrue(
@@ -354,6 +370,7 @@ class GeoIpCheckerTest {
                 proxyChecks = 3,
                 proxySources = listOf("ipquery.io", "iplookup.it"),
             ),
+            emptyList(),
         )
 
         assertTrue(
@@ -382,10 +399,14 @@ class GeoIpCheckerTest {
 
         val result = GeoIpChecker.fetchWithRetries(maxAttempts = 3, retryDelayMs = 0) {
             attempts += 1
-            if (attempts < 3) null else "ok"
+            if (attempts < 3) {
+                GeoIpChecker.ProviderSnapshot("test", false, null, "error")
+            } else {
+                GeoIpChecker.ProviderSnapshot("test", false, geoSnapshot("1.1.1.1", false))
+            }
         }
 
-        assertEquals("ok", result)
+        assertEquals("1.1.1.1", result.snapshot?.ip)
         assertEquals(3, attempts)
     }
 
@@ -407,7 +428,7 @@ class GeoIpCheckerTest {
         val context: android.content.Context =
             androidx.test.core.app.ApplicationProvider.getApplicationContext()
 
-        val result = GeoIpChecker.evaluate(context, snapshot)
+        val result = GeoIpChecker.evaluate(context, snapshot, emptyList())
 
         val facts = result.geoFacts
         assertNotNull(facts)

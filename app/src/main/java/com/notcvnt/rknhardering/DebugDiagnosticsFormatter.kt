@@ -15,6 +15,7 @@ import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.GeoIpResponse
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
@@ -400,6 +401,9 @@ object DebugDiagnosticsFormatter {
         appendNamedCollection(builder, "matchedApps", category.matchedApps, ::formatMatchedVpnApp)
         appendNamedCollection(builder, "activeApps", category.activeApps, ::formatActiveVpnApp)
         appendNamedCollection(builder, "callTransport", category.callTransportLeaks, ::formatCallTransportLeak)
+        if (key == "geoIp") {
+            appendNamedCollection(builder, "responses", category.geoIpResponses, ::formatGeoIpResponse)
+        }
     }
 
     private fun appendIndirectPerformance(
@@ -744,6 +748,16 @@ object DebugDiagnosticsFormatter {
             add("mtProtoReachable=${proxyCheck.mtProtoReachable?.toString() ?: "<not-run>"}")
             add("mtProtoTarget=${proxyCheck.mtProtoTarget?.let(::maskHostPort) ?: "<none>"}")
             add("summaryReason=${proxyCheck.summaryReason ?: "<none>"}")
+        }.joinToString(" ")
+    }
+
+    private fun formatGeoIpResponse(response: GeoIpResponse): String {
+        return buildList {
+            add("provider=${response.provider}")
+            add("isCustom=${response.isCustom}")
+            add("ip=${response.ip?.let(::maskIp) ?: "<none>"}")
+            add("error=${response.error?.let(::maskIpsInText) ?: "<none>"}")
+            add("rawBody=${formatRawBody(response.rawBody)}")
         }.joinToString(" ")
     }
 

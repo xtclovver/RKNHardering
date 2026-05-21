@@ -6,3 +6,7 @@ Added Telegram channel @RKNHardering link in settings and README (#68).
 Compiler warning cleanup: removed dead parameters and variables, migrated deprecated ConnectivityManager.defaultProxy to LinkProperties.httpProxy.
 Dead code removal: obsolete NativeCurlBridge.execute(String) overload and legacy launcher icons (minSdk=26 uses adaptive icons).
 Structural refactor: export formatters moved to the export subpackage, VerdictNarrative to model, TunProbeDiagnosticsFormatter to probe; deduplicated network interface patterns (also fixed missed dummy-interface detection in IndirectSignsChecker).
+Added custom check profiles: create, edit, clone, import and export your own check sets (timeouts, ping counts, custom endpoints, response mapping rules) and switch the active profile from settings.
+Added in-app marketplace for community profiles with search, ratings, verified/official badges and one-tap install with conflict resolution.
+Added domain reachability check (DomainReachabilityChecker) and a configurable endpoint editor with response-mapping DSL for user-defined IP/geo/leak detectors.
+Per-checker overhaul: CDN pulling, GeoIP, IP comparison, Call transport, ICMP spoofing, RTT triangulation and others now accept per-profile parameters and emit richer diagnostics in JSON/Markdown/Debug exports.

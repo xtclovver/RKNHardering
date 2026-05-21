@@ -13,6 +13,10 @@
     <color name="md_on_surface">#FFE8E1EB</color>
     <color name="md_on_surface_variant">#FFCAC4D0</color>
     <color name="md_outline_variant">#FF4B4653</color>
+    <color name="md_outline">#FF79767F</color>
+    <color name="md_outline_soft">#14FFFFFF</color>
+    <color name="md_accent_lavender">#FFB7AFD9</color>
+    <color name="md_accent_sky">#FF7BB7E5</color>
 
     <color name="status_green">#FF89D998</color>
     <color name="status_green_container">#FF193823</color>

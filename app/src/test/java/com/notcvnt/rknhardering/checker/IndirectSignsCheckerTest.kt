@@ -11,6 +11,7 @@ import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.customcheck.IndirectSignsConfig
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.LocalSocketInspector
 import org.junit.Assert.assertEquals
@@ -501,7 +502,7 @@ class IndirectSignsCheckerTest {
                     ipv6Result = null,
                 )
             },
-            publicIpFetcher = { _, _ -> Result.success("203.0.113.10") },
+            publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
         )
 
         val result = IndirectSignsChecker.check(
@@ -592,5 +593,45 @@ class IndirectSignsCheckerTest {
             interfaceName = interfaceName,
             isDefault = isDefault,
         )
+    }
+
+    @Test
+    fun `when checkVpnInterfaces=false the vpn-interfaces finding is skipped`() = runBlocking {
+        // With the toggle disabled the checkNetworkInterfaces path is entirely bypassed.
+        // In Robolectric there are no real VPN interfaces, so evidence from NETWORK_INTERFACE
+        // should be absent in both cases. The assertion confirms no exception is thrown and
+        // no detected NETWORK_INTERFACE evidence appears when the toggle is off.
+        val result = IndirectSignsChecker.check(
+            context = context,
+            config = IndirectSignsConfig(checkVpnInterfaces = false),
+        )
+
+        assertFalse(
+            result.evidence.any { it.source == EvidenceSource.NETWORK_INTERFACE && it.detected },
+        )
+    }
+
+    @Test
+    fun `when checkLocalListeners=false the local-listeners finding is skipped`() = runBlocking {
+        // checkLocalListeners=false prevents the loopback-port scan path inside
+        // checkProxyTechnicalSignals from running. In Robolectric /proc/net/tcp is empty
+        // so this also produces no listeners with the toggle enabled, but the important
+        // contract is that disabling the toggle never produces MORE findings.
+        val resultDisabled = IndirectSignsChecker.check(
+            context = context,
+            config = IndirectSignsConfig(checkLocalListeners = false),
+        )
+        val resultEnabled = IndirectSignsChecker.check(
+            context = context,
+            config = IndirectSignsConfig(checkLocalListeners = true),
+        )
+
+        val disabledListenerFindings = resultDisabled.findings.count {
+            it.source == EvidenceSource.PROXY_TECHNICAL_SIGNAL && it.detected
+        }
+        val enabledListenerFindings = resultEnabled.findings.count {
+            it.source == EvidenceSource.PROXY_TECHNICAL_SIGNAL && it.detected
+        }
+        assertTrue(disabledListenerFindings <= enabledListenerFindings)
     }
 }

@@ -29,4 +29,5 @@ internal object SettingsPrefs {
     const val PREF_RED_GREEN_ICON_VARIANT = "pref_red_green_icon_variant"
     const val PREF_ICON_MIGRATION_DONE = "pref_icon_migration_done"
     const val PREF_ICON_STYLE = "pref_icon_style"
+    const val PREF_CUSTOM_CHECKS_ENABLED = "pref_custom_checks_enabled"
 }

@@ -28,6 +28,7 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.customcheck.LocationSignalsConfig
 import com.notcvnt.rknhardering.model.LocationSignalsFacts
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import kotlinx.coroutines.CancellableContinuation
@@ -121,14 +122,19 @@ object LocationSignalsChecker {
         context: Context,
         networkRequestsEnabled: Boolean = true,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        config: LocationSignalsConfig = LocationSignalsConfig(),
     ): CategoryResult = withContext(Dispatchers.IO) {
-        evaluate(collectSnapshot(context, networkRequestsEnabled, resolverConfig))
+        if (!config.enabled) {
+            return@withContext CategoryResult(name = "Location", detected = false, findings = emptyList())
+        }
+        evaluate(collectSnapshot(context, networkRequestsEnabled, resolverConfig, config))
     }
 
     private suspend fun collectSnapshot(
         context: Context,
         networkRequestsEnabled: Boolean,
         resolverConfig: DnsResolverConfig,
+        config: LocationSignalsConfig = LocationSignalsConfig(),
     ): LocationSnapshot {
         val fineLocationGranted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         val nearbyWifiGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -165,13 +171,13 @@ object LocationSignalsChecker {
 
         val simCards = collectSimCards(context, tm)
 
-        val cellCollection = if (cellLookupPermissionGranted && locationServicesEnabled && telephonyRadioAccessAvailable) {
+        val cellCollection = if (config.checkCellTowers && cellLookupPermissionGranted && locationServicesEnabled && telephonyRadioAccessAvailable) {
             collectCellCandidates(context, tm, simCards).also { cellCandidatesCount = it.candidates.size }
         } else {
             CellCollectionResult()
         }
         val cellCandidates = cellCollection.candidates
-        val wifiCollection = if (wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
+        val wifiCollection = if (config.checkWifiSignals && wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
             collectWifiCandidates(context).also { wifiAccessPointCandidatesCount = it.candidates.size }
         } else {
             WifiCollectionResult()
@@ -186,7 +192,7 @@ object LocationSignalsChecker {
         val beaconDbUnsupportedCellRadios = beaconDbInput.unsupportedCellRadios
         val beaconDbWifiCandidatesUsedCount = beaconDbInput.wifiUsedCount
 
-        if ((cellLookupPermissionGranted || wifiPermissionGranted) && networkRequestsEnabled) {
+        if (config.checkBeacondb && (cellLookupPermissionGranted || wifiPermissionGranted) && networkRequestsEnabled) {
             val lookup = beaconDbClient.lookup(cellCandidates, wifiCandidates)
             cellCountryCode = lookup.countryCode
             cellLookupSummary = buildString {
@@ -197,7 +203,7 @@ object LocationSignalsChecker {
             }
         }
 
-        val bssidResult = if (wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
+        val bssidResult = if (config.checkWifiSignals && wifiPermissionGranted && locationServicesEnabled && wifiFeatureAvailable) {
             collectBssid(context, wifiCandidates)
         } else {
             BssidCollectionResult(bssid = null, source = null, unavailableReason = null)

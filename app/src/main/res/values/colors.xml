@@ -16,6 +16,10 @@
     <color name="md_on_surface">#FF1C1B1F</color>
     <color name="md_on_surface_variant">#FF47464F</color>
     <color name="md_outline_variant">#FFC8C5D0</color>
+    <color name="md_outline">#FF79767F</color>
+    <color name="md_outline_soft">#14FFFFFF</color>
+    <color name="md_accent_lavender">#FFB7AFD9</color>
+    <color name="md_accent_sky">#FF7BB7E5</color>
 
     <!-- Status colours — used in findings and verdicts -->
     <color name="status_green">#FF1A6B2A</color>

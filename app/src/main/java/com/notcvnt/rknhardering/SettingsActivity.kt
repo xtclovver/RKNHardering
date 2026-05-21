@@ -57,6 +57,12 @@ class SettingsActivity : AppCompatActivity() {
                 .commit()
         }
 
+        intent.getStringExtra(EXTRA_IMPORT_RKNCHECK_URI)?.takeIf { it.isNotEmpty() }?.let { uriStr ->
+            val uri = android.net.Uri.parse(uriStr)
+            navigateTo(SettingsCustomChecksFragment.newInstanceWithImport(uri), R.string.settings_cat_custom_checks)
+            intent.removeExtra(EXTRA_IMPORT_RKNCHECK_URI)
+        }
+
         supportFragmentManager.addOnBackStackChangedListener {
             updateToolbarTitle()
         }
@@ -108,7 +114,9 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_EASTER_EGG_PROTANOPIA_UNLOCKED = SettingsPrefs.PREF_EASTER_EGG_PROTANOPIA_UNLOCKED
         const val PREF_RED_GREEN_ICON_VARIANT = SettingsPrefs.PREF_RED_GREEN_ICON_VARIANT
         const val PREF_ICON_MIGRATION_DONE = SettingsPrefs.PREF_ICON_MIGRATION_DONE
+        const val PREF_CUSTOM_CHECKS_ENABLED = SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED
         const val EXTRA_REQUEST_PERMISSIONS = "extra_request_permissions"
+        const val EXTRA_IMPORT_RKNCHECK_URI = "extra_import_rkncheck_uri"
 
         fun applyTheme(theme: String) {
             when (theme) {

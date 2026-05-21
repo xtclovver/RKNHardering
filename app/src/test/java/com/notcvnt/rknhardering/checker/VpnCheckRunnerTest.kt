@@ -69,10 +69,10 @@ class VpnCheckRunnerTest {
         )
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, networkRequestsEnabled, callTransportProbeEnabled, _ ->
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, networkRequestsEnabled, callTransportProbeEnabled, _, _, _ ->
                 assertTrue(networkRequestsEnabled)
                 assertTrue(callTransportProbeEnabled)
                 category(
@@ -89,8 +89,8 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -118,12 +118,12 @@ class VpnCheckRunnerTest {
         var capturedXrayApiScanEnabled: Boolean? = null
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, _, _, _, _, _ ->
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, _, _, _, _, _, _, _, _, _ ->
                 assertTrue(splitTunnelEnabled)
                 capturedProxyScanEnabled = proxyScanEnabled
                 capturedXrayApiScanEnabled = xrayApiScanEnabled
@@ -158,9 +158,9 @@ class VpnCheckRunnerTest {
         var icmpCalls = 0
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            icmpSpoofingCheck = { _, _ ->
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _, _ ->
                 icmpCalls += 1
                 category(
                     name = "icmp",
@@ -175,10 +175,10 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -212,9 +212,9 @@ class VpnCheckRunnerTest {
     @Test
     fun `disabled network checks do not downgrade strong local verdict`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> error("GeoIP should not run when network checks are disabled") },
-            ipComparisonCheck = { _, _ -> error("IP comparison should not run when network checks are disabled") },
-            directCheck = { _, _, _ ->
+            geoIpCheck = { _, _, _ -> error("GeoIP should not run when network checks are disabled") },
+            ipComparisonCheck = { _, _, _ -> error("IP comparison should not run when network checks are disabled") },
+            directCheck = { _, _, _, _ ->
                 category(
                     name = "direct",
                     evidence = listOf(
@@ -227,7 +227,7 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            indirectCheck = { _, networkRequestsEnabled, _, _ ->
+            indirectCheck = { _, networkRequestsEnabled, _, _, _, _ ->
                 assertFalse(networkRequestsEnabled)
                 category(
                     name = "indirect",
@@ -241,9 +241,9 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            locationCheck = { _, _, _ -> category("location") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -263,13 +263,13 @@ class VpnCheckRunnerTest {
     @Test
     fun `direct checker failure promotes final verdict to needs review`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _, _ -> throw java.io.IOException("direct failed") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            directCheck = { _, _, _, _ -> throw java.io.IOException("direct failed") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -291,13 +291,13 @@ class VpnCheckRunnerTest {
     @Test
     fun `indirect checker failure promotes final verdict to needs review`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
-            locationCheck = { _, _, _ -> category("location") },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> throw java.io.IOException("indirect failed") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -319,15 +319,15 @@ class VpnCheckRunnerTest {
     @Test
     fun `run keeps category fallback errors visible`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            icmpSpoofingCheck = { _, _ -> throw java.io.IOException("icmp failed") },
-            rttTriangulationCheck = { _, _, _ -> throw java.io.IOException("rtt failed") },
-            directCheck = { _, _, _ -> throw java.io.IOException("direct failed") },
-            indirectCheck = { _, _, _, _ -> throw java.io.IOException("indirect failed") },
-            locationCheck = { _, _, _ -> throw java.io.IOException("location failed") },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _, _ -> throw java.io.IOException("icmp failed") },
+            rttTriangulationCheck = { _, _, _, _ -> throw java.io.IOException("rtt failed") },
+            directCheck = { _, _, _, _ -> throw java.io.IOException("direct failed") },
+            indirectCheck = { _, _, _, _, _, _ -> throw java.io.IOException("indirect failed") },
+            locationCheck = { _, _, _, _ -> throw java.io.IOException("location failed") },
             nativeCheck = { _ -> throw java.io.IOException("native failed") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -364,19 +364,19 @@ class VpnCheckRunnerTest {
         var bypassProbeResult: UnderlyingNetworkProber.ProbeResult? = null
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
             underlyingProbe = { _, _, _, _, _, _, _ ->
                 probeCalls += 1
                 sharedProbe
             },
-            directCheck = { _, tunActiveProbeResult, _ ->
+            directCheck = { _, tunActiveProbeResult, _, _ ->
                 directProbeResult = tunActiveProbeResult
                 category("direct")
             },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, underlyingProbeDeferred, _ ->
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, underlyingProbeDeferred, _ ->
                 bypassProbeResult = underlyingProbeDeferred?.await()
                 BypassResult(
                     proxyEndpoint = null,
@@ -409,15 +409,15 @@ class VpnCheckRunnerTest {
         var indirectThread: Thread? = null
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ ->
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ ->
                 indirectThread = Thread.currentThread()
                 category("indirect")
             },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 BypassResult(
                     proxyEndpoint = null,
                     directIp = null,
@@ -448,8 +448,8 @@ class VpnCheckRunnerTest {
         var cdnCalls = 0
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ ->
                 cdnCalls += 1
                 CdnPullingResult(
@@ -466,10 +466,10 @@ class VpnCheckRunnerTest {
                     ),
                 )
             },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -521,13 +521,13 @@ class VpnCheckRunnerTest {
         )
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ -> rawCdn },
-            icmpSpoofingCheck = { _, _ -> rawIcmp },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ ->
+            icmpSpoofingCheck = { _, _, _ -> rawIcmp },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ ->
                 CategoryResult(
                     name = "location",
                     detected = false,
@@ -542,7 +542,7 @@ class VpnCheckRunnerTest {
                 )
             },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -571,16 +571,16 @@ class VpnCheckRunnerTest {
         var cdnCalls = 0
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ ->
                 cdnCalls += 1
                 error("CDN pulling should not run when disabled")
             },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -617,23 +617,23 @@ class VpnCheckRunnerTest {
         }
 
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ ->
+            geoIpCheck = { _, _, _ ->
                 awaitRelease()
                 category("geo")
             },
-            ipComparisonCheck = { _, _ ->
+            ipComparisonCheck = { _, _, _ ->
                 awaitRelease()
                 emptyIpComparison()
             },
-            directCheck = { _, _, _ ->
+            directCheck = { _, _, _, _ ->
                 awaitRelease()
                 category("direct")
             },
-            indirectCheck = { _, _, _, _ ->
+            indirectCheck = { _, _, _, _, _, _ ->
                 awaitRelease()
                 category("indirect")
             },
-            locationCheck = { _, _, _ ->
+            locationCheck = { _, _, _, _ ->
                 awaitRelease()
                 category("location")
             },
@@ -641,7 +641,7 @@ class VpnCheckRunnerTest {
                 awaitRelease()
                 category("native")
             },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -674,14 +674,14 @@ class VpnCheckRunnerTest {
     @Test
     fun `run survives geoIpCheck throwing and produces partial result`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> throw java.io.IOException("boom") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
+            geoIpCheck = { _, _, _ -> throw java.io.IOException("boom") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _, _ -> category("icmp") },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -704,14 +704,14 @@ class VpnCheckRunnerTest {
     @Test
     fun `run marks ip comparison fallback as error`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> throw java.io.IOException("ip comparison failed") },
-            icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> throw java.io.IOException("ip comparison failed") },
+            icmpSpoofingCheck = { _, _, _ -> category("icmp") },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -733,15 +733,15 @@ class VpnCheckRunnerTest {
     @Test
     fun `run marks cdn pulling fallback as error`() = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> category("geo") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
+            geoIpCheck = { _, _, _ -> category("geo") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
             cdnPullingCheck = { _, _, _ -> throw java.io.IOException("cdn failed") },
-            icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
+            icmpSpoofingCheck = { _, _, _ -> category("icmp") },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -765,14 +765,14 @@ class VpnCheckRunnerTest {
     @Test
     fun `run propagates cancellation from geoIpCheck`(): Unit = runBlocking {
         VpnCheckRunner.dependenciesOverride = VpnCheckRunner.Dependencies(
-            geoIpCheck = { _, _ -> throw kotlinx.coroutines.CancellationException("stop") },
-            ipComparisonCheck = { _, _ -> emptyIpComparison() },
-            icmpSpoofingCheck = { _, _ -> category("icmp") },
-            directCheck = { _, _, _ -> category("direct") },
-            indirectCheck = { _, _, _, _ -> category("indirect") },
-            locationCheck = { _, _, _ -> category("location") },
+            geoIpCheck = { _, _, _ -> throw kotlinx.coroutines.CancellationException("stop") },
+            ipComparisonCheck = { _, _, _ -> emptyIpComparison() },
+            icmpSpoofingCheck = { _, _, _ -> category("icmp") },
+            directCheck = { _, _, _, _ -> category("direct") },
+            indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
+            locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )

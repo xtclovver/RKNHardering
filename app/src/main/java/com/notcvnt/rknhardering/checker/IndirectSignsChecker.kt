@@ -13,6 +13,8 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.customcheck.CallTransportConfig
+import com.notcvnt.rknhardering.customcheck.IndirectSignsConfig
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
 import com.notcvnt.rknhardering.network.NetworkInterfacePatterns
@@ -145,7 +147,22 @@ object IndirectSignsChecker {
         networkRequestsEnabled: Boolean = true,
         callTransportProbeEnabled: Boolean = false,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        config: IndirectSignsConfig = IndirectSignsConfig(),
+        callTransportConfig: CallTransportConfig = CallTransportConfig(enabled = false),
     ): CategoryResult {
+        if (!config.enabled) {
+            return CategoryResult(
+                name = context.getString(R.string.checker_indirect_category_name),
+                detected = false,
+                findings = emptyList(),
+                needsReview = false,
+                evidence = emptyList(),
+                activeApps = emptyList(),
+                callTransportLeaks = emptyList(),
+                stunProbeGroups = emptyList(),
+            )
+        }
+
         val startedAtMs = IndirectCheckPerformanceSupport.monotonicNowMs()
         val stepTimings = mutableListOf<DebugStepTiming>()
         val findings = mutableListOf<Finding>()
@@ -161,50 +178,65 @@ object IndirectSignsChecker {
         }
         val snapshotByInterface = buildSnapshotIndex(networkSnapshots)
 
-        findings += networkSnapshots
-            .mapNotNull { snapshot ->
-                snapshot.interfaceName
-                    ?.takeIf(NetworkInterfacePatterns::isIpsecInterface)
-                    ?.let { buildIpsecDiagnostics(context, it, snapshot) }
+        if (config.checkIpsec) {
+            findings += networkSnapshots
+                .mapNotNull { snapshot ->
+                    snapshot.interfaceName
+                        ?.takeIf(NetworkInterfacePatterns::isIpsecInterface)
+                        ?.let { buildIpsecDiagnostics(context, it, snapshot) }
+                }
+                .flatten()
+        }
+
+        if (config.checkNotVpnCap) {
+            val notVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkNotVpnCapability", stepTimings) {
+                checkNotVpnCapability(context, findings, evidence)
             }
-            .flatten()
-
-        val notVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkNotVpnCapability", stepTimings) {
-            checkNotVpnCapability(context, findings, evidence)
+            detected = detected || notVpnOutcome.detected
+            needsReview = needsReview || notVpnOutcome.needsReview
         }
-        detected = detected || notVpnOutcome.detected
-        needsReview = needsReview || notVpnOutcome.needsReview
 
-        detected = IndirectCheckPerformanceSupport.measureStep("checkNetworkInterfaces", stepTimings) {
-            checkNetworkInterfaces(context, findings, evidence, snapshotByInterface)
-        } || detected
-        detected = IndirectCheckPerformanceSupport.measureStep("checkMtu", stepTimings) {
-            checkMtu(context, findings, evidence, snapshotByInterface)
-        } || detected
-
-        val routingOutcome = IndirectCheckPerformanceSupport.measureStep("checkRoutingTable", stepTimings) {
-            checkRoutingTable(context, networkSnapshots)
+        if (config.checkVpnInterfaces) {
+            detected = IndirectCheckPerformanceSupport.measureStep("checkNetworkInterfaces", stepTimings) {
+                checkNetworkInterfaces(context, findings, evidence, snapshotByInterface)
+            } || detected
         }
-        findings += routingOutcome.findings
-        evidence += routingOutcome.evidence
-        detected = detected || routingOutcome.detected
-        needsReview = needsReview || routingOutcome.needsReview
 
-        val dnsOutcome = IndirectCheckPerformanceSupport.measureStep("checkDns", stepTimings) {
-            checkDns(context, networkSnapshots)
+        if (config.checkMtuAnomaly) {
+            detected = IndirectCheckPerformanceSupport.measureStep("checkMtu", stepTimings) {
+                checkMtu(context, findings, evidence, snapshotByInterface)
+            } || detected
         }
-        findings += dnsOutcome.findings
-        evidence += dnsOutcome.evidence
-        detected = detected || dnsOutcome.detected
-        needsReview = needsReview || dnsOutcome.needsReview
 
-        val proxyTechnicalOutcome = IndirectCheckPerformanceSupport.measureStep("checkProxyTechnicalSignals", stepTimings) {
-            checkProxyTechnicalSignals(context)
+        if (config.checkRouting) {
+            val routingOutcome = IndirectCheckPerformanceSupport.measureStep("checkRoutingTable", stepTimings) {
+                checkRoutingTable(context, networkSnapshots)
+            }
+            findings += routingOutcome.findings
+            evidence += routingOutcome.evidence
+            detected = detected || routingOutcome.detected
+            needsReview = needsReview || routingOutcome.needsReview
         }
-        findings += proxyTechnicalOutcome.findings
-        evidence += proxyTechnicalOutcome.evidence
-        detected = detected || proxyTechnicalOutcome.detected
-        needsReview = needsReview || proxyTechnicalOutcome.needsReview
+
+        if (config.checkDns) {
+            val dnsOutcome = IndirectCheckPerformanceSupport.measureStep("checkDns", stepTimings) {
+                checkDns(context, networkSnapshots)
+            }
+            findings += dnsOutcome.findings
+            evidence += dnsOutcome.evidence
+            detected = detected || dnsOutcome.detected
+            needsReview = needsReview || dnsOutcome.needsReview
+        }
+
+        if (config.checkProxyTools) {
+            val proxyTechnicalOutcome = IndirectCheckPerformanceSupport.measureStep("checkProxyTechnicalSignals", stepTimings) {
+                checkProxyTechnicalSignals(context, config.checkLocalListeners, config.listenerPortThreshold)
+            }
+            findings += proxyTechnicalOutcome.findings
+            evidence += proxyTechnicalOutcome.evidence
+            detected = detected || proxyTechnicalOutcome.detected
+            needsReview = needsReview || proxyTechnicalOutcome.needsReview
+        }
 
         val callTransportOutcome = IndirectCheckPerformanceSupport.measureSuspendStep("checkCallTransportSignals", stepTimings) {
             checkCallTransportSignals(
@@ -212,6 +244,7 @@ object IndirectSignsChecker {
                 networkRequestsEnabled = networkRequestsEnabled,
                 callTransportProbeEnabled = callTransportProbeEnabled,
                 resolverConfig = resolverConfig,
+                callTransportConfig = callTransportConfig,
             )
         }
         findings += callTransportOutcome.findings
@@ -220,17 +253,19 @@ object IndirectSignsChecker {
         stunProbeGroups += callTransportOutcome.stunGroups
         needsReview = needsReview || callTransportOutcome.needsReview
 
-        val dumpsysVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpn", stepTimings) {
-            checkDumpsysVpn(context, findings, evidence, activeApps)
-        }
-        detected = detected || dumpsysVpnOutcome.detected
-        needsReview = needsReview || dumpsysVpnOutcome.needsReview
+        if (config.checkDumpsys) {
+            val dumpsysVpnOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpn", stepTimings) {
+                checkDumpsysVpn(context, findings, evidence, activeApps)
+            }
+            detected = detected || dumpsysVpnOutcome.detected
+            needsReview = needsReview || dumpsysVpnOutcome.needsReview
 
-        val dumpsysServiceOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpnService", stepTimings) {
-            checkDumpsysVpnService(context, findings, evidence, activeApps)
+            val dumpsysServiceOutcome = IndirectCheckPerformanceSupport.measureStep("checkDumpsysVpnService", stepTimings) {
+                checkDumpsysVpnService(context, findings, evidence, activeApps)
+            }
+            detected = detected || dumpsysServiceOutcome.detected
+            needsReview = needsReview || dumpsysServiceOutcome.needsReview
         }
-        detected = detected || dumpsysServiceOutcome.detected
-        needsReview = needsReview || dumpsysServiceOutcome.needsReview
 
         val result = CategoryResult(
             name = context.getString(R.string.checker_indirect_category_name),
@@ -258,6 +293,7 @@ object IndirectSignsChecker {
         networkRequestsEnabled: Boolean,
         callTransportProbeEnabled: Boolean,
         resolverConfig: DnsResolverConfig,
+        callTransportConfig: CallTransportConfig = CallTransportConfig(enabled = false),
     ): CallTransportEvaluation {
         if (!networkRequestsEnabled || !callTransportProbeEnabled) {
             return CallTransportEvaluation()
@@ -267,6 +303,7 @@ object IndirectSignsChecker {
             context = context,
             resolverConfig = resolverConfig,
             callTransportEnabled = true,
+            config = callTransportConfig,
         )
         return CallTransportEvaluation(
             results = evaluation.results,
@@ -760,9 +797,13 @@ object IndirectSignsChecker {
         return DnsEvaluation(findings, evidence, detected, needsReview)
     }
 
-    private fun checkProxyTechnicalSignals(context: Context): ProxyTechnicalEvaluation {
+    private fun checkProxyTechnicalSignals(
+        context: Context,
+        checkLocalListeners: Boolean = true,
+        listenerPortThreshold: Int = 5,
+    ): ProxyTechnicalEvaluation {
         val installedProxyTools = detectInstalledProxyTools(context)
-        val listeners = collectLocalListeners(context)
+        val listeners = if (checkLocalListeners) collectLocalListeners(context) else emptyList()
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
         var detected = false
@@ -799,64 +840,66 @@ object IndirectSignsChecker {
             needsReview = true
         }
 
-        val loopbackListeners = listeners.filter { listener ->
-            isLoopbackOrAnyAddress(listener.host) && listener.port in KNOWN_LOCAL_PROXY_PORTS
-        }
-        if (loopbackListeners.isNotEmpty()) {
-            for (listener in loopbackListeners.distinctBy { Triple(it.protocol, it.host, it.port) }) {
-                val baseDescription = context.getString(
-                    R.string.checker_indirect_local_listener,
-                    listener.host,
-                    listener.port,
-                    listener.protocol,
-                )
-                val ownerSuffix = formatOwnerSuffix(context, listener.owner)
-                val description = baseDescription + ownerSuffix
-                findings.add(
-                    Finding(
-                        description = description,
-                        detected = true,
-                        source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
-                        confidence = EvidenceConfidence.MEDIUM,
-                        packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
-                    ),
-                )
-                evidence.add(
-                    EvidenceItem(
-                        source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
-                        detected = true,
-                        confidence = EvidenceConfidence.MEDIUM,
-                        description = description,
-                        packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
-                    ),
-                )
+        if (checkLocalListeners) {
+            val loopbackListeners = listeners.filter { listener ->
+                isLoopbackOrAnyAddress(listener.host) && listener.port in KNOWN_LOCAL_PROXY_PORTS
             }
-            detected = true
-        } else if (listeners.isNotEmpty()) {
-            val localhostHighPorts = listeners.count { listener ->
-                isLoopbackOrAnyAddress(listener.host) && listener.port >= 1024
-            }
-            if (localhostHighPorts >= 3) {
-                findings.add(
-                    Finding(
-                        description = context.getString(
-                            R.string.checker_indirect_many_localhost_listeners,
-                            localhostHighPorts,
+            if (loopbackListeners.isNotEmpty()) {
+                for (listener in loopbackListeners.distinctBy { Triple(it.protocol, it.host, it.port) }) {
+                    val baseDescription = context.getString(
+                        R.string.checker_indirect_local_listener,
+                        listener.host,
+                        listener.port,
+                        listener.protocol,
+                    )
+                    val ownerSuffix = formatOwnerSuffix(context, listener.owner)
+                    val description = baseDescription + ownerSuffix
+                    findings.add(
+                        Finding(
+                            description = description,
+                            detected = true,
+                            source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+                            confidence = EvidenceConfidence.MEDIUM,
+                            packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
                         ),
-                        needsReview = true,
-                        source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
-                        confidence = EvidenceConfidence.LOW,
-                    ),
-                )
-                evidence.add(
-                    EvidenceItem(
-                        source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
-                        detected = true,
-                        confidence = EvidenceConfidence.LOW,
-                        description = "Multiple localhost listeners detected on high ports",
-                    ),
-                )
-                needsReview = true
+                    )
+                    evidence.add(
+                        EvidenceItem(
+                            source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+                            detected = true,
+                            confidence = EvidenceConfidence.MEDIUM,
+                            description = description,
+                            packageName = LocalProxyOwnerFormatter.packageName(listener.owner),
+                        ),
+                    )
+                }
+                detected = true
+            } else if (listeners.isNotEmpty()) {
+                val localhostHighPorts = listeners.count { listener ->
+                    isLoopbackOrAnyAddress(listener.host) && listener.port >= 1024
+                }
+                if (localhostHighPorts >= listenerPortThreshold) {
+                    findings.add(
+                        Finding(
+                            description = context.getString(
+                                R.string.checker_indirect_many_localhost_listeners,
+                                localhostHighPorts,
+                            ),
+                            needsReview = true,
+                            source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+                            confidence = EvidenceConfidence.LOW,
+                        ),
+                    )
+                    evidence.add(
+                        EvidenceItem(
+                            source = EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+                            detected = true,
+                            confidence = EvidenceConfidence.LOW,
+                            description = "Multiple localhost listeners detected on high ports",
+                        ),
+                    )
+                    needsReview = true
+                }
             }
         }
 

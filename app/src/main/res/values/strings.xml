@@ -211,6 +211,7 @@
     <string name="main_preview_rtt_triangulation">Local and foreign services will be pinged to compare round-trip latency.</string>
     <string name="main_preview_location">Carrier, cell tower, and nearby Wi-Fi signals will be collected.</string>
     <string name="main_preview_bypass">A search for local split tunnel bypasses and available proxy endpoints will be performed.</string>
+    <string name="main_preview_domain_reachability">Configured domains will be tested for DPI-level blocking via DNS, TCP, and TLS handshake.</string>
 
     <string name="main_loading_geo_ip">Checking country, ASN, and hosting indicators.</string>
     <string name="main_loading_ip_comparison">Comparing the public IP through multiple independent services.</string>
@@ -223,6 +224,7 @@
     <string name="main_loading_call_transport">Checking STUN server responses and call transport leak signals.</string>
     <string name="main_loading_location">Collecting carrier, cell tower, and nearby Wi-Fi signals.</string>
     <string name="main_loading_bypass">Looking for local split tunnel bypasses and available proxy endpoints.</string>
+    <string name="main_loading_domain_reachability">Testing domain accessibility through DNS, TCP, and TLS handshake.</string>
 
     <string name="main_stopped_scan">Scanning was stopped before this stage completed.</string>
     <string name="main_stopped_check">This stage was stopped before completion.</string>
@@ -581,6 +583,15 @@
     <string name="checker_icmp_evidence_control_too_fast">%1$s RTT stayed below the expected threshold on the active route</string>
     <string name="main_card_rtt_triangulation">RTT triangulation β</string>
     <string name="main_card_rtt_triangulation_description">Detects VPN by comparing latency to local vs foreign services</string>
+
+    <!-- Domain Reachability -->
+    <string name="main_card_domain_reachability">Domain reachability</string>
+    <string name="main_card_domain_reachability_description">Tests domains for DPI-level blocking (DNS, TCP, TLS)</string>
+    <string name="domain_reachability_hint_all_ok">%1$d of %2$d reachable</string>
+    <string name="domain_reachability_hint_blocked">%1$d of %2$d blocked</string>
+    <string name="domain_reachability_step_dns" translatable="false">DNS</string>
+    <string name="domain_reachability_step_tcp" translatable="false">TCP</string>
+    <string name="domain_reachability_step_tls" translatable="false">TLS</string>
     <string name="checker_rtt_summary_clean">Latency profile matches your region</string>
     <string name="checker_rtt_summary_detected">Local services slower than foreign — possible tunnel</string>
     <string name="checker_rtt_summary_needs_review">Latency unusual but inconclusive</string>
@@ -644,4 +655,276 @@
     <string name="auto_update_onboarding_message">On first launch the app can contact api.github.com to check GitHub Releases for a newer APK. If you disable this now, the app will not perform this check until you enable it manually in network settings.</string>
     <string name="auto_update_onboarding_enable">Enable</string>
     <string name="auto_update_onboarding_disable">Do not enable</string>
+
+    <!-- Custom Checks -->
+    <string name="settings_cat_custom_checks">Custom checks</string>
+    <string name="settings_custom_checks_enabled">Use custom check profile</string>
+    <string name="settings_custom_checks_active_label">Active profile</string>
+    <string name="settings_custom_checks_no_active">Standard (built-in)</string>
+    <string name="settings_custom_check_create">Create new profile</string>
+    <string name="settings_custom_check_import">Import from file</string>
+    <string name="settings_custom_check_marketplace">Marketplace</string>
+    <string name="settings_custom_check_instructions">Instructions</string>
+    <string name="settings_custom_check_profiles_label">My profiles</string>
+    <string name="settings_custom_check_export_done">Profile exported</string>
+    <string name="settings_custom_check_export_failed">Failed to export profile</string>
+    <string name="settings_custom_check_import_done">Profile imported</string>
+    <string name="settings_custom_check_import_failed">Failed to import profile</string>
+
+    <!-- Custom Check Editor -->
+    <string name="settings_custom_check_editor_title">Edit profile</string>
+    <string name="settings_custom_check_name">Profile name</string>
+    <string name="settings_custom_check_description">Description</string>
+    <string name="settings_custom_check_author">Author</string>
+    <string name="settings_custom_check_version">Version</string>
+    <string name="settings_custom_check_save">Save</string>
+    <string name="settings_custom_check_cancel">Cancel</string>
+    <string name="settings_custom_check_add_endpoint">Add custom endpoint</string>
+    <string name="settings_custom_check_name_required">Profile name is required</string>
+    <string name="settings_custom_check_no_checks_enabled">Enable at least one check to save the profile</string>
+    <string name="settings_custom_check_dependency_required">"%1$s" requires "%2$s" — it has been enabled automatically</string>
+    <string name="settings_custom_check_timeout_ms">Timeout (ms)</string>
+    <string name="settings_custom_check_ping_count">Ping count</string>
+
+    <!-- Check sections -->
+    <string name="settings_custom_check_section_geo_ip">GeoIP</string>
+    <string name="settings_custom_check_section_ip_comparison">IP comparison</string>
+    <string name="settings_custom_check_section_cdn_pulling">CDN pulling</string>
+    <string name="settings_custom_check_section_direct_signs">Direct signs</string>
+    <string name="settings_custom_check_section_indirect_signs">Indirect signs</string>
+    <string name="settings_custom_check_section_native_signs">Native signs</string>
+    <string name="settings_custom_check_section_location_signals">Location signals</string>
+    <string name="settings_custom_check_section_icmp_spoofing">ICMP spoofing</string>
+    <string name="settings_custom_check_section_rtt_triangulation">RTT triangulation</string>
+    <string name="settings_custom_check_section_call_transport">Call transport</string>
+    <string name="settings_custom_check_section_split_tunnel">Split tunnel</string>
+    <string name="settings_custom_check_section_domain_reachability">Domain reachability</string>
+    <string name="settings_custom_check_section_domain_reachability_desc">Configured domains will be tested for DPI-level blocking via DNS, TCP, and TLS handshake.</string>
+    <string name="settings_custom_check_add_reachability_domain">Add domain</string>
+    <string name="settings_custom_check_reachability_blocked_in_generic">Use the Domain reachability section for this type.</string>
+    <string name="editor_summary_domain_reachability">%1$d domains</string>
+
+    <!-- Custom Check Editor: sub-toggles -->
+    <!-- IpComparison -->
+    <string name="settings_custom_check_ip_builtin_ru">Use built-in RU checkers</string>
+    <string name="settings_custom_check_ip_builtin_non_ru">Use built-in non-RU checkers</string>
+    <!-- CdnPulling -->
+    <string name="settings_custom_check_cdn_builtin_targets">Use built-in CDN targets</string>
+    <string name="settings_custom_check_cdn_meduza">Include meduza.io</string>
+    <string name="settings_custom_check_cdn_rutracker">Include rutracker.org</string>
+    <!-- DirectSigns -->
+    <string name="settings_custom_check_direct_check_transport_vpn">Check VPN transport capability</string>
+    <string name="settings_custom_check_direct_check_http_proxy">Check HTTP proxy</string>
+    <string name="settings_custom_check_direct_check_socks_proxy">Check SOCKS proxy</string>
+    <string name="settings_custom_check_direct_check_proxy_info">Check ProxyInfo (per-network)</string>
+    <string name="settings_custom_check_direct_check_vpn_service">Check installed VPN apps</string>
+    <!-- IndirectSigns -->
+    <string name="settings_custom_check_indirect_not_vpn_cap">Check NOT_VPN capability</string>
+    <string name="settings_custom_check_indirect_vpn_interfaces">Check VPN-like interfaces</string>
+    <string name="settings_custom_check_indirect_mtu_anomaly">Check MTU anomaly</string>
+    <string name="settings_custom_check_indirect_ipsec">Check IPsec interfaces</string>
+    <string name="settings_custom_check_indirect_routing">Check routing table</string>
+    <string name="settings_custom_check_indirect_dns">Check DNS configuration</string>
+    <string name="settings_custom_check_indirect_proxy_tools">Check proxy tools</string>
+    <string name="settings_custom_check_indirect_local_listeners">Check local listeners</string>
+    <string name="settings_custom_check_indirect_dumpsys">Check dumpsys VPN</string>
+    <string name="settings_custom_check_indirect_listener_port_threshold">Listener port threshold (default: 5)</string>
+    <!-- LocationSignals -->
+    <string name="settings_custom_check_location_beacondb">Use BeaconDB lookup</string>
+    <string name="settings_custom_check_location_cell_towers">Collect cell towers</string>
+    <string name="settings_custom_check_location_wifi_signals">Collect WiFi signals</string>
+    <!-- IcmpSpoofing -->
+    <string name="settings_custom_check_icmp_builtin_targets">Use built-in targets</string>
+    <string name="settings_custom_check_add_icmp_target">Add custom ICMP target</string>
+    <string name="settings_custom_check_icmp_target_is_control">Is control target</string>
+    <!-- RttTriangulation -->
+    <string name="settings_custom_check_rtt_builtin_targets">Use built-in targets</string>
+    <string name="settings_custom_check_add_rtt_target">Add custom RTT target</string>
+    <string name="settings_custom_check_rtt_expected_location">Expected location (e.g. RU)</string>
+    <!-- CallTransport -->
+    <string name="settings_custom_check_call_builtin_global_stun">Use built-in global STUN</string>
+    <string name="settings_custom_check_call_builtin_ru_stun">Use built-in RU STUN</string>
+    <string name="settings_custom_check_call_mtproto">Check MTProto</string>
+    <string name="settings_custom_check_add_stun_server">Add custom STUN server</string>
+    <string name="settings_custom_check_stun_port">Port (default: 3478)</string>
+    <!-- SplitTunnel -->
+    <string name="settings_custom_check_split_proxy_scan">Enable proxy scan</string>
+    <string name="settings_custom_check_split_xray_api_scan">Enable Xray API scan</string>
+    <string name="settings_custom_check_split_connect_timeout">Connect timeout (ms, default: 300)</string>
+    <string name="settings_custom_check_split_check_underlying_network">Check underlying network</string>
+    <string name="settings_custom_check_split_check_vpn_network_binding">Check VPN network binding</string>
+    <string name="settings_custom_check_split_check_mtproto_via_proxy">Check MTProto via proxy</string>
+    <string name="settings_custom_check_split_port_range_label">Port range</string>
+    <!-- Custom domains section -->
+    <string name="settings_custom_check_section_custom_domains">Custom domains</string>
+    <string name="settings_custom_check_add_custom_domain">Add domain</string>
+    <string name="settings_custom_check_domain_field">Domain (example.com)</string>
+    <string name="settings_custom_check_check_type_field">Check type (http/dns/tcp)</string>
+    <string name="settings_custom_check_description_field">Description</string>
+
+    <!-- Network configuration section -->
+    <string name="settings_custom_check_section_network_config">Network configuration</string>
+    <string name="settings_custom_check_network_requests">Network requests</string>
+    <string name="settings_custom_check_dns_mode">DNS mode</string>
+    <string name="settings_custom_check_dns_mode_system">System</string>
+    <string name="settings_custom_check_dns_mode_direct">Direct</string>
+    <string name="settings_custom_check_dns_mode_doh">DoH</string>
+    <string name="settings_custom_check_dns_preset">DNS preset</string>
+    <string name="settings_custom_check_dns_preset_custom">Custom</string>
+    <string name="settings_custom_check_dns_preset_cloudflare">Cloudflare</string>
+    <string name="settings_custom_check_dns_preset_google">Google</string>
+    <string name="settings_custom_check_dns_preset_yandex">Yandex</string>
+    <string name="settings_custom_check_dns_servers">DNS servers (comma-separated)</string>
+    <string name="settings_custom_check_doh_url">DoH URL</string>
+    <string name="settings_custom_check_doh_bootstrap">Bootstrap IPs (comma-separated)</string>
+
+    <!-- GeoIP builtin providers -->
+    <string name="settings_custom_check_geoip_provider_ipapi_is">ipapi.is (built-in)</string>
+    <string name="settings_custom_check_geoip_provider_iplocate">iplocate.io (built-in)</string>
+    <string name="settings_custom_check_geoip_provider_ipquery">ipquery.io (built-in)</string>
+    <string name="settings_custom_check_geoip_provider_iplookup">iplookup.it (built-in)</string>
+    <string name="settings_custom_check_geoip_provider_ipbot">ipbot.com (built-in)</string>
+
+    <!-- Dialog shared -->
+    <string name="settings_custom_check_target_host">Host</string>
+    <string name="settings_custom_check_target_label">Label (optional)</string>
+
+    <!-- Endpoint Mapper -->
+    <string name="endpoint_mapper_title">Endpoint mapper</string>
+    <string name="endpoint_mapper_scope_ru">RU</string>
+    <string name="endpoint_mapper_scope_non_ru">NON_RU</string>
+    <string name="endpoint_mapper_url_hint">Endpoint URL</string>
+    <string name="endpoint_mapper_label_hint">Label (optional)</string>
+    <string name="endpoint_mapper_test_button">Test request</string>
+    <string name="endpoint_mapper_response_label">Response</string>
+    <string name="endpoint_mapper_detected_type">Detected type: %1$s</string>
+    <string name="endpoint_mapper_mapping_section">Field mapping (JSONPath / key / regex)</string>
+    <string name="endpoint_mapper_field_ip">IP address path</string>
+    <string name="endpoint_mapper_field_country_code">Country code path</string>
+    <string name="endpoint_mapper_field_country_name">Country name path</string>
+    <string name="endpoint_mapper_field_isp">ISP path</string>
+    <string name="endpoint_mapper_field_org">Organization path</string>
+    <string name="endpoint_mapper_field_asn">ASN path</string>
+    <string name="endpoint_mapper_field_is_hosting">Is hosting path</string>
+    <string name="endpoint_mapper_field_is_proxy">Is proxy path</string>
+    <string name="endpoint_mapper_error_network">Network error</string>
+
+    <!-- Badges -->
+    <string name="badge_official">Official</string>
+    <string name="badge_verified">Verified</string>
+
+    <!-- Actions -->
+    <string name="action_activate">Activate</string>
+    <string name="action_deactivate">Deactivate</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_clone">Clone</string>
+    <string name="action_export">Export</string>
+    <string name="action_delete">Delete</string>
+
+    <!-- Marketplace stub -->
+    <string name="settings_marketplace_stub">Marketplace coming soon.\n\nCommunity check profiles will be available here.</string>
+
+    <!-- Import intent label -->
+    <string name="import_rkncheck_label">Open with RKNHardering</string>
+    <string name="import_rkncheck_hint">Open Settings → Custom Checks → Import to load the profile</string>
+
+    <!-- Marketplace -->
+    <string name="marketplace_search_hint">Search by name, author, description…</string>
+    <string name="marketplace_retry">Retry</string>
+    <string name="marketplace_empty">No profiles found</string>
+    <string name="marketplace_error_unknown">Unknown error</string>
+    <string name="marketplace_meta_format">by %1$s · v%2$s</string>
+    <string name="marketplace_install_count">%1$d installs</string>
+    <string name="marketplace_action_install">Install</string>
+    <string name="marketplace_action_clone_edit">Clone &amp; edit</string>
+    <string name="marketplace_preview_author">Author: %1$s</string>
+    <string name="marketplace_preview_version">Version: %1$s</string>
+    <string name="marketplace_install_done">Profile "%1$s" installed</string>
+    <string name="marketplace_install_failed">Failed to install profile</string>
+
+    <!-- Security warning -->
+    <string name="security_warning_title">⚠️ Profile is not verified</string>
+    <string name="security_warning_message">Profile "%1$s" is not verified by the repository maintainers. It contains the following custom network endpoints:\n\n%2$s\n\nInstall only if you trust the author.</string>
+    <string name="security_warning_no_custom_urls">No custom endpoints declared.</string>
+    <string name="security_warning_install_anyway">Install anyway</string>
+    <string name="security_warning_cancel">Cancel</string>
+
+    <!-- Profile list redesign -->
+    <string name="profiles_section_active">Active profile</string>
+    <string name="profiles_create_new">Create new profile</string>
+    <string name="profiles_import">Import</string>
+    <string name="profiles_installed_marker_cd">Installed from marketplace</string>
+    <string name="profile_row_menu_cd">Profile actions</string>
+    <string name="profile_builtin_standard_name">Standard</string>
+    <string name="profile_builtin_standard_desc">Built-in default check profile</string>
+    <string name="profile_subtitle_all_enabled">%1$d checkers · all enabled</string>
+    <string name="profile_subtitle_enabled_of">%1$d of %2$d enabled</string>
+    <string name="profile_subtitle_from_marketplace">from marketplace</string>
+    <string name="profile_name_edited_suffix"> (edited)</string>
+    <string name="settings_custom_check_delete_confirm">Delete this profile?</string>
+
+    <!-- Discover card -->
+    <string name="discover_profiles_title">Discover profiles</string>
+    <string name="discover_profiles_subtitle">Featured from the marketplace</string>
+    <string name="discover_profiles_see_all">See all ›</string>
+    <string name="discover_profiles_empty">No featured profiles yet</string>
+
+    <!-- Editor: checker section accordion -->
+    <string name="editor_checkers_section">Checkers</string>
+    <string name="editor_checkers_section_count">Checkers · %1$d</string>
+    <string name="checker_section_disabled_note">Enable this check to edit its parameters</string>
+    <string name="checker_section_summary_disabled">Disabled</string>
+    <string name="editor_summary_geoip">%1$d/%2$d built-in · %3$d custom</string>
+    <string name="editor_summary_ip_comparison">%1$d/%2$d built-in · %3$d custom</string>
+    <string name="editor_summary_cdn">%1$d/%2$d built-in · %3$d custom</string>
+    <string name="editor_summary_x_of_y_active">%1$d/%2$d active</string>
+    <string name="editor_summary_targets">%1$d targets</string>
+    <string name="section_native_signs_description">JNI checks for routes, interfaces, hook markers and root indicators. No additional parameters.</string>
+
+    <!-- Inline endpoint editor -->
+    <string name="inline_editor_title_new">New endpoint</string>
+    <string name="inline_editor_close_cd">Close editor</string>
+    <string name="inline_editor_url_hint">URL</string>
+    <string name="inline_editor_label_hint">Label (optional)</string>
+    <string name="inline_editor_scope_ru" translatable="false">RU</string>
+    <string name="inline_editor_scope_non_ru" translatable="false">NON_RU</string>
+    <string name="inline_editor_test">Test request</string>
+    <string name="inline_editor_testing">Testing…</string>
+    <string name="inline_editor_retest">Re-test</string>
+    <string name="inline_editor_field_mapping">Field mapping</string>
+    <string name="inline_editor_auto_badge" translatable="false">AUTO</string>
+    <string name="inline_editor_not_detected">not detected</string>
+    <string name="inline_editor_path_hint">JSONPath / key / regex</string>
+    <string name="inline_editor_save">Save endpoint</string>
+    <string name="inline_editor_custom_providers">Custom providers</string>
+    <string name="inline_editor_custom_endpoints">Custom endpoints</string>
+    <string name="inline_editor_custom_targets">Custom targets</string>
+    <string name="inline_editor_url_required">URL is required</string>
+    <string name="inline_editor_test_failed">Test failed: %1$s</string>
+    <string name="inline_editor_unknown_error">unknown error</string>
+    <string name="inline_editor_result_status">%1$d · %2$d ms</string>
+
+    <!-- Marketplace redesign -->
+    <string name="marketplace_by_author">by %1$s</string>
+    <string name="marketplace_action_installed">Installed</string>
+    <string name="marketplace_filter_all">All</string>
+    <string name="marketplace_filter_official">Official</string>
+    <string name="marketplace_filter_verified">Verified</string>
+    <string name="marketplace_filter_ru" translatable="false">RU</string>
+    <string name="marketplace_filter_privacy">Privacy</string>
+    <string name="marketplace_filter_tor" translatable="false">Tor</string>
+    <string name="marketplace_filter_mobile">Mobile</string>
+
+    <!-- Install dialog redesign -->
+    <string name="install_verified_title">Install verified profile</string>
+    <string name="install_subtitle_format">%1$s · by %2$s</string>
+    <string name="security_warning_intro">When installed, this profile will send requests to the following URLs:</string>
+
+    <!-- Domain reachability expected booleans -->
+    <string name="editor_expected_availability">EXPECTED AVAILABILITY</string>
+    <string name="domain_reachability_hint_mismatch">%1$d of %2$d mismatch</string>
+    <string name="domain_reachability_hint_all_match">%1$d of %2$d as expected</string>
+    <string name="domain_reachability_expected_prefix">Expected:</string>
+    <string name="domain_reachability_test_running">Testing DNS → TCP → TLS…</string>
+    <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
 </resources>

@@ -15,6 +15,7 @@ import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunProbeResult
+import com.notcvnt.rknhardering.customcheck.CallTransportConfig
 import com.notcvnt.rknhardering.model.StunScope
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
@@ -98,12 +99,12 @@ object CallTransportChecker {
                     binding = binding,
                 )
             },
-        val publicIpFetcher: suspend (PathDescriptor, DnsResolverConfig) -> Result<String> =
-            { path, resolverConfig ->
+        val publicIpFetcher: suspend (PathDescriptor, DnsResolverConfig, Int) -> Result<String> =
+            { path, resolverConfig, timeoutMs ->
                 when (path.path) {
                     CallTransportNetworkPath.ACTIVE ->
                         IfconfigClient.fetchDirectIp(
-                            timeoutMs = STUN_HTTP_TIMEOUT_MS,
+                            timeoutMs = timeoutMs,
                             resolverConfig = resolverConfig,
                             okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
                             nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,
@@ -113,7 +114,7 @@ object CallTransportChecker {
                             IfconfigClient.fetchIpViaNetwork(
                                 primaryBinding = ResolverBinding.AndroidNetworkBinding(path.network),
                                 fallbackBinding = path.fallbackBinding(),
-                                timeoutMs = STUN_HTTP_TIMEOUT_MS,
+                                timeoutMs = timeoutMs,
                                 resolverConfig = resolverConfig,
                                 okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
                                 nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,
@@ -165,6 +166,7 @@ object CallTransportChecker {
         resolverConfig: DnsResolverConfig,
         callTransportEnabled: Boolean,
         onProgress: (suspend (String, String) -> Unit)? = null,
+        config: CallTransportConfig = CallTransportConfig(enabled = false),
     ): Evaluation = withContext(Dispatchers.IO) {
         if (!callTransportEnabled) {
             return@withContext Evaluation()
@@ -187,9 +189,11 @@ object CallTransportChecker {
                     context = context,
                     resolverConfig = resolverConfig,
                     onProgress = onProgress,
+                    config = config,
                 )
             }
         }
+        val effectiveTimeoutMs = config.timeoutMs.coerceAtLeast(1)
         val directDeferred = async {
             IndirectCheckPerformanceSupport.measureSuspendStep("probeDirect", stepTimings) {
                 probeDirect(
@@ -197,11 +201,16 @@ object CallTransportChecker {
                     resolverConfig = resolverConfig,
                     onProgress = onProgress,
                     activeStunGroupsProvider = { stunSweepDeferred.await().groups },
+                    timeoutMs = effectiveTimeoutMs,
                 )
             }
         }
 
         val proxyAssistedDeferred = async {
+            if (!config.checkMtproto) {
+                IndirectCheckPerformanceSupport.markSkippedStep("probeProxyAssistedTelegram", stepTimings)
+                return@async emptyList()
+            }
             val proxyEndpoint = proxyEndpointDeferred.await()
             if (proxyEndpoint?.type != ProxyType.SOCKS5) {
                 IndirectCheckPerformanceSupport.markSkippedStep("probeProxyAssistedTelegram", stepTimings)
@@ -214,6 +223,7 @@ object CallTransportChecker {
                     context = context,
                     proxyEndpoint = proxyEndpoint,
                     resolverConfig = resolverConfig,
+                    timeoutMs = effectiveTimeoutMs,
                 )
             }
         }
@@ -260,9 +270,10 @@ object CallTransportChecker {
         context: Context,
         resolverConfig: DnsResolverConfig,
         onProgress: (suspend (String, String) -> Unit)? = null,
+        config: CallTransportConfig = CallTransportConfig(enabled = false),
     ): StunSweepResult = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
-        val catalog = cancellationAwareRunCatching { dependencies.loadCatalog(context) }
+        val rawCatalog = cancellationAwareRunCatching { dependencies.loadCatalog(context) }
             .getOrElse { error ->
                 return@withContext StunSweepResult(
                     groups = emptyList(),
@@ -275,6 +286,23 @@ object CallTransportChecker {
                     ),
                 )
             }
+        val filteredBuiltin = rawCatalog.stunTargets.filter { target ->
+            when (target.scope) {
+                StunScope.GLOBAL -> config.builtinGlobalStunEnabled
+                StunScope.RU -> config.builtinRuStunEnabled
+            }
+        }
+        val customTargets = config.customStunServers
+            .filter { it.host.isNotBlank() }
+            .map { custom ->
+                CallTransportTargetCatalog.StunTarget(
+                    host = custom.host,
+                    port = custom.port,
+                    scope = StunScope.GLOBAL,
+                    enabled = true,
+                )
+            }
+        val catalog = CallTransportTargetCatalog.Catalog(stunTargets = filteredBuiltin + customTargets)
 
         val paths = cancellationAwareRunCatching { dependencies.loadPaths(context) }
             .getOrElse { error ->
@@ -331,6 +359,7 @@ object CallTransportChecker {
         resolverConfig: DnsResolverConfig,
         onProgress: (suspend (String, String) -> Unit)? = null,
         activeStunGroupsProvider: (suspend () -> List<StunProbeGroupResult>)? = null,
+        timeoutMs: Int = STUN_HTTP_TIMEOUT_MS,
     ): List<CallTransportLeakResult> = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
         val paths = cancellationAwareRunCatching { dependencies.loadPaths(context) }
@@ -368,7 +397,7 @@ object CallTransportChecker {
                                     targets = catalog.stunTargets,
                                     path = path,
                                     sweepGroups = sweepGroups,
-                                    fetchPublicIp = { dependencies.publicIpFetcher(path, resolverConfig) },
+                                    fetchPublicIp = { dependencies.publicIpFetcher(path, resolverConfig, timeoutMs) },
                                 )
                             }
                     } else {
@@ -380,7 +409,7 @@ object CallTransportChecker {
                     probeStunServiceTargets(
                         targets = catalog.stunTargets,
                         path = path,
-                        fetchPublicIp = { dependencies.publicIpFetcher(path, resolverConfig) },
+                        fetchPublicIp = { dependencies.publicIpFetcher(path, resolverConfig, timeoutMs) },
                         stunProbe = { target ->
                             preferSuccessfulBinding(
                                 dependencies.stunDualStackProbe(
@@ -402,6 +431,7 @@ object CallTransportChecker {
         context: Context,
         proxyEndpoint: ProxyEndpoint,
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
+        timeoutMs: Int = STUN_HTTP_TIMEOUT_MS,
     ): List<CallTransportLeakResult> = withContext(Dispatchers.IO) {
         val dependencies = dependenciesOverride ?: Dependencies()
         if (proxyEndpoint.type != ProxyType.SOCKS5) {
@@ -413,7 +443,7 @@ object CallTransportChecker {
             cancellationAwareRunCatchingSuspend {
                 IfconfigClient.fetchIpViaProxy(
                     endpoint = proxyEndpoint,
-                    timeoutMs = STUN_HTTP_TIMEOUT_MS,
+                    timeoutMs = timeoutMs,
                     resolverConfig = resolverConfig,
                     okHttpRetryCount = STUN_HTTP_OKHTTP_RETRY_COUNT,
                     nativeCurlRetryCount = STUN_HTTP_NATIVE_CURL_RETRY_COUNT,

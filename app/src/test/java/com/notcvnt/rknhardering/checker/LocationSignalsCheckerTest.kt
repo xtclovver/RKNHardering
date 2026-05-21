@@ -538,6 +538,39 @@ class LocationSignalsCheckerTest {
         )
     }
 
+    @Test
+    fun `when checkBeacondb=false the beacondb fetch is skipped`() {
+        // When checkBeacondb is false, collectSnapshot never calls beaconDbClient.lookup,
+        // so cellCountryCode remains null. Simulate this via evaluate() with a snapshot
+        // that has cellCountryCode=null (the state produced when the toggle is off).
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                cellLookupPermissionGranted = true,
+                cellCandidatesCount = 1,
+                cellCountryCode = null,
+                cellLookupSummary = null,
+            ),
+        )
+
+        assertFalse(result.findings.any { it.description.startsWith("Cell lookup country:") })
+        assertFalse(result.findings.any { it.description == "cell_country_ru:true" })
+    }
+
+    @Test
+    fun `when checkCellTowers=false the cell tower finding is skipped`() {
+        // When checkCellTowers is false, collectCellCandidates is not called,
+        // so cellCandidatesCount stays 0. Simulate via snapshot with count=0.
+        val result = LocationSignalsChecker.evaluate(
+            snapshot(
+                cellLookupPermissionGranted = true,
+                cellCandidatesCount = 0,
+            ),
+        )
+
+        assertTrue(result.findings.any { it.description == "Cell lookup: base station identifiers are unavailable" })
+        assertFalse(result.findings.any { it.description.startsWith("Cell lookup candidates:") && it.description != "Cell lookup candidates: 0" })
+    }
+
     private fun sim(
         slotIndex: Int = 0,
         subscriptionId: Int = 1,
