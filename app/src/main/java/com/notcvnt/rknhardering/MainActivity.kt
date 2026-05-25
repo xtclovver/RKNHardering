@@ -1306,15 +1306,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun resolveTextColorPrimary(): Int {
-        val tv = android.util.TypedValue()
-        theme.resolveAttribute(android.R.attr.textColorPrimary, tv, true)
-        return getColor(tv.resourceId)
+        return MaterialColors.getColor(this, android.R.attr.textColorPrimary, 0xFFFFFFFF.toInt())
     }
 
     private fun resolveTextColorSecondary(): Int {
-        val tv = android.util.TypedValue()
-        theme.resolveAttribute(android.R.attr.textColorSecondary, tv, true)
-        return getColor(tv.resourceId)
+        return MaterialColors.getColor(this, android.R.attr.textColorSecondary, 0x99FFFFFF.toInt())
     }
 
     private fun updateTileFromDomainReachability(result: DomainReachabilityResult) {

@@ -1,0 +1,3 @@
+Fixed check interruption (crash) during long network timeouts in the operator whitelist probe.
+Improved stability of applying custom profiles when building scan results.
+Fixed a potential crash when resolving system colors in the UI.

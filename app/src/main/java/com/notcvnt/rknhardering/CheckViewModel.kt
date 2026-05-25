@@ -82,14 +82,18 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 if (isCurrentScan(scanId, executionContext)) {
-                    val app: Application = getApplication()
-                    val customEnabled = AppUiSettings.prefs(app)
-                        .getBoolean(SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED, false)
-                    val profile = if (customEnabled) CustomCheckRunner.getActiveProfile(app) else null
-                    val enrichedResult = result.copy(
-                        customProfileId = profile?.id,
-                        customProfileName = profile?.name,
-                    )
+                    val enrichedResult = try {
+                        val app: Application = getApplication()
+                        val customEnabled = AppUiSettings.prefs(app)
+                            .getBoolean(SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED, false)
+                        val profile = if (customEnabled) CustomCheckRunner.getActiveProfile(app) else null
+                        result.copy(
+                            customProfileId = profile?.id,
+                            customProfileName = profile?.name,
+                        )
+                    } catch (_: Exception) {
+                        result
+                    }
                     appendScanEvent(scanId, ScanEvent.Completed(enrichedResult, privacyMode))
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {

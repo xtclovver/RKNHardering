@@ -2,7 +2,7 @@ package com.notcvnt.rknhardering.probe
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.dnsoverhttps.DnsOverHttps
@@ -24,7 +24,7 @@ object OperatorWhitelistProbe {
         val startMs = System.currentTimeMillis()
         val errors = mutableMapOf<String, String>()
 
-        val (googleOk, appleOk, firefoxOk, ruOk) = withTimeout(PROBE_TIMEOUT_MS) {
+        val results = withTimeoutOrNull(PROBE_TIMEOUT_MS) {
             coroutineScope {
                 val googleDeferred = async { checkGoogle(errors) }
                 val appleDeferred = async { checkApple(errors) }
@@ -37,7 +37,11 @@ object OperatorWhitelistProbe {
                     ruDeferred.await(),
                 )
             }
-        }
+        } ?: arrayOf(false, false, false, false)
+        val googleOk = results[0]
+        val appleOk = results[1]
+        val firefoxOk = results[2]
+        val ruOk = results[3]
 
         val allCaptiveFailed = !googleOk && !appleOk && !firefoxOk
         val whitelistDetected = allCaptiveFailed && ruOk

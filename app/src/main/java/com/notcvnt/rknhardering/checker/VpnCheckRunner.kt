@@ -446,7 +446,7 @@ object VpnCheckRunner {
         }
 
         val operatorWhitelistDeferred = if (settings.networkRequestsEnabled) {
-            safeAsync<OperatorWhitelistProbeResult?>(fallback = { null }) {
+            safeAsync<OperatorWhitelistProbeResult?>(context = Dispatchers.IO, fallback = { null }) {
                 dependencies.operatorWhitelistProbe()
             }
         } else null
