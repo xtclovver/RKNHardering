@@ -794,8 +794,9 @@
     <string name="marketplace_empty">未找到配置文件</string>
     <string name="marketplace_error_unknown">未知错误</string>
     <string name="marketplace_meta_format">作者：%1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d 次安装</string>
     <string name="marketplace_action_install">安装</string>
+    <string name="install_file_subtitle">本地文件</string>
+    <string name="install_dns_override_warning">此配置文件将覆盖您的 DNS 设置。扫描期间的所有 DNS 查询将通过上面的服务器,而不是您配置的 DNS。</string>
     <string name="marketplace_action_update">更新</string>
     <string name="marketplace_action_clone_edit">克隆并编辑</string>
     <string name="marketplace_preview_author">作者：%1$s</string>

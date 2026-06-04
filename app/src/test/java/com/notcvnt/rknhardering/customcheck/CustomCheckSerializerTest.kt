@@ -119,13 +119,19 @@ class CustomCheckSerializerTest {
 
     @Test
     fun `roundtrip preserves marketplace info`() {
-        val info = MarketplaceInfo(sourceUrl = "https://market.example.com", official = true, verified = true, installCount = 42, marketplaceId = "abc")
+        val info = MarketplaceInfo(sourceUrl = "https://market.example.com", official = true, verified = true, signatureVerified = true, marketplaceId = "abc")
         val profile = defaultProfile().copy(marketplaceInfo = info)
+        // Untrusted deserialize: signature_verified is dropped, which downgrades
+        // official/verified to false. This is the public contract.
         val restored = CustomCheckSerializer.deserialize(CustomCheckSerializer.serialize(profile))
-
         assertEquals("https://market.example.com", restored.marketplaceInfo?.sourceUrl)
-        assertEquals(true, restored.marketplaceInfo?.official)
-        assertEquals(42, restored.marketplaceInfo?.installCount)
+        assertEquals(false, restored.marketplaceInfo?.official)
+        assertEquals(false, restored.marketplaceInfo?.signatureVerified)
+
+        // Trusted deserialize (storage) honors the bit.
+        val fromStorage = CustomCheckSerializer.deserializeFromStorage(CustomCheckSerializer.serialize(profile))
+        assertEquals(true, fromStorage.marketplaceInfo?.official)
+        assertEquals(true, fromStorage.marketplaceInfo?.signatureVerified)
     }
 
     @Test

@@ -223,16 +223,17 @@ data class NetworkConfig(
 )
 
 // === Marketplace info ===
-// originalHash: SHA-256 of the canonical JSON of the profile as downloaded from the
-// marketplace, computed *without* the marketplace block itself. Allows the app to
-// detect whether the profile body has been tampered with after installation — if a
-// recomputation of the canonical hash diverges from this value, official/verified
-// badges must be discarded.
+// signatureVerified: true only when this profile entered the device via a
+// catalog whose Ed25519 signature validated against the bundled public key
+// AND the profile body matched the catalog's expected_hash. Any other source
+// (file import, clipboard, hand-edited storage) must store false. Drives the
+// "Official" / "Verified" badges — the in-file flags official/verified are
+// advisory and ignored unless signatureVerified is also true.
 data class MarketplaceInfo(
     val sourceUrl: String? = null,
     val official: Boolean = false,
     val verified: Boolean = false,
-    val installCount: Int = 0,
+    val signatureVerified: Boolean = false,
     val marketplaceId: String? = null,
     val originalHash: String? = null,
 )

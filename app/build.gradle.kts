@@ -29,8 +29,8 @@ android {
         applicationId = "com.notcvnt.rknhardering"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20801
-        versionName = "2.8.1"
+        versionCode = 20802
+        versionName = "2.8.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         androidResources.localeFilters += listOf("en", "ru", "fa", "zh-rCN")
 
@@ -100,6 +100,13 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     systemProperty("robolectric.dependency.dir", robolectricRuntimeDepsDir.get().asFile.absolutePath)
     systemProperty("robolectric.offline", "true")
     systemProperty("robolectric.usePreinstrumentedJars", "false")
+
+    // Forward maintainer-only -Dmarketplace.* properties to the test JVM so the
+    // MarketplaceSigningTool can pick them up. No effect when unset.
+    System.getProperties().forEach { (k, v) ->
+        val key = k.toString()
+        if (key.startsWith("marketplace.")) systemProperty(key, v.toString())
+    }
 }
 
 dependencies {

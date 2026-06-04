@@ -817,8 +817,9 @@
     <string name="marketplace_empty">Профили не найдены</string>
     <string name="marketplace_error_unknown">Неизвестная ошибка</string>
     <string name="marketplace_meta_format">от %1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d установок</string>
     <string name="marketplace_action_install">Установить</string>
+    <string name="install_file_subtitle">Локальный файл</string>
+    <string name="install_dns_override_warning">Этот профиль переопределяет настройки DNS. Все DNS-запросы во время сканирования пойдут через указанный выше сервер, а не через выбранный в настройках.</string>
     <string name="marketplace_action_update">Обновить</string>
     <string name="marketplace_action_clone_edit">Клонировать и редактировать</string>
     <string name="marketplace_preview_author">Автор: %1$s</string>

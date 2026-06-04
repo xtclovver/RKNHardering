@@ -1,0 +1,3 @@
+Hardened the marketplace and profile imports against data exfiltration: catalog now requires an Ed25519 signature, official/verified badges no longer travel inside profile files, and DoH/DNS overrides are surfaced in the install warning.
+Custom URLs in imported profiles are restricted to https only and reject loopback, RFC1918, CGNAT and link-local addresses to prevent local-network probing.
+File and clipboard imports now go through the same warning sheet as unverified marketplace entries, with the full URL preview.

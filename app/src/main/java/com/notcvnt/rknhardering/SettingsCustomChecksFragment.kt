@@ -64,14 +64,15 @@ internal class SettingsCustomChecksFragment : Fragment(R.layout.fragment_setting
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri ?: return@registerForActivityResult
-        runCatching {
-            val profile = CustomCheckRepository.importFromFile(requireContext(), uri)
-            CustomCheckRepository.save(requireContext(), profile)
-            loadProfiles()
-            Toast.makeText(requireContext(), R.string.settings_custom_check_import_done, Toast.LENGTH_SHORT).show()
-        }.onFailure {
-            Toast.makeText(requireContext(), R.string.settings_custom_check_import_failed, Toast.LENGTH_SHORT).show()
-        }
+        showImportConfirmDialog(uri)
+    }
+
+    private fun showImportConfirmDialog(uri: Uri) {
+        // Route all file imports through the same unverified-install bottom sheet
+        // the marketplace uses so users see the same URL preview + warning as for
+        // any third-party profile. The dialog itself strips official/verified.
+        SettingsMarketplaceInstallDialogFragment.newInstanceForFile(uri)
+            .show(childFragmentManager, "import_dialog")
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -134,6 +135,15 @@ internal class SettingsCustomChecksFragment : Fragment(R.layout.fragment_setting
         // Discover card → Marketplace
         view.findViewById<TextView>(R.id.btnSeeAll).setOnClickListener { openMarketplace() }
         view.findViewById<View>(R.id.discoverCard).setOnClickListener { /* no-op, body clickable via See all */ }
+
+        childFragmentManager.setFragmentResultListener(
+            SettingsMarketplaceInstallDialogFragment.REQUEST_KEY,
+            viewLifecycleOwner,
+        ) { _, _ ->
+            loadProfiles()
+            view?.let { loadDiscover(it) }
+            Toast.makeText(requireContext(), R.string.settings_custom_check_import_done, Toast.LENGTH_SHORT).show()
+        }
 
         loadProfiles()
         loadDiscover(view)
@@ -292,28 +302,11 @@ internal class SettingsCustomChecksFragment : Fragment(R.layout.fragment_setting
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
+    @Suppress("UNUSED_PARAMETER")
     private fun handlePendingImport(view: View) {
         arguments?.getString(ARG_IMPORT_URI)?.let { uriStr ->
             arguments?.remove(ARG_IMPORT_URI)
-            val uri = Uri.parse(uriStr)
-            val profileName = runCatching {
-                CustomCheckRepository.importFromFile(requireContext(), uri).name
-            }.getOrNull()
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.settings_custom_check_import)
-                .setMessage(profileName ?: uri.lastPathSegment ?: uriStr)
-                .setPositiveButton(R.string.settings_custom_check_import) { _, _ ->
-                    runCatching {
-                        val profile = CustomCheckRepository.importFromFile(requireContext(), uri)
-                        CustomCheckRepository.save(requireContext(), profile)
-                        loadProfiles()
-                        Toast.makeText(requireContext(), R.string.settings_custom_check_import_done, Toast.LENGTH_SHORT).show()
-                    }.onFailure {
-                        Toast.makeText(requireContext(), R.string.settings_custom_check_import_failed, Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .setNegativeButton(R.string.settings_custom_check_cancel, null)
-                .show()
+            showImportConfirmDialog(Uri.parse(uriStr))
         }
     }
 }

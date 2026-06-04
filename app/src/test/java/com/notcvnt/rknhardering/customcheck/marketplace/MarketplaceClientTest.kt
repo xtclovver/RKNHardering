@@ -91,7 +91,6 @@ class MarketplaceClientTest {
         assertEquals("xtclovver", e1.author)
         assertTrue(e1.official)
         assertTrue(e1.verified)
-        assertEquals(10, e1.installCount)
         assertEquals(listOf("official", "complete"), e1.tags)
 
         val e2 = catalog.entries[1]
@@ -136,7 +135,7 @@ class MarketplaceClientTest {
             id = "test-profile", name = "Test Profile", description = "", author = "tester",
             version = "1.0.0", official = false, verified = false,
             profileUrl = server.url("/test.rkncheck").toString(),
-            installCount = 0, tags = emptyList(), createdAt = "", updatedAt = "",
+             tags = emptyList(), createdAt = "", updatedAt = "",
         )
         val profile = runBlocking { buildClientFor("").fetchProfileFromUrl(entry.profileUrl) }
         assertEquals("test-profile", profile.id)
@@ -153,7 +152,7 @@ class MarketplaceClientTest {
                 id = "x", name = "x", description = "", author = "x", version = "1.0.0",
                 official = false, verified = false,
                 profileUrl = server.url("/profile.rkncheck").toString(),
-                installCount = 0, tags = emptyList(), createdAt = "", updatedAt = "",
+                 tags = emptyList(), createdAt = "", updatedAt = "",
             )
             runCatching {
                 buildClientFor("").fetchProfileFromUrl(entry.profileUrl)
@@ -215,7 +214,6 @@ private object TestableMarketplaceClient {
                         official = e.optBoolean("official", false),
                         verified = e.optBoolean("verified", false),
                         profileUrl = e.optString("profile_url", ""),
-                        installCount = e.optInt("install_count", 0),
                         tags = tags,
                         createdAt = e.optString("created_at", ""),
                         updatedAt = e.optString("updated_at", ""),

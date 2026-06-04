@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "id": "mtproxy-tg-stun-check",
+  "name": "MTProxy/TG STUN Check",
+  "description": "Focused on Telegram traffic analysis: STUN reflexive IP detection (global + RU servers), MTProto probing via localhost proxies, and underlying network leak checks. Useful for verifying that Telegram traffic does not bypass VPN tunnels.",
+  "author": "xtclovver",
+  "version": "1.0.0",
+  "created_at": 1748296800000,
+  "updated_at": 1748296800000,
+  "checks": {
+    "geo_ip": {
+      "enabled": true,
+      "timeout_ms": 8000,
+      "builtin_providers": {},
+      "custom_providers": []
+    },
+    "ip_comparison": {
+      "enabled": false,
+      "timeout_ms": 8000,
+      "builtin_ru_checkers_enabled": false,
+      "builtin_non_ru_checkers_enabled": false,
+      "custom_endpoints": []
+    },
+    "cdn_pulling": {
+      "enabled": false,
+      "timeout_ms": 10000,
+      "meduza_enabled": false,
+      "rutracker_enabled": false,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "direct_signs": {
+      "enabled": true,
+      "check_transport_vpn": true,
+      "check_http_proxy": false,
+      "check_socks_proxy": false,
+      "check_proxy_info": false,
+      "check_vpn_service": true
+    },
+    "indirect_signs": {
+      "enabled": true,
+      "check_not_vpn_cap": false,
+      "check_vpn_interfaces": false,
+      "check_mtu_anomaly": false,
+      "check_ipsec": false,
+      "check_routing": true,
+      "check_dns": true,
+      "check_proxy_tools": false,
+      "check_local_listeners": false,
+      "check_dumpsys": false,
+      "listener_port_threshold": 5
+    },
+    "native_signs": {
+      "enabled": false
+    },
+    "location_signals": {
+      "enabled": false,
+      "check_beacondb": false,
+      "check_cell_towers": false,
+      "check_wifi_signals": false
+    },
+    "icmp_spoofing": {
+      "enabled": false,
+      "timeout_ms": 5000,
+      "ping_count": 3,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "rtt_triangulation": {
+      "enabled": false,
+      "timeout_ms": 5000,
+      "ping_count": 5,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "call_transport": {
+      "enabled": true,
+      "timeout_ms": 8000,
+      "builtin_global_stun_enabled": true,
+      "builtin_ru_stun_enabled": true,
+      "check_mtproto": true,
+      "custom_stun_servers": []
+    },
+    "split_tunnel": {
+      "enabled": true,
+      "proxy_scan": true,
+      "xray_api_scan": false,
+      "port_range": "popular",
+      "port_range_start": 1024,
+      "port_range_end": 65535,
+      "connect_timeout_ms": 300,
+      "check_underlying_network": true,
+      "check_vpn_network_binding": true,
+      "check_mtproto_via_proxy": true
+    },
+    "domain_reachability_enabled": true
+  },
+  "custom_domains": [
+    {
+      "domain": "core.telegram.org",
+      "check_type": "telegram",
+      "description": "Telegram Core (API docs & web)",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "web.telegram.org",
+      "check_type": "telegram",
+      "description": "Telegram Web Client",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "desktop.telegram.org",
+      "check_type": "telegram",
+      "description": "Telegram Desktop download",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "t.me",
+      "check_type": "telegram",
+      "description": "Telegram short links",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    }
+  ],
+  "network": {
+    "network_requests_enabled": true,
+    "dns_mode": "system",
+    "dns_preset": "custom",
+    "dns_servers": "",
+    "doh_url": "",
+    "doh_bootstrap": ""
+  },
+  "marketplace": {
+    "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/mtproxy-tg-stun-check.rkncheck",
+    "official": true,
+    "verified": true,
+    "marketplace_id": "mtproxy-tg-stun-check"
+  }
+}

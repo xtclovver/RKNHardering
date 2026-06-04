@@ -834,8 +834,9 @@
     <string name="marketplace_empty">No profiles found</string>
     <string name="marketplace_error_unknown">Unknown error</string>
     <string name="marketplace_meta_format">by %1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d installs</string>
     <string name="marketplace_action_install">Install</string>
+    <string name="install_file_subtitle">Local file</string>
+    <string name="install_dns_override_warning">This profile overrides your DNS settings. All DNS lookups during the scan will go through the server above instead of your configured DNS.</string>
     <string name="marketplace_action_update">Update</string>
     <string name="marketplace_action_clone_edit">Clone &amp; edit</string>
     <string name="marketplace_preview_author">Author: %1$s</string>

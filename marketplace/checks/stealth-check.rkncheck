@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "id": "default-quick-scan",
-  "name": "Quick Scan",
-  "description": "Fast subset \u00e2\u20ac\u201d only direct/indirect signs and GeoIP. Official profile.",
+  "id": "stealth-check",
+  "name": "Stealth Check",
+  "description": "Local-only checks without any network requests. Detects VPN/proxy using on-device signals: NetworkCapabilities, interfaces, routing, DNS config, dumpsys, native JNI, and localhost proxy scanning.",
   "author": "xtclovver",
   "version": "1.0.0",
-  "created_at": 1747699200000,
-  "updated_at": 1747699200000,
+  "created_at": 1748296800000,
+  "updated_at": 1748296800000,
   "checks": {
     "geo_ip": {
-      "enabled": true,
-      "timeout_ms": 8000,
+      "enabled": false,
+      "timeout_ms": 10000,
       "builtin_providers": {},
       "custom_providers": []
     },
     "ip_comparison": {
-      "enabled": true,
-      "timeout_ms": 6000,
-      "builtin_ru_checkers_enabled": true,
-      "builtin_non_ru_checkers_enabled": true,
+      "enabled": false,
+      "timeout_ms": 8000,
+      "builtin_ru_checkers_enabled": false,
+      "builtin_non_ru_checkers_enabled": false,
       "custom_endpoints": []
     },
     "cdn_pulling": {
@@ -51,7 +51,7 @@
       "listener_port_threshold": 5
     },
     "native_signs": {
-      "enabled": false
+      "enabled": true
     },
     "location_signals": {
       "enabled": true,
@@ -60,10 +60,10 @@
       "check_wifi_signals": true
     },
     "icmp_spoofing": {
-      "enabled": true,
+      "enabled": false,
       "timeout_ms": 5000,
       "ping_count": 3,
-      "builtin_targets_enabled": true,
+      "builtin_targets_enabled": false,
       "custom_targets": []
     },
     "rtt_triangulation": {
@@ -89,14 +89,15 @@
       "port_range_start": 1024,
       "port_range_end": 65535,
       "connect_timeout_ms": 300,
-      "check_underlying_network": true,
-      "check_vpn_network_binding": true,
+      "check_underlying_network": false,
+      "check_vpn_network_binding": false,
       "check_mtproto_via_proxy": false
-    }
+    },
+    "domain_reachability_enabled": false
   },
   "custom_domains": [],
   "network": {
-    "network_requests_enabled": true,
+    "network_requests_enabled": false,
     "dns_mode": "system",
     "dns_preset": "custom",
     "dns_servers": "",
@@ -104,9 +105,9 @@
     "doh_bootstrap": ""
   },
   "marketplace": {
-    "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/quick-scan.rkncheck",
+    "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/stealth-check.rkncheck",
     "official": true,
     "verified": true,
-    "marketplace_id": "default-quick-scan"
+    "marketplace_id": "stealth-check"
   }
 }

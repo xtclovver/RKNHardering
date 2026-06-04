@@ -107,7 +107,6 @@
     "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/full-scan.rkncheck",
     "official": true,
     "verified": true,
-    "install_count": 0,
     "marketplace_id": "default-full-scan"
   }
 }

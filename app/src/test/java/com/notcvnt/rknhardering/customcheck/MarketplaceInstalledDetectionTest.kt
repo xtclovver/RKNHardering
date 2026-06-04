@@ -39,7 +39,7 @@ class MarketplaceInstalledDetectionTest {
         official = false,
         verified = false,
         profileUrl = "https://example.invalid/$id.rkncheck",
-        installCount = 0,
+        
         tags = emptyList(),
         createdAt = "",
         updatedAt = "",

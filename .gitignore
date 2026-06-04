@@ -20,4 +20,6 @@ release.jks
 .claude/
 *.sh
 *.ps1
+!CONTRIBUTING.md
 /.codex
+.marketplace-keys/

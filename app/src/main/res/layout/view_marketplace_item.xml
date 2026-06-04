@@ -133,13 +133,6 @@
                 android:gravity="center_vertical"
                 android:layout_marginTop="8dp">
 
-                <TextView
-                    android:id="@+id/textItemInstallCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="11sp" />
-
                 <View
                     android:layout_width="0dp"
                     android:layout_height="1dp"
