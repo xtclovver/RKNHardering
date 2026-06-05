@@ -80,6 +80,8 @@ object GeoIpChecker {
     private const val IPLOOKUP_PROVIDER = "iplookup.it"
     private const val IPBOT_PROVIDER = "ipbot.com"
 
+    private const val MISSING_IP_FIELD = "Missing ip field"
+
     private const val IPAPIIS_URL = "https://api.ipapi.is/"
 
     private const val IPLOCATE_URL = "https://www.iplocate.io/api/lookup"
@@ -326,7 +328,7 @@ object GeoIpChecker {
                 resolverConfig = resolverConfig,
                 timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return ProviderSnapshot(IPAPIIS_PROVIDER, false, null, "Missing ip field", json.toString())
+            if (!json.has("ip")) return ProviderSnapshot(IPAPIIS_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
 
             val location = json.optJSONObject("location")
             val company = json.optJSONObject("company")
@@ -385,7 +387,7 @@ object GeoIpChecker {
                 resolverConfig = resolverConfig,
                 timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return ProviderSnapshot(IPLOCATE_PROVIDER, false, null, "Missing ip field", json.toString())
+            if (!json.has("ip")) return ProviderSnapshot(IPLOCATE_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
 
             val privacy = json.optJSONObject("privacy")
             val company = json.optJSONObject("company")
@@ -438,7 +440,7 @@ object GeoIpChecker {
                 resolverConfig = resolverConfig,
                 timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return ProviderSnapshot(IPQUERY_PROVIDER, false, null, "Missing ip field", json.toString())
+            if (!json.has("ip")) return ProviderSnapshot(IPQUERY_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
 
             val location = json.optJSONObject("location")
             val isp = json.optJSONObject("isp")
@@ -492,7 +494,7 @@ object GeoIpChecker {
                 resolverConfig = resolverConfig,
                 timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, "Missing ip field", json.toString())
+            if (!json.has("ip")) return ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
 
             val geo = json.optJSONObject("geo")
             val network = json.optJSONObject("network")
@@ -546,7 +548,7 @@ object GeoIpChecker {
                 resolverConfig = resolverConfig,
                 timeoutMs = timeoutMs,
             )
-            if (!json.has("ip")) return ProviderSnapshot(IPBOT_PROVIDER, false, null, "Missing ip field", json.toString())
+            if (!json.has("ip")) return ProviderSnapshot(IPBOT_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
 
             val location = json.optJSONObject("location")
             val network = json.optJSONObject("network")

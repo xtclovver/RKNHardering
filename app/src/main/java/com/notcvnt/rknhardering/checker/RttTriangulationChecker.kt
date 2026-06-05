@@ -29,6 +29,7 @@ internal object RttTriangulationChecker {
     private const val THRESHOLD_HOME_MS = 80.0
     private const val JITTER_LIMIT_MS = 60.0
     private const val MIN_REACHABLE_TARGETS_PER_GROUP = 2
+    private const val CATEGORY_NAME = "RTT triangulation"
 
     private val RU_TARGETS = listOf(
         "yandex.ru",
@@ -86,7 +87,7 @@ internal object RttTriangulationChecker {
     ): CategoryResult = withContext(Dispatchers.IO) {
         if (!config.enabled) {
             return@withContext CategoryResult(
-                name = "RTT triangulation",
+                name = CATEGORY_NAME,
                 detected = false,
                 findings = emptyList(),
             )
@@ -96,7 +97,7 @@ internal object RttTriangulationChecker {
 
         if (resolved.country == null) {
             return@withContext CategoryResult(
-                name = "RTT triangulation",
+                name = CATEGORY_NAME,
                 detected = false,
                 needsReview = true,
                 findings = listOf(
@@ -112,7 +113,7 @@ internal object RttTriangulationChecker {
 
         if (resolved.country != "RU") {
             return@withContext CategoryResult(
-                name = "RTT triangulation",
+                name = CATEGORY_NAME,
                 detected = false,
                 needsReview = true,
                 findings = listOf(
@@ -329,7 +330,7 @@ internal object RttTriangulationChecker {
         }
 
         CategoryResult(
-            name = "RTT triangulation",
+            name = CATEGORY_NAME,
             detected = detected,
             needsReview = needsReview,
             findings = allFindings,

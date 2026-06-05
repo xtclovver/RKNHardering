@@ -103,11 +103,15 @@ object CustomCheckRepository {
     }
 
     fun delete(context: Context, id: String) {
-        profileFile(context, id).delete()
-        prefs(context).edit { remove(KEY_PREFIX_TRUSTED_HASH + id) }
-        // Clear active profile if deleted
-        if (getActiveProfileId(context) == id) {
-            setActiveProfileId(context, null)
+        val file = profileFile(context, id)
+        if (!file.exists() || file.delete()) {
+            prefs(context).edit { remove(KEY_PREFIX_TRUSTED_HASH + id) }
+            // Clear active profile if deleted
+            if (getActiveProfileId(context) == id) {
+                setActiveProfileId(context, null)
+            }
+        } else {
+            android.util.Log.w("CustomCheckRepository", "Failed to delete profile file: $id")
         }
     }
 

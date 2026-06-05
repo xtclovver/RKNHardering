@@ -12,7 +12,7 @@ object Ed25519 {
     private val L = BigInteger("7237005577332262213973186563042994240857116359379907606001950938285454250989")
     private val D = BigInteger("-121665").mod(P)
         .multiply(BigInteger("121666").modInverse(P)).mod(P)
-    private val I = BigInteger.TWO.modPow(P.subtract(BigInteger.ONE).shiftRight(2), P)
+    private val I = BigInteger.valueOf(2).modPow(P.subtract(BigInteger.ONE).shiftRight(2), P)
     private val B: Point = run {
         val by = BigInteger.valueOf(4).multiply(BigInteger.valueOf(5).modInverse(P)).mod(P)
         val bx = recoverX(by, false)

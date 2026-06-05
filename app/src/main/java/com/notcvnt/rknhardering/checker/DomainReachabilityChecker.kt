@@ -34,6 +34,7 @@ object DomainReachabilityChecker {
     private const val TCP_TIMEOUT_MS = 8_000
     private const val TLS_TIMEOUT_MS = 10_000
     private const val DNS_TIMEOUT_MS = 8_000
+    private const val CONNECTION_RESET_DPI = "Connection Reset (DPI)"
 
     suspend fun check(
         context: Context,
@@ -215,18 +216,18 @@ object DomainReachabilityChecker {
             } catch (e: java.net.SocketException) {
                 val msg = e.message?.lowercase() ?: ""
                 val error = when {
-                    msg.contains("reset") -> "Connection Reset (DPI)"
+                    msg.contains("reset") -> CONNECTION_RESET_DPI
                     msg.contains("refused") -> "Connection Refused"
-                    msg.contains("broken pipe") -> "Connection Reset (DPI)"
+                    msg.contains("broken pipe") -> CONNECTION_RESET_DPI
                     else -> e.message ?: "SocketException"
                 }
                 StepResult(DomainReachabilityStepStatus.FAILED, error)
             } catch (e: java.io.EOFException) {
-                StepResult(DomainReachabilityStepStatus.FAILED, "Connection Reset (DPI)")
+                StepResult(DomainReachabilityStepStatus.FAILED, CONNECTION_RESET_DPI)
             } catch (e: javax.net.ssl.SSLException) {
                 val msg = e.message?.lowercase() ?: ""
                 if (msg.contains("reset") || msg.contains("closed") || msg.contains("peer")) {
-                    StepResult(DomainReachabilityStepStatus.FAILED, "Connection Reset (DPI)")
+                    StepResult(DomainReachabilityStepStatus.FAILED, CONNECTION_RESET_DPI)
                 } else {
                     // Other SSL errors (protocol, etc.) — handshake at least started
                     StepResult(DomainReachabilityStepStatus.OK)
