@@ -50,21 +50,24 @@ If you have expertise in these areas, please open an Issue or Pull Request, or r
 
 Independent check modules run in parallel. The final verdict is calculated in `VerdictEngine`.
 
-`IpComparisonChecker` is stored in the result and shown in the UI as a diagnostic block, but in the current version it does not participate in `VerdictEngine`.
+`IpComparisonChecker` is stored in the result and shown in the UI as a diagnostic block. It does not participate directly in `VerdictEngine`, but its data feeds into `IpConsensusBuilder`.
 
 ```text
 VpnCheckRunner
-├── GeoIpChecker           — GeoIP + hosting/proxy signals
-├── IpComparisonChecker    — RU/non-RU IP checkers (diagnostics)
-├── DirectSignsChecker     — NetworkCapabilities, system proxy, installed VPN apps
-├── IndirectSignsChecker   — interfaces, routes, DNS, dumpsys, proxy-tech signals
-├── CallTransportChecker   — STUN/MTProto (leaks and connectivity)
-├── CdnPullingChecker      — HTTPS requests to CDN/redirector
-├── LocationSignalsChecker — MCC/SIM/cell/Wi-Fi/BeaconDB
-├── BypassChecker          — localhost proxy, Xray gRPC API, underlying-network leak
-├── RttTriangulationChecker — SNITCH (β): RTT triangulation against RU/foreign hosts
-└── NativeSignsChecker     — JNI checks (routes, hooks, root)
-        └── VerdictEngine  — final verdict logic
+├── GeoIpChecker             — GeoIP + hosting/proxy signals
+├── IpComparisonChecker      — RU/non-RU IP checkers (diagnostics)
+├── DirectSignsChecker       — NetworkCapabilities, system proxy, TUN probe, installed VPN apps
+├── IndirectSignsChecker     — interfaces, routes, DNS, dumpsys, proxy-tech signals
+├── CallTransportChecker     — STUN/MTProto (leaks and connectivity)
+├── CdnPullingChecker        — HTTPS requests to CDN/redirector
+├── LocationSignalsChecker   — MCC/SIM/cell/Wi-Fi/BeaconDB
+├── BypassChecker            — localhost proxy, Xray gRPC API, underlying-network leak
+├── RttTriangulationChecker  — SNITCH (β): RTT triangulation against RU/foreign hosts
+├── IcmpSpoofingChecker      — operator ICMP spoofing (blocked host replies to ping)
+├── DomainReachabilityChecker — DNS→TCP→TLS pipeline for DPI blocking detection
+├── NativeSignsChecker       — JNI checks (routes, interfaces, hooks, root)
+└── IpConsensusBuilder       — cross-module IP consensus
+        └── VerdictEngine    — final verdict logic
 ```
 
 ---
@@ -98,7 +101,7 @@ HTTP(S) connect and read timeout: 10 seconds. `GeoIpChecker` uses only HTTPS pro
 
 ### 2. IP checker comparison (`IpComparisonChecker`)
 
-This module compares responses from RU and non-RU public IP checkers. It is a diagnostic block: it is shown in the UI, but currently does not participate in `VerdictEngine`.
+This module compares responses from RU and non-RU public IP checkers. It is shown in the UI as a diagnostic block. It does not participate directly in `VerdictEngine`, but its data feeds into `IpConsensusBuilder`, whose results are used in R3.
 
 Service groups:
 
@@ -152,13 +155,18 @@ Logic:
 
 Known proxy ports: `80`, `443`, `1080`, `3127`, `3128`, `4080`, `5555`, `7000`, `7044`, `8000`, `8080`, `8081`, `8082`, `8888`, `9000`, `9050`, `9051`, `9150`, `12345`, and the range `16000..16100`.
 
-#### 3.3 Installed VPN/Proxy apps (`InstalledVpnAppDetector`)
+#### 3.3 TUN Active Probe (`checkTunActiveProbe`)
 
-The module checks two sources:
+If a TUN interface is detected during initialization, `UnderlyingNetworkProber` sends HTTP requests through the VPN network to both RU and non-RU targets. A DNS path mismatch (different IPs on VPN vs direct path) or explicit per-app VPN exclusion (tun0 present but `vpnActive = false`) yields `detected = true`. This signal enters `VerdictEngine` via `EvidenceSource.TUN_ACTIVE_PROBE`.
+
+#### 3.4 Installed VPN/Proxy apps (`InstalledVpnAppDetector`)
+
+The module checks three sources:
 
 - known package signatures from [`VpnAppCatalog`](../app/src/main/java/com/notcvnt/rknhardering/vpn/VpnAppCatalog.kt);
-- apps that declare `VpnService.SERVICE_INTERFACE` through `PackageManager.queryIntentServices`.
-- the app has "VPN" in the name (this, of course, doesn't 100% guarantee that it's a VPN)
+- apps that declare `VpnService.SERVICE_INTERFACE` through `PackageManager.queryIntentServices`;
+- apps with "VPN" in the name.
+
 These are diagnostic signals of installation or `VpnService` declaration, not confirmation of an active tunnel. Matches move the category into `needsReview`, but do not by themselves make `DirectSignsChecker.detected = true`.
 
 ---
@@ -401,7 +409,48 @@ The check is optional and disabled by default.
 
 ---
 
-### 10. Native Signs (`NativeSignsChecker`)
+### 10. ICMP Spoofing (`IcmpSpoofingChecker`)
+
+Detects whether the operator is spoofing ICMP replies for blocked hosts.
+
+Default targets:
+
+- `instagram.com` — blocked host (`BLOCKED`);
+- `google.com` — control host (`CONTROL`).
+
+Targets are configurable via custom checks. At least one BLOCKED and one CONTROL target are required.
+
+Logic:
+
+| Condition | Result |
+|-----------|--------|
+| BLOCKED host replied to ping | `needsReview = true` — possible operator ICMP spoofing |
+| CONTROL host replied with RTT < 10 ms | `needsReview = true` — suspiciously low latency (possible local interception) |
+| Both conditions simultaneously | `needsReview = true` with a stronger signal |
+| CONTROL host did not reply | inconclusive |
+| None of the above | normal |
+
+`IcmpSpoofingChecker.detected` is always `false`. The result can upgrade the verdict from `NOT_DETECTED` to `NEEDS_REVIEW` via R6 in `VerdictEngine`. Enabled by default. Signals are automatically suppressed when home-routed roaming is detected.
+
+---
+
+### 11. Domain Reachability (`DomainReachabilityChecker`)
+
+Checks each domain from the user-supplied list through a DNS → TCP → TLS pipeline:
+
+| Step | Detected blocking | Timeout |
+|------|-------------------|---------|
+| DNS | NXDOMAIN, timeout | 8 s |
+| TCP :443 | Connection refused, timeout | 8 s |
+| TLS (SNI) | Connection reset — DPI indicator | 10 s |
+
+The TLS step uses a trust-all X.509 manager because the goal is to detect DPI-level connection resets, not to validate certificates. An `SSLHandshakeException` due to an invalid certificate is treated as a successful TLS step.
+
+Results do not affect the verdict. The module is disabled by default (`domainReachabilityEnabled = false`) and only activates when a non-empty domain list is provided in the custom check settings.
+
+---
+
+### 12. Native Signs (`NativeSignsChecker`)
 
 Performs low-level JNI checks directly from C++:
 - Native interface listing and `getifaddrs()` checks
@@ -418,20 +467,26 @@ Native findings can translate into `needsReview` or generic indirect routing sig
 
 `VerdictEngine` does not use all collected blocks equally.
 
-First, unconditional rules are applied:
+**R1 — unconditional detection via bypass evidence:**
 
-1. `DETECTED` if bypass evidence contains `SPLIT_TUNNEL_BYPASS`.
-2. `DETECTED` if `XRAY_API` is found.
-3. `DETECTED` if `VPN_GATEWAY_LEAK` is found.
-4. `DETECTED` if location signals confirm Russia (`network_mcc_ru:true`, `cell_country_ru:true`, or `location_country_ru:true`) while `GeoIP` simultaneously reports a foreign signal.
+If any detected evidence has source `SPLIT_TUNNEL_BYPASS`, `XRAY_API`, `VPN_GATEWAY_LEAK`, or `VPN_NETWORK_BINDING` → `DETECTED`.
 
-Then a matrix is computed:
+**R3 — IP consensus:**
 
-- `geoMatrixHit` = foreign GeoIP signal (`geoIp.needsReview` or `GEO_IP` evidence)
-- `directMatrixHit` = evidence from `DIRECT_NETWORK_CAPABILITIES` or `SYSTEM_PROXY`
-- `indirectMatrixHit` = evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`
+`IpConsensusBuilder` aggregates signals from GeoIP, IpComparison, CDN Pulling, TUN probe, bypass, and callTransportLeaks. If a `geoAxis` is established (foreign IPs, geo-country mismatch, or Warp indicator) and `probeTargetDivergence`, `probeTargetDirectDivergence`, or `crossChannelMismatch` is present → `DETECTED`.
 
-Combinations:
+**R4 — location vs GeoIP:**
+
+- If location signals confirm Russia (`network_mcc_ru:true`, `cell_country_ru:true`, or `location_country_ru:true`) while GeoIP reports a foreign IP (`outsideRu = true`) → `DETECTED`, unless home-routed roaming is detected.
+- If location confirms Russia and GeoIP shows hosting/proxy without a foreign IP and no other signals → `NEEDS_REVIEW`.
+
+The `expectedRoamingExit` flag (resolved by `HomeNetworkCatalog` from SIM MCC/MNC and ASN) protects against false positives when a foreign SIM is used on a Russian visited network with home-operator routing.
+
+**R5 — three-axis matrix (geo × direct × indirect):**
+
+- `geoHit` = `GeoIP.outsideRu == true` (excluding roaming)
+- `directHit` = detected evidence from `DIRECT_NETWORK_CAPABILITIES` or `SYSTEM_PROXY`
+- `indirectHit` = detected evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`
 
 | Geo | Direct | Indirect | Verdict |
 |-----|--------|----------|---------|
@@ -439,14 +494,28 @@ Combinations:
 | no | yes | no | `NOT_DETECTED` |
 | no | no | yes | `NOT_DETECTED` |
 | yes | no | no | `NEEDS_REVIEW` |
-| no | yes | yes | `NEEDS_REVIEW` |
-| any other combination | | | `DETECTED` |
+| no | yes | yes | `NEEDS_REVIEW` (if geo available), else `DETECTED` |
+| yes | yes | no | `DETECTED` |
+| yes | no | yes | `DETECTED` |
+| yes | yes | yes | `DETECTED` |
+
+**R6 — fallback to `NEEDS_REVIEW`:**
+
+If the matrix returned `NOT_DETECTED` but at least one condition holds, the result is upgraded to `NEEDS_REVIEW`:
+- `bypassResult.needsReview` (open proxy without bypass confirmation)
+- `directSigns.needsReview` or `indirectSigns.needsReview`
+- `locationSignalHit` (location.detected && !expectedRoamingExit)
+- actionable leak from `CallTransportChecker` (status `NEEDS_REVIEW`, not via local proxy)
+- `icmpSpoofing.needsReview`
+- `NativeSignsChecker` found hook markers (`NATIVE_HOOK_MARKERS`) or integrity violation (`NATIVE_LIBRARY_INTEGRITY`)
+- `ipConsensus.needsReview`, `ipConsensus.channelConflict` is non-empty, or `ipConsensus.probeTargetDivergence`
+- `TUN_ACTIVE_PROBE` evidence with `detected = false` (tun present but VPN not active for this app)
 
 Notes:
 
-- `IpComparisonChecker` currently does not participate in `VerdictEngine`;
-- `INSTALLED_APP` and `VPN_SERVICE_DECLARATION` signals are also not part of the matrix and remain diagnostic;
-- Actionable leaks from `CallTransportChecker` or review hits from `NativeSignsChecker` (e.g., hook markers) upgrade `NOT_DETECTED` to `NEEDS_REVIEW`.
+- `IpComparisonChecker` now participates indirectly in R3 via `IpConsensusBuilder`;
+- `INSTALLED_APP` and `VPN_SERVICE_DECLARATION` signals are not part of the matrix and remain diagnostic;
+- `DomainReachabilityChecker` does not affect the verdict.
 
 ---
 
