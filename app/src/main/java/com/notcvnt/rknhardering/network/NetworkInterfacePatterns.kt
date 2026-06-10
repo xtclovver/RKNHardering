@@ -21,6 +21,19 @@ object NetworkInterfacePatterns {
         Regex("^dummy\\d+"),
     )
 
+    // Base interfaces eligible for "v4-" clat de-stacking. Intentionally a strict
+    // subset of STANDARD_INTERFACES: seth/dummy are excluded so that e.g.
+    // "v4-seth0" keeps its name, matching the historical normalization behavior.
+    // Widening this list changes detection results; reconcile with README first.
+    val STACKED_BASE_INTERFACES: List<Regex> = listOf(
+        Regex("^wlan.*"),
+        Regex("^rmnet.*"),
+        Regex("^eth.*"),
+        Regex("^lo$"),
+        Regex("^ccmni.*"),
+        Regex("^ccemni.*"),
+    )
+
     fun isVpnInterface(name: String?): Boolean {
         val canonical = NetworkInterfaceNameNormalizer.canonicalName(name)
         if (canonical.isNullOrBlank()) return false
