@@ -229,7 +229,8 @@ class CdnPullingCheckerTest {
 
     @Test
     fun `when builtinTargetsEnabled=false then only custom targets are fetched`() = runBlocking {
-        val fetchedLabels = mutableListOf<String>()
+        // fetchEndpoint is invoked from parallel coroutines; a plain ArrayList races.
+        val fetchedLabels = java.util.concurrent.CopyOnWriteArrayList<String>()
         CdnPullingChecker.dependenciesOverride = CdnPullingChecker.Dependencies(
             fetchEndpoint = { _, endpoint, _, _ ->
                 fetchedLabels.add(endpoint.label)
@@ -263,7 +264,8 @@ class CdnPullingCheckerTest {
 
     @Test
     fun `when meduzaEnabled=false the meduza domain is skipped`() = runBlocking {
-        val fetchedLabels = mutableListOf<String>()
+        // fetchEndpoint is invoked from parallel coroutines; a plain ArrayList races.
+        val fetchedLabels = java.util.concurrent.CopyOnWriteArrayList<String>()
         CdnPullingChecker.dependenciesOverride = CdnPullingChecker.Dependencies(
             fetchEndpoint = { _, endpoint, _, _ ->
                 fetchedLabels.add(endpoint.label)
