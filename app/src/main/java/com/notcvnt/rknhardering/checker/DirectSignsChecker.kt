@@ -22,11 +22,6 @@ import com.notcvnt.rknhardering.vpn.InstalledVpnAppDetector
 
 object DirectSignsChecker {
 
-    private data class SignalOutcome(
-        val detected: Boolean = false,
-        val needsReview: Boolean = false,
-    )
-
     internal data class ProxyProfileSnapshot(
         val interfaceName: String? = null,
         val isDefault: Boolean = false,

@@ -321,235 +321,217 @@ object GeoIpChecker {
         return lastResult ?: fetcher() // fallback if maxAttempts=0
     }
 
-    private fun fetchIpapiIs(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
+    // Shared fetch/validate/error skeleton for the builtin providers. Each
+    // provider keeps its own URL construction and field-path cascades; only
+    // the plumbing is shared.
+    private inline fun fetchBuiltinProvider(
+        provider: String,
+        url: String,
+        resolverConfig: DnsResolverConfig,
+        timeoutMs: Int,
+        parse: (JSONObject) -> GeoIpSnapshot,
+    ): ProviderSnapshot {
         return try {
-            val json = fetchJson(
-                url = ip?.let { "$IPAPIIS_URL?q=${urlEncode(it)}" } ?: IPAPIIS_URL,
-                resolverConfig = resolverConfig,
-                timeoutMs = timeoutMs,
-            )
-            if (!json.has("ip")) return ProviderSnapshot(IPAPIIS_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
+            val json = fetchJson(url = url, resolverConfig = resolverConfig, timeoutMs = timeoutMs)
+            if (!json.has("ip")) {
+                ProviderSnapshot(provider, false, null, MISSING_IP_FIELD, json.toString())
+            } else {
+                ProviderSnapshot(
+                    provider = provider,
+                    isCustom = false,
+                    snapshot = parse(json),
+                    rawBody = json.toString(),
+                )
+            }
+        } catch (error: Exception) {
+            rethrowIfCancellation(error)
+            ProviderSnapshot(provider, false, null, error.message)
+        }
+    }
 
+    private fun fetchIpapiIs(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot =
+        fetchBuiltinProvider(
+            provider = IPAPIIS_PROVIDER,
+            url = ip?.let { "$IPAPIIS_URL?q=${urlEncode(it)}" } ?: IPAPIIS_URL,
+            resolverConfig = resolverConfig,
+            timeoutMs = timeoutMs,
+        ) { json ->
             val location = json.optJSONObject("location")
             val company = json.optJSONObject("company")
             val datacenter = json.optJSONObject("datacenter")
             val asn = json.optJSONObject("asn")
 
-            ProviderSnapshot(
-                provider = IPAPIIS_PROVIDER,
-                isCustom = false,
-                snapshot = GeoIpSnapshot(
-                    ip = firstMeaningful(json.optString("ip"), default = "N/A"),
-                    country = firstMeaningful(location?.optString("country"), default = "N/A"),
-                    countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
-                    isp = firstMeaningful(
-                        company?.optString("name"),
-                        asn?.optString("org"),
-                        datacenter?.optString("datacenter"),
-                        asn?.optString("descr"),
-                        default = "N/A",
-                    ),
-                    org = firstMeaningful(
-                        datacenter?.optString("datacenter"),
-                        company?.optString("name"),
-                        asn?.optString("org"),
-                        asn?.optString("descr"),
-                        default = "N/A",
-                    ),
-                    asn = formatAsn(
-                        code = asn?.opt("asn")?.toString(),
-                        name = firstMeaningful(
-                            asn?.optString("org"),
-                            asn?.optString("descr"),
-                            default = "N/A",
-                        ),
-                    ),
-                    isProxy = json.optBoolean("is_proxy", false) ||
-                        json.optBoolean("is_vpn", false) ||
-                        json.optBoolean("is_tor", false),
-                    isHosting = json.optBoolean("is_datacenter", false),
-                    hostingVotes = 0,
-                    hostingChecks = 0,
-                    hostingSources = emptyList(),
+            GeoIpSnapshot(
+                ip = firstMeaningful(json.optString("ip"), default = "N/A"),
+                country = firstMeaningful(location?.optString("country"), default = "N/A"),
+                countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
+                isp = firstMeaningful(
+                    company?.optString("name"),
+                    asn?.optString("org"),
+                    datacenter?.optString("datacenter"),
+                    asn?.optString("descr"),
+                    default = "N/A",
                 ),
-                rawBody = json.toString(),
+                org = firstMeaningful(
+                    datacenter?.optString("datacenter"),
+                    company?.optString("name"),
+                    asn?.optString("org"),
+                    asn?.optString("descr"),
+                    default = "N/A",
+                ),
+                asn = formatAsn(
+                    code = asn?.opt("asn")?.toString(),
+                    name = firstMeaningful(
+                        asn?.optString("org"),
+                        asn?.optString("descr"),
+                        default = "N/A",
+                    ),
+                ),
+                isProxy = json.optBoolean("is_proxy", false) ||
+                    json.optBoolean("is_vpn", false) ||
+                    json.optBoolean("is_tor", false),
+                isHosting = json.optBoolean("is_datacenter", false),
+                hostingVotes = 0,
+                hostingChecks = 0,
+                hostingSources = emptyList(),
             )
-        } catch (error: Exception) {
-            rethrowIfCancellation(error)
-            ProviderSnapshot(IPAPIIS_PROVIDER, false, null, error.message)
         }
-    }
 
-    private fun fetchIplocate(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
-        return try {
-            val json = fetchJson(
-                url = ip?.let { "$IPLOCATE_URL/${urlEncode(it)}" } ?: IPLOCATE_URL,
-                resolverConfig = resolverConfig,
-                timeoutMs = timeoutMs,
-            )
-            if (!json.has("ip")) return ProviderSnapshot(IPLOCATE_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
-
+    private fun fetchIplocate(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot =
+        fetchBuiltinProvider(
+            provider = IPLOCATE_PROVIDER,
+            url = ip?.let { "$IPLOCATE_URL/${urlEncode(it)}" } ?: IPLOCATE_URL,
+            resolverConfig = resolverConfig,
+            timeoutMs = timeoutMs,
+        ) { json ->
             val privacy = json.optJSONObject("privacy")
             val company = json.optJSONObject("company")
             val hosting = json.optJSONObject("hosting")
             val asn = json.optJSONObject("asn")
 
-            ProviderSnapshot(
-                provider = IPLOCATE_PROVIDER,
-                isCustom = false,
-                snapshot = GeoIpSnapshot(
-                    ip = firstMeaningful(json.optString("ip"), default = "N/A"),
-                    country = firstMeaningful(json.optString("country"), default = "N/A"),
-                    countryCode = firstMeaningful(json.optString("country_code"), default = ""),
-                    isp = firstMeaningful(
-                        company?.optString("name"),
-                        asn?.optString("name"),
-                        hosting?.optString("provider"),
-                        default = "N/A",
-                    ),
-                    org = firstMeaningful(
-                        hosting?.optString("provider"),
-                        company?.optString("name"),
-                        asn?.optString("name"),
-                        default = "N/A",
-                    ),
-                    asn = formatAsn(
-                        code = asn?.optString("asn"),
-                        name = firstMeaningful(asn?.optString("name"), default = "N/A"),
-                    ),
-                    isProxy = (privacy?.optBoolean("is_proxy", false) == true) ||
-                        (privacy?.optBoolean("is_vpn", false) == true) ||
-                        (privacy?.optBoolean("is_tor", false) == true),
-                    isHosting = privacy?.optBoolean("is_hosting", false) == true,
-                    hostingVotes = 0,
-                    hostingChecks = 0,
-                    hostingSources = emptyList(),
+            GeoIpSnapshot(
+                ip = firstMeaningful(json.optString("ip"), default = "N/A"),
+                country = firstMeaningful(json.optString("country"), default = "N/A"),
+                countryCode = firstMeaningful(json.optString("country_code"), default = ""),
+                isp = firstMeaningful(
+                    company?.optString("name"),
+                    asn?.optString("name"),
+                    hosting?.optString("provider"),
+                    default = "N/A",
                 ),
-                rawBody = json.toString(),
+                org = firstMeaningful(
+                    hosting?.optString("provider"),
+                    company?.optString("name"),
+                    asn?.optString("name"),
+                    default = "N/A",
+                ),
+                asn = formatAsn(
+                    code = asn?.optString("asn"),
+                    name = firstMeaningful(asn?.optString("name"), default = "N/A"),
+                ),
+                isProxy = (privacy?.optBoolean("is_proxy", false) == true) ||
+                    (privacy?.optBoolean("is_vpn", false) == true) ||
+                    (privacy?.optBoolean("is_tor", false) == true),
+                isHosting = privacy?.optBoolean("is_hosting", false) == true,
+                hostingVotes = 0,
+                hostingChecks = 0,
+                hostingSources = emptyList(),
             )
-        } catch (error: Exception) {
-            rethrowIfCancellation(error)
-            ProviderSnapshot(IPLOCATE_PROVIDER, false, null, error.message)
         }
-    }
 
-    private fun fetchIpquery(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
-        return try {
-            val json = fetchJson(
-                url = ip?.let { "$IPQUERY_URL${urlEncode(it)}" } ?: "${IPQUERY_URL}?format=json",
-                resolverConfig = resolverConfig,
-                timeoutMs = timeoutMs,
-            )
-            if (!json.has("ip")) return ProviderSnapshot(IPQUERY_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
-
+    private fun fetchIpquery(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot =
+        fetchBuiltinProvider(
+            provider = IPQUERY_PROVIDER,
+            url = ip?.let { "$IPQUERY_URL${urlEncode(it)}" } ?: "${IPQUERY_URL}?format=json",
+            resolverConfig = resolverConfig,
+            timeoutMs = timeoutMs,
+        ) { json ->
             val location = json.optJSONObject("location")
             val isp = json.optJSONObject("isp")
             val risk = json.optJSONObject("risk")
 
-            ProviderSnapshot(
-                provider = IPQUERY_PROVIDER,
-                isCustom = false,
-                snapshot = GeoIpSnapshot(
-                    ip = firstMeaningful(json.optString("ip"), default = "N/A"),
-                    country = firstMeaningful(location?.optString("country"), default = "N/A"),
-                    countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
-                    isp = firstMeaningful(
-                        isp?.optString("isp"),
-                        isp?.optString("org"),
-                        default = "N/A",
-                    ),
-                    org = firstMeaningful(
-                        isp?.optString("org"),
-                        isp?.optString("isp"),
-                        default = "N/A",
-                    ),
-                    asn = formatAsn(
-                        code = isp?.optString("asn"),
-                        name = firstMeaningful(
-                            isp?.optString("org"),
-                            isp?.optString("isp"),
-                            default = "N/A",
-                        ),
-                    ),
-                    isProxy = (risk?.optBoolean("is_proxy", false) == true) ||
-                        (risk?.optBoolean("is_vpn", false) == true) ||
-                        (risk?.optBoolean("is_tor", false) == true),
-                    isHosting = risk?.optBoolean("is_datacenter", false) == true,
-                    hostingVotes = 0,
-                    hostingChecks = 0,
-                    hostingSources = emptyList(),
+            GeoIpSnapshot(
+                ip = firstMeaningful(json.optString("ip"), default = "N/A"),
+                country = firstMeaningful(location?.optString("country"), default = "N/A"),
+                countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
+                isp = firstMeaningful(
+                    isp?.optString("isp"),
+                    isp?.optString("org"),
+                    default = "N/A",
                 ),
-                rawBody = json.toString(),
+                org = firstMeaningful(
+                    isp?.optString("org"),
+                    isp?.optString("isp"),
+                    default = "N/A",
+                ),
+                asn = formatAsn(
+                    code = isp?.optString("asn"),
+                    name = firstMeaningful(
+                        isp?.optString("org"),
+                        isp?.optString("isp"),
+                        default = "N/A",
+                    ),
+                ),
+                isProxy = (risk?.optBoolean("is_proxy", false) == true) ||
+                    (risk?.optBoolean("is_vpn", false) == true) ||
+                    (risk?.optBoolean("is_tor", false) == true),
+                isHosting = risk?.optBoolean("is_datacenter", false) == true,
+                hostingVotes = 0,
+                hostingChecks = 0,
+                hostingSources = emptyList(),
             )
-        } catch (error: Exception) {
-            rethrowIfCancellation(error)
-            ProviderSnapshot(IPQUERY_PROVIDER, false, null, error.message)
         }
-    }
 
-    private fun fetchIplookup(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
-        return try {
-            val json = fetchJson(
-                url = ip?.let { "$IPLOOKUP_URL/ip/${urlEncode(it)}" } ?: "$IPLOOKUP_URL/json",
-                resolverConfig = resolverConfig,
-                timeoutMs = timeoutMs,
-            )
-            if (!json.has("ip")) return ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
-
+    private fun fetchIplookup(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot =
+        fetchBuiltinProvider(
+            provider = IPLOOKUP_PROVIDER,
+            url = ip?.let { "$IPLOOKUP_URL/ip/${urlEncode(it)}" } ?: "$IPLOOKUP_URL/json",
+            resolverConfig = resolverConfig,
+            timeoutMs = timeoutMs,
+        ) { json ->
             val geo = json.optJSONObject("geo")
             val network = json.optJSONObject("network")
             val privacy = json.optJSONObject("privacy")
 
-            ProviderSnapshot(
-                provider = IPLOOKUP_PROVIDER,
-                isCustom = false,
-                snapshot = GeoIpSnapshot(
-                    ip = firstMeaningful(json.optString("ip"), default = "N/A"),
-                    country = firstMeaningful(geo?.optString("country"), default = "N/A"),
-                    countryCode = firstMeaningful(geo?.optString("country_code"), default = ""),
-                    isp = firstMeaningful(
-                        network?.optString("isp"),
-                        network?.optString("org"),
-                        default = "N/A",
-                    ),
-                    org = firstMeaningful(
-                        network?.optString("org"),
-                        network?.optString("isp"),
-                        default = "N/A",
-                    ),
-                    asn = formatAsn(
-                        code = network?.opt("asn")?.toString(),
-                        name = firstMeaningful(
-                            network?.optString("org"),
-                            network?.optString("isp"),
-                            default = "N/A",
-                        ),
-                    ),
-                    isProxy = (privacy?.optBoolean("proxy", false) == true) ||
-                        (privacy?.optBoolean("vpn", false) == true) ||
-                        (privacy?.optBoolean("tor", false) == true),
-                    isHosting = privacy?.optBoolean("hosting", false) == true,
-                    hostingVotes = 0,
-                    hostingChecks = 0,
-                    hostingSources = emptyList(),
+            GeoIpSnapshot(
+                ip = firstMeaningful(json.optString("ip"), default = "N/A"),
+                country = firstMeaningful(geo?.optString("country"), default = "N/A"),
+                countryCode = firstMeaningful(geo?.optString("country_code"), default = ""),
+                isp = firstMeaningful(
+                    network?.optString("isp"),
+                    network?.optString("org"),
+                    default = "N/A",
                 ),
-                rawBody = json.toString(),
+                org = firstMeaningful(
+                    network?.optString("org"),
+                    network?.optString("isp"),
+                    default = "N/A",
+                ),
+                asn = formatAsn(
+                    code = network?.opt("asn")?.toString(),
+                    name = firstMeaningful(
+                        network?.optString("org"),
+                        network?.optString("isp"),
+                        default = "N/A",
+                    ),
+                ),
+                isProxy = (privacy?.optBoolean("proxy", false) == true) ||
+                    (privacy?.optBoolean("vpn", false) == true) ||
+                    (privacy?.optBoolean("tor", false) == true),
+                isHosting = privacy?.optBoolean("hosting", false) == true,
+                hostingVotes = 0,
+                hostingChecks = 0,
+                hostingSources = emptyList(),
             )
-        } catch (error: Exception) {
-            rethrowIfCancellation(error)
-            ProviderSnapshot(IPLOOKUP_PROVIDER, false, null, error.message)
         }
-    }
 
-    private fun fetchIpbot(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot {
-        return try {
-            val json = fetchJson(
-                url = ip?.let { "$IPBOT_URL${urlEncode(it)}" } ?: IPBOT_URL,
-                resolverConfig = resolverConfig,
-                timeoutMs = timeoutMs,
-            )
-            if (!json.has("ip")) return ProviderSnapshot(IPBOT_PROVIDER, false, null, MISSING_IP_FIELD, json.toString())
-
+    private fun fetchIpbot(resolverConfig: DnsResolverConfig, ip: String? = null, timeoutMs: Int = GEOIP_TIMEOUT_MS): ProviderSnapshot =
+        fetchBuiltinProvider(
+            provider = IPBOT_PROVIDER,
+            url = ip?.let { "$IPBOT_URL${urlEncode(it)}" } ?: IPBOT_URL,
+            resolverConfig = resolverConfig,
+            timeoutMs = timeoutMs,
+        ) { json ->
             val location = json.optJSONObject("location")
             val network = json.optJSONObject("network")
             val security = json.optJSONObject("security")
@@ -558,44 +540,35 @@ object GeoIpChecker {
             val threatLists = security?.optJSONArray("threat_lists")
             val proxyThreat = threatLists.containsAny("proxy", "proxies", "vpn", "tor")
 
-            ProviderSnapshot(
-                provider = IPBOT_PROVIDER,
-                isCustom = false,
-                snapshot = GeoIpSnapshot(
-                    ip = firstMeaningful(json.optString("ip"), default = "N/A"),
-                    country = firstMeaningful(location?.optString("country"), default = "N/A"),
-                    countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
-                    isp = firstMeaningful(
-                        network?.optString("org"),
-                        default = "N/A",
-                    ),
-                    org = firstMeaningful(
-                        network?.optString("org"),
-                        default = "N/A",
-                    ),
-                    asn = formatAsn(
-                        code = network?.optString("asn"),
-                        name = firstMeaningful(network?.optString("org"), default = "N/A"),
-                    ),
-                    isProxy = (security?.optBoolean("is_proxy", false) == true) ||
-                        proxyThreat ||
-                        radarType == "vpn" ||
-                        radarType == "proxy" ||
-                        radarType == "tor",
-                    isHosting = (security?.optBoolean("is_datacenter", false) == true) ||
-                        usageType == "DCH" ||
-                        radarType == "datacenter",
-                    hostingVotes = 0,
-                    hostingChecks = 0,
-                    hostingSources = emptyList(),
+            GeoIpSnapshot(
+                ip = firstMeaningful(json.optString("ip"), default = "N/A"),
+                country = firstMeaningful(location?.optString("country"), default = "N/A"),
+                countryCode = firstMeaningful(location?.optString("country_code"), default = ""),
+                isp = firstMeaningful(
+                    network?.optString("org"),
+                    default = "N/A",
                 ),
-                rawBody = json.toString(),
+                org = firstMeaningful(
+                    network?.optString("org"),
+                    default = "N/A",
+                ),
+                asn = formatAsn(
+                    code = network?.optString("asn"),
+                    name = firstMeaningful(network?.optString("org"), default = "N/A"),
+                ),
+                isProxy = (security?.optBoolean("is_proxy", false) == true) ||
+                    proxyThreat ||
+                    radarType == "vpn" ||
+                    radarType == "proxy" ||
+                    radarType == "tor",
+                isHosting = (security?.optBoolean("is_datacenter", false) == true) ||
+                    usageType == "DCH" ||
+                    radarType == "datacenter",
+                hostingVotes = 0,
+                hostingChecks = 0,
+                hostingSources = emptyList(),
             )
-        } catch (error: Exception) {
-            rethrowIfCancellation(error)
-            ProviderSnapshot(IPBOT_PROVIDER, false, null, error.message)
         }
-    }
 
     private fun fetchJson(url: String, resolverConfig: DnsResolverConfig, timeoutMs: Int = GEOIP_TIMEOUT_MS): JSONObject {
         val executionContext = ScanExecutionContext.currentOrDefault()
