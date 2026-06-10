@@ -159,6 +159,8 @@ object PublicIpClient {
         }
     }
 
+    // Deliberately loose heuristic: mail.ru HTML extraction depends on
+    // permissive matching. Not interchangeable with the strict IpLiterals.
     private fun looksLikeIp(text: String): Boolean {
         if (text.length > 45) return false
         return text.matches(Regex("""[\d.:a-fA-F]+"""))

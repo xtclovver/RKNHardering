@@ -6,8 +6,6 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.network.ResolverBinding
 import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import java.io.IOException
-import java.net.Inet4Address
-import java.net.Inet6Address
 
 object CdnPullingClient {
 
@@ -112,44 +110,11 @@ object CdnPullingClient {
         ).takeIf { it.hasUsefulData }
     }
 
-    internal fun looksLikeIp(value: String): Boolean {
-        if (value.isBlank() || value.length > 64) return false
-        val normalized = value.trim()
-        return when {
-            ':' in normalized -> looksLikeIpv6Literal(normalized)
-            '.' in normalized -> looksLikeIpv4Literal(normalized)
-            else -> false
-        }
-    }
+    internal fun looksLikeIp(value: String): Boolean = IpLiterals.isIpLiteral(value)
 
-    internal fun looksLikeIpv4(value: String): Boolean {
-        if (value.isBlank() || value.length > 64) return false
-        return looksLikeIpv4Literal(value.trim())
-    }
+    internal fun looksLikeIpv4(value: String): Boolean = IpLiterals.isIpv4Literal(value)
 
-    internal fun looksLikeIpv6(value: String): Boolean {
-        if (value.isBlank() || value.length > 64) return false
-        val normalized = value.trim()
-        return ':' in normalized && looksLikeIpv6Literal(normalized)
-    }
-
-    private fun looksLikeIpv4Literal(value: String): Boolean {
-        val parts = value.split('.')
-        if (parts.size != 4 || parts.any { it.isBlank() }) return false
-        if (parts.any { it.length > 1 && it.startsWith('0') }) return false
-        if (parts.any { part -> part.any { !it.isDigit() } }) return false
-        if (parts.any { (it.toIntOrNull() ?: -1) !in 0..255 }) return false
-        val parsed = runCatching { java.net.InetAddress.getByName(value) }.getOrNull() ?: return false
-        return parsed is Inet4Address
-    }
-
-    private fun looksLikeIpv6Literal(value: String): Boolean {
-        if (!value.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' || it == '.' }) {
-            return false
-        }
-        val parsed = runCatching { java.net.InetAddress.getByName(value) }.getOrNull() ?: return false
-        return parsed is Inet6Address
-    }
+    internal fun looksLikeIpv6(value: String): Boolean = IpLiterals.isIpv6Literal(value)
 
     internal fun resetForTests() {
         fetchBodyOverride = null
