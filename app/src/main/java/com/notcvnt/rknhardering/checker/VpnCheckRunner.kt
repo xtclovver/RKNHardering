@@ -389,6 +389,23 @@ object VpnCheckRunner {
         )
     }
 
+    // Wraps a checker deferred so its result is published as a CheckUpdate as
+    // soon as it completes, preserving the await -> throwIfCancelled -> publish
+    // sequence and the null contract (no deferred -> no wrapper).
+    private fun <T> CoroutineScope.publishOnReady(
+        deferred: Deferred<T>?,
+        executionContext: ScanExecutionContext,
+        onUpdate: (suspend (CheckUpdate) -> Unit)?,
+        toUpdate: (T) -> CheckUpdate,
+    ): Deferred<T>? = deferred?.let { d ->
+        async {
+            d.await().also { result ->
+                executionContext.throwIfCancelled()
+                onUpdate?.invoke(toUpdate(result))
+            }
+        }
+    }
+
     suspend fun run(
         context: Context,
         settings: CheckSettings = CheckSettings(),
@@ -527,94 +544,17 @@ object VpnCheckRunner {
             }
         } else null
 
-        val geoIpReadyDeferred = geoIpDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.GeoIpReady(result))
-                }
-            }
-        }
-        val ipComparisonReadyDeferred = ipComparisonDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.IpComparisonReady(result))
-                }
-            }
-        }
-        val cdnPullingReadyDeferred = cdnPullingDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.CdnPullingReady(result))
-                }
-            }
-        }
-        val icmpSpoofingReadyDeferred = icmpSpoofingDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.IcmpSpoofingReady(result))
-                }
-            }
-        }
-        val rttTriangulationReadyDeferred = rttTriangulationDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.RttTriangulationReady(result))
-                }
-            }
-        }
-        val directReadyDeferred = directDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.DirectSignsReady(result))
-                }
-            }
-        }
-        val indirectReadyDeferred = indirectDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.IndirectSignsReady(result))
-                }
-            }
-        }
-        val locationReadyDeferred = locationDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.LocationSignalsReady(result))
-                }
-            }
-        }
-        val nativeReadyDeferred = nativeDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.NativeSignsReady(result))
-                }
-            }
-        }
-        val domainReachabilityReadyDeferred = domainReachabilityDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.DomainReachabilityReady(result))
-                }
-            }
-        }
-        val bypassReadyDeferred = bypassDeferred?.let { deferred ->
-            async {
-                deferred.await().also { result ->
-                    executionContext.throwIfCancelled()
-                    onUpdate?.invoke(CheckUpdate.BypassReady(result))
-                }
-            }
-        }
+        val geoIpReadyDeferred = publishOnReady(geoIpDeferred, executionContext, onUpdate, CheckUpdate::GeoIpReady)
+        val ipComparisonReadyDeferred = publishOnReady(ipComparisonDeferred, executionContext, onUpdate, CheckUpdate::IpComparisonReady)
+        val cdnPullingReadyDeferred = publishOnReady(cdnPullingDeferred, executionContext, onUpdate, CheckUpdate::CdnPullingReady)
+        val icmpSpoofingReadyDeferred = publishOnReady(icmpSpoofingDeferred, executionContext, onUpdate, CheckUpdate::IcmpSpoofingReady)
+        val rttTriangulationReadyDeferred = publishOnReady(rttTriangulationDeferred, executionContext, onUpdate, CheckUpdate::RttTriangulationReady)
+        val directReadyDeferred = publishOnReady(directDeferred, executionContext, onUpdate, CheckUpdate::DirectSignsReady)
+        val indirectReadyDeferred = publishOnReady(indirectDeferred, executionContext, onUpdate, CheckUpdate::IndirectSignsReady)
+        val locationReadyDeferred = publishOnReady(locationDeferred, executionContext, onUpdate, CheckUpdate::LocationSignalsReady)
+        val nativeReadyDeferred = publishOnReady(nativeDeferred, executionContext, onUpdate, CheckUpdate::NativeSignsReady)
+        val domainReachabilityReadyDeferred = publishOnReady(domainReachabilityDeferred, executionContext, onUpdate, CheckUpdate::DomainReachabilityReady)
+        val bypassReadyDeferred = publishOnReady(bypassDeferred, executionContext, onUpdate, CheckUpdate::BypassReady)
 
         val emptyGeoIpCategory = CategoryResult(name = "GeoIP", detected = false, findings = emptyList())
         val emptyIpComparison = IpComparisonResult(
