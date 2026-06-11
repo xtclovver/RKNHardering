@@ -80,6 +80,8 @@ import com.notcvnt.rknhardering.model.VerdictNarrative
 import com.notcvnt.rknhardering.model.VerdictNarrativeBuilder
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.network.DnsResolverConfig
+import com.notcvnt.rknhardering.ui.main.CategoryTiles
+import com.notcvnt.rknhardering.ui.main.TileSpec
 import com.notcvnt.rknhardering.util.formatCallTransportReason
 import com.notcvnt.rknhardering.util.maskInfoValue
 import com.notcvnt.rknhardering.util.maskIp
@@ -494,24 +496,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupCategoryAccordion() {
         tiles.clear()
         expandedCategoryIds.clear()
-        val specs = listOf(
-            Triple(CATEGORY_GEO, getString(R.string.main_card_geo_ip), R.drawable.ic_public),
-            Triple(CATEGORY_IPC, getString(R.string.main_card_ip_comparison), R.drawable.ic_compare_arrows),
-            Triple(CATEGORY_CDN, getString(R.string.main_card_cdn_pulling), R.drawable.ic_cloud),
-            Triple(CATEGORY_DIR, getString(R.string.main_card_direct_signs), R.drawable.ic_security),
-            Triple(CATEGORY_IND, getString(R.string.main_card_indirect_signs), R.drawable.ic_lan),
-            Triple(CATEGORY_NAT, getString(R.string.main_card_native_signs), R.drawable.ic_lock),
-            Triple(CATEGORY_STN, getString(R.string.main_card_call_transport), R.drawable.ic_call),
-            Triple(CATEGORY_ICM, getString(R.string.main_card_icmp_spoofing), R.drawable.ic_network),
-            Triple(CATEGORY_RTT, getString(R.string.main_card_rtt_triangulation), R.drawable.ic_pin),
-            Triple(CATEGORY_LOC, getString(R.string.main_card_location_signals), R.drawable.ic_location_on),
-            Triple(CATEGORY_BYP, getString(R.string.settings_split_tunnel), R.drawable.ic_call_split),
-            Triple(CATEGORY_REA, getString(R.string.main_card_domain_reachability), R.drawable.ic_globe),
-        )
-        specs.forEach { (id, title, iconRes) ->
-            val holder = createTileHolder(id)
-            holder.title.text = title
-            findViewById<ImageView>(headerIconId(id)).setImageResource(iconRes)
+        CategoryTiles.ALL.forEach { spec ->
+            val id = spec.id
+            val holder = createTileHolder(spec)
+            holder.title.text = getString(spec.titleRes)
+            findViewById<ImageView>(spec.views.icon).setImageResource(spec.iconRes)
             holder.hint.text = getString(R.string.tile_hint_placeholder)
             holder.body.visibility = View.GONE
             holder.chevron.rotation = 0f
@@ -522,145 +511,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createTileHolder(id: String): TileHolder {
+    private fun createTileHolder(spec: TileSpec): TileHolder {
         return TileHolder(
-            id = id,
-            card = findViewById(cardId(id)),
-            header = findViewById(headerId(id)),
-            statusDot = findViewById(headerDotId(id)),
-            title = findViewById(headerTitleId(id)),
-            hint = findViewById(headerHintId(id)),
-            chevron = findViewById(chevronId(id)),
-            body = findViewById(bodyId(id)),
+            id = spec.id,
+            card = findViewById(spec.views.card),
+            header = findViewById(spec.views.header),
+            statusDot = findViewById(spec.views.dot),
+            title = findViewById(spec.views.title),
+            hint = findViewById(spec.views.hint),
+            chevron = findViewById(spec.views.chevron),
+            body = findViewById(spec.views.body),
         )
-    }
-
-    private fun cardId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.cardGeoIp
-        CATEGORY_IPC -> R.id.cardIpComparison
-        CATEGORY_CDN -> R.id.cardCdnPulling
-        CATEGORY_DIR -> R.id.cardDirect
-        CATEGORY_IND -> R.id.cardIndirect
-        CATEGORY_NAT -> R.id.cardNativeSigns
-        CATEGORY_STN -> R.id.cardCallTransport
-        CATEGORY_ICM -> R.id.cardIcmpSpoofing
-        CATEGORY_RTT -> R.id.cardRttTriangulation
-        CATEGORY_LOC -> R.id.cardLocation
-        CATEGORY_BYP -> R.id.cardBypass
-        CATEGORY_REA -> R.id.cardDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerGeoIp
-        CATEGORY_IPC -> R.id.headerIpComparison
-        CATEGORY_CDN -> R.id.headerCdnPulling
-        CATEGORY_DIR -> R.id.headerDirect
-        CATEGORY_IND -> R.id.headerIndirect
-        CATEGORY_NAT -> R.id.headerNativeSigns
-        CATEGORY_STN -> R.id.headerCallTransport
-        CATEGORY_ICM -> R.id.headerIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerRttTriangulation
-        CATEGORY_LOC -> R.id.headerLocation
-        CATEGORY_BYP -> R.id.headerBypass
-        CATEGORY_REA -> R.id.headerDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerDotId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerDotGeoIp
-        CATEGORY_IPC -> R.id.headerDotIpComparison
-        CATEGORY_CDN -> R.id.headerDotCdnPulling
-        CATEGORY_DIR -> R.id.headerDotDirect
-        CATEGORY_IND -> R.id.headerDotIndirect
-        CATEGORY_NAT -> R.id.headerDotNativeSigns
-        CATEGORY_STN -> R.id.headerDotCallTransport
-        CATEGORY_ICM -> R.id.headerDotIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerDotRttTriangulation
-        CATEGORY_LOC -> R.id.headerDotLocation
-        CATEGORY_BYP -> R.id.headerDotBypass
-        CATEGORY_REA -> R.id.headerDotDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerIconId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerIconGeoIp
-        CATEGORY_IPC -> R.id.headerIconIpComparison
-        CATEGORY_CDN -> R.id.headerIconCdnPulling
-        CATEGORY_DIR -> R.id.headerIconDirect
-        CATEGORY_IND -> R.id.headerIconIndirect
-        CATEGORY_NAT -> R.id.headerIconNativeSigns
-        CATEGORY_STN -> R.id.headerIconCallTransport
-        CATEGORY_ICM -> R.id.headerIconIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerIconRttTriangulation
-        CATEGORY_LOC -> R.id.headerIconLocation
-        CATEGORY_BYP -> R.id.headerIconBypass
-        CATEGORY_REA -> R.id.headerIconDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerTitleId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerTitleGeoIp
-        CATEGORY_IPC -> R.id.headerTitleIpComparison
-        CATEGORY_CDN -> R.id.headerTitleCdnPulling
-        CATEGORY_DIR -> R.id.headerTitleDirect
-        CATEGORY_IND -> R.id.headerTitleIndirect
-        CATEGORY_NAT -> R.id.headerTitleNativeSigns
-        CATEGORY_STN -> R.id.headerTitleCallTransport
-        CATEGORY_ICM -> R.id.headerTitleIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerTitleRttTriangulation
-        CATEGORY_LOC -> R.id.headerTitleLocation
-        CATEGORY_BYP -> R.id.headerTitleBypass
-        CATEGORY_REA -> R.id.headerTitleDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerHintId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerHintGeoIp
-        CATEGORY_IPC -> R.id.headerHintIpComparison
-        CATEGORY_CDN -> R.id.headerHintCdnPulling
-        CATEGORY_DIR -> R.id.headerHintDirect
-        CATEGORY_IND -> R.id.headerHintIndirect
-        CATEGORY_NAT -> R.id.headerHintNativeSigns
-        CATEGORY_STN -> R.id.headerHintCallTransport
-        CATEGORY_ICM -> R.id.headerHintIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerHintRttTriangulation
-        CATEGORY_LOC -> R.id.headerHintLocation
-        CATEGORY_BYP -> R.id.headerHintBypass
-        CATEGORY_REA -> R.id.headerHintDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun chevronId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.chevronGeoIp
-        CATEGORY_IPC -> R.id.chevronIpComparison
-        CATEGORY_CDN -> R.id.chevronCdnPulling
-        CATEGORY_DIR -> R.id.chevronDirect
-        CATEGORY_IND -> R.id.chevronIndirect
-        CATEGORY_NAT -> R.id.chevronNativeSigns
-        CATEGORY_STN -> R.id.chevronCallTransport
-        CATEGORY_ICM -> R.id.chevronIcmpSpoofing
-        CATEGORY_RTT -> R.id.chevronRttTriangulation
-        CATEGORY_LOC -> R.id.chevronLocation
-        CATEGORY_BYP -> R.id.chevronBypass
-        CATEGORY_REA -> R.id.chevronDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun bodyId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.bodyGeoIp
-        CATEGORY_IPC -> R.id.bodyIpComparison
-        CATEGORY_CDN -> R.id.bodyCdnPulling
-        CATEGORY_DIR -> R.id.bodyDirect
-        CATEGORY_IND -> R.id.bodyIndirect
-        CATEGORY_NAT -> R.id.bodyNativeSigns
-        CATEGORY_STN -> R.id.bodyCallTransport
-        CATEGORY_ICM -> R.id.bodyIcmpSpoofing
-        CATEGORY_RTT -> R.id.bodyRttTriangulation
-        CATEGORY_LOC -> R.id.bodyLocation
-        CATEGORY_BYP -> R.id.bodyBypass
-        CATEGORY_REA -> R.id.bodyDomainReachability
-        else -> error("Unknown category id: $id")
     }
 
     private fun showPrivacyFooterDialog() {
@@ -3286,19 +3147,19 @@ class MainActivity : AppCompatActivity() {
         private const val LOADING_STATUS_FRAME_MS = 420L
         private const val AUTO_SCROLL_LOCK_MS = 450L
 
-        private const val CATEGORY_GEO = "geo"
-        private const val CATEGORY_IPC = "ipc"
-        private const val CATEGORY_CDN = "cdn"
-        private const val CATEGORY_IPS = "ip_channels"
-        private const val CATEGORY_DIR = "dir"
-        private const val CATEGORY_IND = "ind"
-        private const val CATEGORY_STN = "stn"
-        private const val CATEGORY_ICM = "icmp"
-        private const val CATEGORY_RTT = "rtt"
-        private const val CATEGORY_LOC = "loc"
-        private const val CATEGORY_BYP = "byp"
-        private const val CATEGORY_NAT = "nat"
-        private const val CATEGORY_REA = "rea"
+        private const val CATEGORY_GEO = CategoryTiles.GEO
+        private const val CATEGORY_IPC = CategoryTiles.IPC
+        private const val CATEGORY_CDN = CategoryTiles.CDN
+        private const val CATEGORY_IPS = CategoryTiles.IPS
+        private const val CATEGORY_DIR = CategoryTiles.DIR
+        private const val CATEGORY_IND = CategoryTiles.IND
+        private const val CATEGORY_STN = CategoryTiles.STN
+        private const val CATEGORY_ICM = CategoryTiles.ICM
+        private const val CATEGORY_RTT = CategoryTiles.RTT
+        private const val CATEGORY_LOC = CategoryTiles.LOC
+        private const val CATEGORY_BYP = CategoryTiles.BYP
+        private const val CATEGORY_NAT = CategoryTiles.NAT
+        private const val CATEGORY_REA = CategoryTiles.REA
 
         private const val TILE_STATUS_NEUTRAL = 0
         private const val TILE_STATUS_CLEAN = 1
