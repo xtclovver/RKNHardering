@@ -199,6 +199,27 @@ object NativeSignsChecker {
             detected = true
         }
 
+        val tuntapByType = uniqueByName.filter { iface ->
+            iface.isUp &&
+                iface.ifaceType == 65534 &&
+                !NetworkInterfacePatterns.isVpnInterface(iface.name)
+        }
+        for (iface in tuntapByType) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_tuntap_type, iface.name),
+                detected = true,
+                source = EvidenceSource.NATIVE_INTERFACE,
+                confidence = EvidenceConfidence.HIGH,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_INTERFACE,
+                detected = true,
+                confidence = EvidenceConfidence.HIGH,
+                description = "Interface ${iface.name} reports ARPHRD_TUNTAP (type 65534) despite non-tunnel name",
+            )
+            detected = true
+        }
+
         val ipsecInterfaces = uniqueByName.filter { iface ->
             iface.isUp && NetworkInterfacePatterns.isIpsecInterface(iface.name)
         }

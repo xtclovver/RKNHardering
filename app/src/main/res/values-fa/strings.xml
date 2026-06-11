@@ -602,6 +602,7 @@
     <string name="checker_native_interfaces_empty">getifaddrs() هیچ واسطی برنگرداند</string>
     <string name="checker_native_interfaces_summary">getifaddrs(): %1$d واسط (%2$d فعال)</string>
     <string name="checker_native_vpn_interface">واسط VPN بومی: %1$s (ایندکس %2$d، MTU %3$d)</string>
+    <string name="checker_native_tuntap_type">رابط %1$s نوع TUN/TAP (ARPHRD_TUNTAP) دارد صرف‌نظر از نام</string>
     <string name="checker_native_ipsec_interface">واسط IPsec بومی: %1$s (ایندکس %2$d)</string>
     <string name="checker_native_mismatch_missing_in_jvm">واسط %1$s: در بومی هست اما در JVM نیست</string>
     <string name="checker_native_mismatch_missing_in_native">واسط %1$s: در JVM هست اما در بومی نیست</string>

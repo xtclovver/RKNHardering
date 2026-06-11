@@ -623,6 +623,7 @@
     <string name="checker_native_interfaces_empty">getifaddrs() не вернул интерфейсов</string>
     <string name="checker_native_interfaces_summary">getifaddrs(): %1$d интерфейсов (%2$d активны)</string>
     <string name="checker_native_vpn_interface">Нативный VPN-интерфейс: %1$s (индекс %2$d, MTU %3$d)</string>
+    <string name="checker_native_tuntap_type">Интерфейс %1$s имеет тип TUN/TAP (ARPHRD_TUNTAP) независимо от имени</string>
     <string name="checker_native_ipsec_interface">Нативный IPsec-интерфейс: %1$s (индекс %2$d)</string>
     <string name="checker_native_mismatch_missing_in_jvm">Интерфейс %1$s: виден нативно, но отсутствует в JVM</string>
     <string name="checker_native_mismatch_missing_in_native">Интерфейс %1$s: виден в JVM, но отсутствует нативно</string>

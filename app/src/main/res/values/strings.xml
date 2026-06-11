@@ -628,6 +628,7 @@
     <string name="checker_native_interfaces_empty">getifaddrs() returned no interfaces</string>
     <string name="checker_native_interfaces_summary">getifaddrs(): %1$d interfaces (%2$d up)</string>
     <string name="checker_native_vpn_interface">Native VPN-like interface: %1$s (index %2$d, MTU %3$d)</string>
+    <string name="checker_native_tuntap_type">Interface %1$s has TUN/TAP type (ARPHRD_TUNTAP) regardless of name</string>
     <string name="checker_native_ipsec_interface">Native IPsec-like interface: %1$s (index %2$d)</string>
     <string name="checker_native_mismatch_missing_in_jvm">Interface %1$s: visible in native but missing in JVM</string>
     <string name="checker_native_mismatch_missing_in_native">Interface %1$s: visible in JVM but missing in native</string>

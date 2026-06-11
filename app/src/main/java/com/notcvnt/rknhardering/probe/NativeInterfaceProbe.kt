@@ -11,6 +11,7 @@ data class NativeInterface(
     val address: String?,
     val netmask: String?,
     val mtu: Int,
+    val ifaceType: Int? = null,
 ) {
     val isUp: Boolean get() = (flags and IFF_UP) != 0L
     val isLoopback: Boolean get() = (flags and IFF_LOOPBACK) != 0L
@@ -82,6 +83,7 @@ object NativeInterfaceProbe {
         val addr = parts[4].takeIf { it.isNotBlank() }
         val mask = parts[5].takeIf { it.isNotBlank() }
         val mtu = parts[6].toIntOrNull() ?: -1
+        val ifaceType = parts.getOrNull(7)?.toIntOrNull()?.takeIf { it >= 0 }
         return NativeInterface(
             name = name,
             canonicalName = NetworkInterfaceNameNormalizer.canonicalName(name),
@@ -91,6 +93,7 @@ object NativeInterfaceProbe {
             address = addr,
             netmask = mask,
             mtu = mtu,
+            ifaceType = ifaceType,
         )
     }
 
