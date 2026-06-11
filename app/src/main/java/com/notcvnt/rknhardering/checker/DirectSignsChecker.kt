@@ -820,9 +820,10 @@ object DirectSignsChecker {
     }
 
     internal fun vpnTypeLabel(type: Int): String? = when (type) {
-        0 -> "PLATFORM"
-        1 -> "LEGACY"
-        2 -> "IKEV2"
+        1 -> "SERVICE"
+        2 -> "PLATFORM"
+        3 -> "LEGACY"
+        4 -> "OEM"
         else -> null
     }
 

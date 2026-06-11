@@ -510,9 +510,12 @@ class DirectSignsCheckerTest {
 
     @Test
     fun `maps vpn transport info type constants to labels`() {
-        assertEquals("PLATFORM", DirectSignsChecker.vpnTypeLabel(0))
-        assertEquals("LEGACY", DirectSignsChecker.vpnTypeLabel(1))
-        assertEquals("IKEV2", DirectSignsChecker.vpnTypeLabel(2))
+        assertEquals("SERVICE", DirectSignsChecker.vpnTypeLabel(1))
+        assertEquals("PLATFORM", DirectSignsChecker.vpnTypeLabel(2))
+        assertEquals("LEGACY", DirectSignsChecker.vpnTypeLabel(3))
+        assertEquals("OEM", DirectSignsChecker.vpnTypeLabel(4))
+        assertEquals(null, DirectSignsChecker.vpnTypeLabel(-1))
+        assertEquals(null, DirectSignsChecker.vpnTypeLabel(0))
         assertEquals(null, DirectSignsChecker.vpnTypeLabel(99))
     }
 
