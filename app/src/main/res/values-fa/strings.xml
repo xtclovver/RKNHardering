@@ -423,6 +423,7 @@
     <string name="checker_direct_not_detected">شناسایی نشد</string>
     <string name="checker_direct_flag_is_vpn">پرچم IS_VPN در capabilities پیدا شد</string>
     <string name="checker_direct_vpn_transport_info">VpnTransportInfo در transport info پیدا شد</string>
+    <string name="checker_direct_vpn_type">نوع انتقال VPN: %1$s</string>
     <string name="checker_direct_http_proxy">HTTP proxy</string>
     <string name="checker_direct_socks_proxy">SOCKS proxy</string>
     <string name="checker_direct_proxy_not_configured">%1$s: پیکربندی نشده</string>

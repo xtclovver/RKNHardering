@@ -409,6 +409,7 @@
     <string name="checker_direct_not_detected">не обнаружен</string>
     <string name="checker_direct_flag_is_vpn">Флаг IS_VPN обнаружен в capabilities</string>
     <string name="checker_direct_vpn_transport_info">VpnTransportInfo обнаружен в транспортной информации</string>
+    <string name="checker_direct_vpn_type">Тип VPN-транспорта: %1$s</string>
     <string name="checker_direct_http_proxy">HTTP прокси</string>
     <string name="checker_direct_socks_proxy">SOCKS прокси</string>
     <string name="checker_direct_proxy_not_configured">%1$s: не настроен</string>

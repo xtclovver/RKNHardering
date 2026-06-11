@@ -422,6 +422,7 @@
     <string name="checker_direct_not_detected">未发现</string>
     <string name="checker_direct_flag_is_vpn">在 capabilities 中发现了 IS_VPN 标记</string>
     <string name="checker_direct_vpn_transport_info">在 transport info 中发现了 VpnTransportInfo</string>
+    <string name="checker_direct_vpn_type">VPN 传输类型：%1$s</string>
     <string name="checker_direct_http_proxy">HTTP 代理</string>
     <string name="checker_direct_socks_proxy">SOCKS 代理</string>
     <string name="checker_direct_proxy_not_configured">%1$s：未配置</string>
