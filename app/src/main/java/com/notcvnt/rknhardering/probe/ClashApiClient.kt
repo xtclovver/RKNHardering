@@ -12,18 +12,12 @@ import java.util.concurrent.TimeUnit
  * the real destination IPs of active VPN-server tunnels.
  *
  * Parsing helpers live in the companion object (pure, statically testable);
- * networking is per-instance.
+ * networking delegates to a single shared OkHttpClient so all instances share
+ * one connection pool and dispatcher — no per-scan thread-pool churn.
  */
 class ClashApiClient(
     private val host: String = "127.0.0.1",
-    private val timeoutMs: Long = 600,
 ) {
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-        .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-        .callTimeout(timeoutMs * 2, TimeUnit.MILLISECONDS)
-        .build()
-
     fun fetchConfigs(port: Int): String? = httpGet(port, "/configs")
     fun fetchConnections(port: Int): String? = httpGet(port, "/connections")
     fun fetchProxies(port: Int): String? = httpGet(port, "/proxies")
@@ -32,13 +26,19 @@ class ClashApiClient(
         val bracketHost = if (host.contains(':')) "[$host]" else host
         val url = "http://$bracketHost:$port$path"
         return runCatching {
-            client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+            SHARED_CLIENT.newCall(Request.Builder().url(url).build()).execute().use { resp ->
                 if (!resp.isSuccessful) null else resp.body?.string()
             }
         }.getOrNull()
     }
 
     companion object {
+        private val SHARED_CLIENT: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(600, TimeUnit.MILLISECONDS)
+            .readTimeout(600, TimeUnit.MILLISECONDS)
+            .callTimeout(1200, TimeUnit.MILLISECONDS)
+            .build()
+
         fun isConfigResponseAlive(body: String?): Boolean {
             if (body.isNullOrBlank()) return false
             return runCatching { JSONObject(body); true }.getOrDefault(false)
