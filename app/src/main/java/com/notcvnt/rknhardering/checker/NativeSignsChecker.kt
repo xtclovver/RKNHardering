@@ -36,6 +36,8 @@ object NativeSignsChecker {
         "libzygisk",
     )
 
+    private const val ARPHRD_TUNTAP = 65534
+
     private val HIGH_CONFIDENCE_ROOT_MOUNT_MARKERS = setOf(
         "magisk",
         "zygisk",
@@ -201,7 +203,7 @@ object NativeSignsChecker {
 
         val tuntapByType = uniqueByName.filter { iface ->
             iface.isUp &&
-                iface.ifaceType == 65534 &&
+                iface.ifaceType == ARPHRD_TUNTAP &&
                 !NetworkInterfacePatterns.isVpnInterface(iface.name)
         }
         for (iface in tuntapByType) {
@@ -215,7 +217,7 @@ object NativeSignsChecker {
                 source = EvidenceSource.NATIVE_INTERFACE,
                 detected = true,
                 confidence = EvidenceConfidence.HIGH,
-                description = "Interface ${iface.name} reports ARPHRD_TUNTAP (type 65534) despite non-tunnel name",
+                description = "Interface ${iface.name} reports ARPHRD_TUNTAP (type $ARPHRD_TUNTAP) despite non-tunnel name",
             )
             detected = true
         }
