@@ -37,6 +37,9 @@ object NativeSignsBridge {
     internal var detectRootOverride: (() -> Array<String>)? = null
 
     @Volatile
+    internal var detectEmulatorOverride: (() -> Array<String>)? = null
+
+    @Volatile
     private var initialized = false
 
     @Volatile
@@ -132,6 +135,12 @@ object NativeSignsBridge {
         return runCatching { nativeDetectRoot() }.getOrDefault(emptyArray())
     }
 
+    fun detectEmulator(): Array<String> {
+        detectEmulatorOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectEmulator() }.getOrDefault(emptyArray())
+    }
+
     internal fun resetForTests() {
         isLibraryLoadedOverride = null
         getIfAddrsOverride = null
@@ -144,6 +153,7 @@ object NativeSignsBridge {
         netlinkRouteDumpOverride = null
         netlinkSockDiagOverride = null
         detectRootOverride = null
+        detectEmulatorOverride = null
         initialized = false
         libraryLoaded = false
         lastLoadError = null
@@ -159,4 +169,5 @@ object NativeSignsBridge {
     private external fun nativeNetlinkRouteDump(family: Int): Array<String>
     private external fun nativeNetlinkSockDiag(family: Int, protocol: Int): Array<String>
     private external fun nativeDetectRoot(): Array<String>
+    private external fun nativeDetectEmulator(): Array<String>
 }

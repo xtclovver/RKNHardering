@@ -640,6 +640,13 @@
     <string name="checker_native_root_uid">Процесс выполняется с root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Обнаружено свойство Magisk: %1$s</string>
 
+    <!-- NativeSignsChecker: эмулятор / изоляция песочницы -->
+    <string name="checker_native_emulator_marker">Маркер эмулятора: %1$s</string>
+    <string name="checker_native_emulator_build">Профиль Build выглядит эмулированным: %1$s</string>
+    <string name="checker_native_isolation_secondary_user">Приложение работает во вторичном пользователе Android %1$d; детекторы видят только этого пользователя, VPN в другом пользователе не обнаруживается без root</string>
+    <string name="checker_native_isolation_clone">Приложение работает в клонированном/dual-app контейнере (пользователь %1$d); VPN в основном профиле не обнаруживается</string>
+    <string name="checker_native_isolation_work_profile">Приложение работает в управляемом рабочем профиле; VPN в личном профиле не обнаруживается без root</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">Доступно обновление</string>
     <string name="update_dialog_message">Установленная версия: %1$s\nАктуальная версия: %2$s</string>

@@ -925,6 +925,94 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
     return toStringArray(env, findings);
 }
 
+bool fileContains(const char *path, const char *needle) {
+    FILE *f = std::fopen(path, "re");
+    if (f == nullptr) return false;
+    char line[1024];
+    bool found = false;
+    while (std::fgets(line, sizeof(line), f) != nullptr) {
+        if (std::strstr(line, needle) != nullptr) { found = true; break; }
+    }
+    std::fclose(f);
+    return found;
+}
+
+jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    // 1. QEMU system properties
+    static const char *const kQemuProps[] = {
+        "ro.kernel.qemu",
+        "ro.kernel.qemu.gles",
+        "ro.boot.qemu",
+        "qemu.hw.mainkeys",
+    };
+    for (const char *prop : kQemuProps) {
+        char val[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop, val) > 0 && val[0] != '\0') {
+            std::string f = "qemu_prop|";
+            f.append(prop);
+            f.push_back('=');
+            f.append(val);
+            findings.push_back(f);
+        }
+    }
+
+    // 2. Goldfish/ranchu hardware
+    static const char *const kHwProps[] = {
+        "ro.hardware",
+        "ro.product.board",
+    };
+    for (const char *prop : kHwProps) {
+        char val[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop, val) > 0) {
+            if (std::strstr(val, "goldfish") != nullptr ||
+                std::strstr(val, "ranchu") != nullptr) {
+                std::string f = "goldfish|";
+                f.append(prop);
+                f.push_back('=');
+                f.append(val);
+                findings.push_back(f);
+            }
+        }
+    }
+
+    // 3. Emulator pipe devices (genyd => Genymotion)
+    static const char *const kPipePaths[] = {
+        "/dev/qemu_pipe",
+        "/dev/socket/qemud",
+        "/dev/socket/genyd",
+        "/dev/socket/baseband_genyd",
+    };
+    for (const char *path : kPipePaths) {
+        if (access(path, F_OK) == 0) {
+            std::string f = "qemu_pipe|";
+            f.append(path);
+            findings.push_back(f);
+        }
+    }
+
+    // 4. Goldfish TTY driver
+    if (fileContains("/proc/tty/drivers", "goldfish")) {
+        findings.emplace_back("qemu_driver|/proc/tty/drivers:goldfish");
+    }
+
+    // 5. BlueStacks artifacts
+    static const char *const kBlueStacksPaths[] = {
+        "/system/lib/libbstfolder_jni.so",
+        "/data/bluestacks.prop",
+    };
+    for (const char *path : kBlueStacksPaths) {
+        if (access(path, F_OK) == 0) {
+            std::string f = "bluestacks|";
+            f.append(path);
+            findings.push_back(f);
+        }
+    }
+
+    return toStringArray(env, findings);
+}
+
 const JNINativeMethod kMethods[] = {
     {"nativeGetIfAddrs", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeGetIfAddrs)},
     {"nativeIfNameToIndex", "(Ljava/lang/String;)I", reinterpret_cast<void *>(nativeIfNameToIndex)},
@@ -936,6 +1024,7 @@ const JNINativeMethod kMethods[] = {
     {"nativeNetlinkRouteDump", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkRouteDump)},
     {"nativeNetlinkSockDiag", "(II)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkSockDiag)},
     {"nativeDetectRoot", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectRoot)},
+    {"nativeDetectEmulator", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectEmulator)},
 };
 
 } // namespace

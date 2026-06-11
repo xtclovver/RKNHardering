@@ -9,6 +9,7 @@ import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
 import com.notcvnt.rknhardering.network.NetworkInterfacePatterns
+import com.notcvnt.rknhardering.probe.NativeEmulatorFinding
 import com.notcvnt.rknhardering.probe.NativeInterface
 import com.notcvnt.rknhardering.probe.NativeInterfaceProbe
 import com.notcvnt.rknhardering.probe.NativeMapsFinding
@@ -46,6 +47,16 @@ object NativeSignsChecker {
         "/data/adb",
         "core-only",
     )
+
+    private val HIGH_CONFIDENCE_EMULATOR_KINDS = setOf(
+        "qemu_prop",
+        "qemu_pipe",
+        "goldfish",
+        "bluestacks",
+    )
+
+    private val CLONE_USER_IDS = setOf(999)
+    private val CLONE_USER_ID_RANGE = 950..959 // MIUI dual-app range
 
     internal data class JvmInterfaceSnapshot(
         val name: String,
@@ -114,6 +125,24 @@ object NativeSignsChecker {
         findings += rootOutcome.findings
         evidence += rootOutcome.evidence
         needsReview = needsReview || rootOutcome.needsReview
+
+        val emulatorOutcome = evaluateEmulator(
+            context,
+            runCatching { NativeInterfaceProbe.collectEmulatorFindings() }.getOrDefault(emptyList()),
+            collectBuildEmulatorFacts(),
+        )
+        findings += emulatorOutcome.findings
+        evidence += emulatorOutcome.evidence
+        needsReview = needsReview || emulatorOutcome.needsReview
+
+        val isolationOutcome = evaluateIsolation(
+            context,
+            userId = extractUserId(context.dataDir?.absolutePath),
+            isProfileOwner = collectIsProfileOwner(context),
+        )
+        findings += isolationOutcome.findings
+        evidence += isolationOutcome.evidence
+        needsReview = needsReview || isolationOutcome.needsReview
 
         if (findings.isEmpty()) {
             findings += Finding(
@@ -651,6 +680,161 @@ object NativeSignsChecker {
         }
 
         return PartialOutcome(findings, evidence, needsReview = needsReview)
+    }
+
+    internal fun evaluateEmulator(
+        context: Context,
+        emulatorFindings: List<NativeEmulatorFinding>,
+        buildFacts: List<String>,
+    ): PartialOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var needsReview = false
+
+        for (finding in emulatorFindings) {
+            val detail = finding.detail ?: finding.kind
+            val confidence = if (finding.kind in HIGH_CONFIDENCE_EMULATOR_KINDS) {
+                EvidenceConfidence.HIGH
+            } else {
+                EvidenceConfidence.MEDIUM
+            }
+            findings += Finding(
+                description = context.getString(R.string.checker_native_emulator_marker, detail),
+                needsReview = true,
+                source = EvidenceSource.NATIVE_EMULATOR,
+                confidence = confidence,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_EMULATOR,
+                detected = true,
+                confidence = confidence,
+                description = "Emulator marker [${finding.kind}]: $detail",
+            )
+            needsReview = true
+        }
+
+        for (fact in buildFacts) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_emulator_build, fact),
+                needsReview = true,
+                source = EvidenceSource.NATIVE_EMULATOR,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_EMULATOR,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Build emulator heuristic: $fact",
+            )
+            needsReview = true
+        }
+
+        return PartialOutcome(findings, evidence, needsReview = needsReview)
+    }
+
+    internal fun collectBuildEmulatorFacts(): List<String> {
+        val facts = mutableListOf<String>()
+        val fp = android.os.Build.FINGERPRINT.orEmpty()
+        if (fp.startsWith("generic") || fp.startsWith("unknown") ||
+            fp.contains("vbox") || fp.contains("emulator") || fp.contains("test-keys")
+        ) {
+            facts += "Build.FINGERPRINT=$fp"
+        }
+        val model = android.os.Build.MODEL.orEmpty()
+        if (model.contains("google_sdk") || model.contains("Emulator") ||
+            model.contains("Android SDK built for")
+        ) {
+            facts += "Build.MODEL=$model"
+        }
+        val hw = android.os.Build.HARDWARE.orEmpty()
+        if (hw in setOf("goldfish", "ranchu", "vbox86")) {
+            facts += "Build.HARDWARE=$hw"
+        }
+        val product = android.os.Build.PRODUCT.orEmpty()
+        if (product.startsWith("sdk_gphone") || product in setOf("vbox86p", "emulator", "sdk", "google_sdk")) {
+            facts += "Build.PRODUCT=$product"
+        }
+        val manufacturer = android.os.Build.MANUFACTURER.orEmpty()
+        // "unknown" alone is too broad — some legitimate AOSP/budget devices report it.
+        // Only flag named emulator vendors here; weaker signals are covered by FINGERPRINT/PRODUCT above.
+        if (manufacturer.equals("Genymotion", ignoreCase = true)) {
+            facts += "Build.MANUFACTURER=$manufacturer"
+        }
+        return facts
+    }
+
+    internal fun evaluateIsolation(
+        context: Context,
+        userId: Int,
+        isProfileOwner: Boolean,
+    ): PartialOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var needsReview = false
+
+        val isClone = userId in CLONE_USER_IDS || userId in CLONE_USER_ID_RANGE
+
+        if (isClone) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_isolation_clone, userId),
+                needsReview = true,
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Isolation: clone/dual-app container (user $userId)",
+            )
+            needsReview = true
+        } else if (userId != 0) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_isolation_secondary_user, userId),
+                needsReview = true,
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Isolation: secondary user $userId",
+            )
+            needsReview = true
+        }
+
+        if (isProfileOwner) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_isolation_work_profile),
+                needsReview = true,
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.SANDBOX_ISOLATION,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Isolation: managed work profile (profile owner)",
+            )
+            needsReview = true
+        }
+
+        return PartialOutcome(findings, evidence, needsReview = needsReview)
+    }
+
+    internal fun extractUserId(dataDirPath: String?): Int {
+        if (dataDirPath == null) return 0
+        val match = Regex("/data/user/(\\d+)/").find(dataDirPath) ?: return 0
+        return match.groupValues[1].toIntOrNull() ?: 0
+    }
+
+    internal fun collectIsProfileOwner(context: Context): Boolean {
+        return runCatching {
+            val dpm = context.getSystemService(android.content.Context.DEVICE_POLICY_SERVICE)
+                as? android.app.admin.DevicePolicyManager ?: return false
+            dpm.isProfileOwnerApp(context.packageName)
+        }.getOrDefault(false)
     }
 
     internal fun containsHighConfidenceRootMountMarker(detail: String): Boolean {

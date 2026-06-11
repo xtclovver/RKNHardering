@@ -645,6 +645,13 @@
     <string name="checker_native_root_uid">Process is running with root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Magisk property detected: %1$s</string>
 
+    <!-- NativeSignsChecker: emulator / sandbox isolation -->
+    <string name="checker_native_emulator_marker">Emulator marker: %1$s</string>
+    <string name="checker_native_emulator_build">Build profile looks emulated: %1$s</string>
+    <string name="checker_native_isolation_secondary_user">App runs in secondary Android user %1$d; detectors only see this user, a VPN in another user is not observable without root</string>
+    <string name="checker_native_isolation_clone">App runs in a cloned/dual-app container (user %1$d); a VPN in the primary profile is not observable</string>
+    <string name="checker_native_isolation_work_profile">App runs in a managed work profile; a VPN in the personal profile is not observable without root</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">Update available</string>
     <string name="update_dialog_message">Installed version: %1$s\nLatest version: %2$s</string>

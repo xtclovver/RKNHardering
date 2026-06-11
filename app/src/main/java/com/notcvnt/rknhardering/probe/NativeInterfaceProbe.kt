@@ -62,6 +62,11 @@ data class NativeRootFinding(
     val detail: String?,
 )
 
+data class NativeEmulatorFinding(
+    val kind: String,
+    val detail: String?,
+)
+
 object NativeInterfaceProbe {
     private const val IPV4_DEFAULT_DESTINATION = "00000000"
     private const val IPV6_DEFAULT_DESTINATION = "00000000000000000000000000000000"
@@ -357,5 +362,20 @@ object NativeInterfaceProbe {
     fun collectRootFindings(): List<NativeRootFinding> {
         val rows = NativeSignsBridge.detectRoot()
         return parseRootFindings(rows)
+    }
+
+    fun parseEmulatorFindings(rows: Array<String>): List<NativeEmulatorFinding> {
+        return rows.mapNotNull { row ->
+            val sep = row.indexOf('|')
+            if (sep <= 0) return@mapNotNull null
+            val kind = row.substring(0, sep)
+            val detail = row.substring(sep + 1).takeIf { it.isNotBlank() }
+            NativeEmulatorFinding(kind = kind, detail = detail)
+        }
+    }
+
+    fun collectEmulatorFindings(): List<NativeEmulatorFinding> {
+        val rows = NativeSignsBridge.detectEmulator()
+        return parseEmulatorFindings(rows)
     }
 }

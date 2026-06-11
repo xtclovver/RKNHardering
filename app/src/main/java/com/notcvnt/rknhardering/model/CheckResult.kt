@@ -80,6 +80,8 @@ enum class EvidenceSource {
     NATIVE_JVM_MISMATCH,
     NATIVE_LIBRARY_INTEGRITY,
     NATIVE_ROOT_DETECTION,
+    NATIVE_EMULATOR,
+    SANDBOX_ISOLATION,
 }
 
 enum class StunScope {
