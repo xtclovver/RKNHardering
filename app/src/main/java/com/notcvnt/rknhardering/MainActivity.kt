@@ -1338,6 +1338,30 @@ class MainActivity : AppCompatActivity() {
         RunningStage.DOMAIN_REACHABILITY -> CATEGORY_REA
     }
 
+    // View bundle for the "plain category card" stages handled by
+    // showCategoryLoading/showCategoryStopped. Stages with specialized
+    // loading/stopped handlers (IP comparison, CDN, bypass, reachability,
+    // consensus) return null.
+    private data class StageCategoryViews(
+        val card: MaterialCardView,
+        val icon: ImageView,
+        val status: TextView,
+        val findingsContainer: LinearLayout,
+        val infoSection: LinearLayout? = null,
+        val infoDivider: View? = null,
+    )
+
+    private fun categoryViewsForStage(stage: RunningStage): StageCategoryViews? = when (stage) {
+        RunningStage.GEO_IP -> StageCategoryViews(cardGeoIp, iconGeoIp, statusGeoIp, findingsGeoIp, geoIpInfoSection, geoIpDivider)
+        RunningStage.ICMP -> StageCategoryViews(cardIcmpSpoofing, iconIcmpSpoofing, statusIcmpSpoofing, findingsIcmpSpoofing)
+        RunningStage.RTT_TRIANGULATION -> StageCategoryViews(cardRttTriangulation, iconRttTriangulation, statusRttTriangulation, findingsRttTriangulation)
+        RunningStage.DIRECT -> StageCategoryViews(cardDirect, iconDirect, statusDirect, findingsDirect, directInfoSection, directDivider)
+        RunningStage.INDIRECT -> StageCategoryViews(cardIndirect, iconIndirect, statusIndirect, findingsIndirect)
+        RunningStage.NATIVE_SIGNS -> StageCategoryViews(cardNativeSigns, iconNativeSigns, statusNativeSigns, findingsNativeSigns)
+        RunningStage.LOCATION -> StageCategoryViews(cardLocation, iconLocation, statusLocation, findingsLocation, locationInfoSection, locationDivider)
+        else -> null
+    }
+
     private fun showLoadingCardForStage(stage: RunningStage) {
         if (stage == RunningStage.IP_CONSENSUS) return
         if (stage in completedStages) return
@@ -1346,73 +1370,23 @@ class MainActivity : AppCompatActivity() {
         setTileStatus(tileIdForStage(stage), TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
         loadingStages += stage
         when (stage) {
-            RunningStage.GEO_IP -> showCategoryLoading(
-                stage = stage,
-                card = cardGeoIp,
-                icon = iconGeoIp,
-                status = statusGeoIp,
-                findingsContainer = findingsGeoIp,
-                hint = stageLoadingMessage(stage),
-                infoSection = geoIpInfoSection,
-                infoDivider = geoIpDivider,
-            )
             RunningStage.IP_COMPARISON -> showIpComparisonLoading(stage)
             RunningStage.CDN_PULLING -> showCdnPullingLoading(stage)
-            RunningStage.ICMP -> showCategoryLoading(
-                stage = stage,
-                card = cardIcmpSpoofing,
-                icon = iconIcmpSpoofing,
-                status = statusIcmpSpoofing,
-                findingsContainer = findingsIcmpSpoofing,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.RTT_TRIANGULATION -> showCategoryLoading(
-                stage = stage,
-                card = cardRttTriangulation,
-                icon = iconRttTriangulation,
-                status = statusRttTriangulation,
-                findingsContainer = findingsRttTriangulation,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.DIRECT -> showCategoryLoading(
-                stage = stage,
-                card = cardDirect,
-                icon = iconDirect,
-                status = statusDirect,
-                findingsContainer = findingsDirect,
-                hint = stageLoadingMessage(stage),
-                infoSection = directInfoSection,
-                infoDivider = directDivider,
-            )
-            RunningStage.INDIRECT -> showCategoryLoading(
-                stage = stage,
-                card = cardIndirect,
-                icon = iconIndirect,
-                status = statusIndirect,
-                findingsContainer = findingsIndirect,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.NATIVE_SIGNS -> showCategoryLoading(
-                stage = stage,
-                card = cardNativeSigns,
-                icon = iconNativeSigns,
-                status = statusNativeSigns,
-                findingsContainer = findingsNativeSigns,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.LOCATION -> showCategoryLoading(
-                stage = stage,
-                card = cardLocation,
-                icon = iconLocation,
-                status = statusLocation,
-                findingsContainer = findingsLocation,
-                hint = stageLoadingMessage(stage),
-                infoSection = locationInfoSection,
-                infoDivider = locationDivider,
-            )
-            RunningStage.IP_CONSENSUS -> Unit
             RunningStage.BYPASS -> showBypassLoading(stage)
             RunningStage.DOMAIN_REACHABILITY -> showDomainReachabilityLoading(stage)
+            RunningStage.IP_CONSENSUS -> Unit
+            else -> categoryViewsForStage(stage)?.let { v ->
+                showCategoryLoading(
+                    stage = stage,
+                    card = v.card,
+                    icon = v.icon,
+                    status = v.status,
+                    findingsContainer = v.findingsContainer,
+                    hint = stageLoadingMessage(stage),
+                    infoSection = v.infoSection,
+                    infoDivider = v.infoDivider,
+                )
+            }
         }
         syncLoadingStatusAnimation()
     }
@@ -1479,73 +1453,37 @@ class MainActivity : AppCompatActivity() {
     private fun markLoadingStagesCancelled() {
         loadingStages.toList().forEach { stage ->
             when (stage) {
-                RunningStage.GEO_IP -> showCategoryStopped(
-                    card = cardGeoIp,
-                    icon = iconGeoIp,
-                    status = statusGeoIp,
-                    findingsContainer = findingsGeoIp,
-                    message = stageStoppedMessage(stage),
-                    infoSection = geoIpInfoSection,
-                    infoDivider = geoIpDivider,
-                )
                 RunningStage.IP_COMPARISON -> showIpComparisonStopped(stage)
                 RunningStage.CDN_PULLING -> showCdnPullingStopped(stage)
-                RunningStage.ICMP -> showCategoryStopped(
-                    card = cardIcmpSpoofing,
-                    icon = iconIcmpSpoofing,
-                    status = statusIcmpSpoofing,
-                    findingsContainer = findingsIcmpSpoofing,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.RTT_TRIANGULATION -> showCategoryStopped(
-                    card = cardRttTriangulation,
-                    icon = iconRttTriangulation,
-                    status = statusRttTriangulation,
-                    findingsContainer = findingsRttTriangulation,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.DIRECT -> showCategoryStopped(
-                    card = cardDirect,
-                    icon = iconDirect,
-                    status = statusDirect,
-                    findingsContainer = findingsDirect,
-                    message = stageStoppedMessage(stage),
-                    infoSection = directInfoSection,
-                    infoDivider = directDivider,
-                )
-                RunningStage.INDIRECT -> showCategoryStopped(
-                    card = cardIndirect,
-                    icon = iconIndirect,
-                    status = statusIndirect,
-                    findingsContainer = findingsIndirect,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.NATIVE_SIGNS -> showCategoryStopped(
-                    card = cardNativeSigns,
-                    icon = iconNativeSigns,
-                    status = statusNativeSigns,
-                    findingsContainer = findingsNativeSigns,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.LOCATION -> showCategoryStopped(
-                    card = cardLocation,
-                    icon = iconLocation,
-                    status = statusLocation,
-                    findingsContainer = findingsLocation,
-                    message = stageStoppedMessage(stage),
-                    infoSection = locationInfoSection,
-                    infoDivider = locationDivider,
-                )
-                RunningStage.IP_CONSENSUS -> Unit
                 RunningStage.BYPASS -> showBypassStopped(stage)
                 RunningStage.DOMAIN_REACHABILITY -> {
                     findingsDomainReachability.removeAllViews()
                     findingsDomainReachability.addView(createLoadingHintView(stageStoppedMessage(stage)))
                     findingsDomainReachability.visibility = View.VISIBLE
                 }
+                RunningStage.IP_CONSENSUS -> Unit
+                else -> categoryViewsForStage(stage)?.let { v ->
+                    showCategoryStopped(
+                        card = v.card,
+                        icon = v.icon,
+                        status = v.status,
+                        findingsContainer = v.findingsContainer,
+                        message = stageStoppedMessage(stage),
+                        infoSection = v.infoSection,
+                        infoDivider = v.infoDivider,
+                    )
+                }
             }
         }
         loadingStages.clear()
+    }
+
+    private fun bindCardStoppedState(icon: ImageView, status: TextView) {
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        icon.setImageResource(visual.iconRes)
+        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
+        status.text = getString(R.string.main_status_stopped)
+        status.setTextColor(visual.accentColor)
     }
 
     private fun showCategoryStopped(
@@ -1557,11 +1495,7 @@ class MainActivity : AppCompatActivity() {
         infoSection: LinearLayout? = null,
         infoDivider: View? = null,
     ) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        icon.setImageResource(visual.iconRes)
-        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        status.text = getString(R.string.main_status_stopped)
-        status.setTextColor(visual.accentColor)
+        bindCardStoppedState(icon, status)
         infoSection?.apply {
             removeAllViews()
             visibility = View.GONE
@@ -1574,11 +1508,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showIpComparisonStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconIpComparison.setImageResource(visual.iconRes)
-        iconIpComparison.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusIpComparison.text = getString(R.string.main_status_stopped)
-        statusIpComparison.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconIpComparison, statusIpComparison)
         textIpComparisonSummary.text = stageStoppedMessage(stage)
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.GONE
@@ -1586,11 +1516,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCdnPullingStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconCdnPulling.setImageResource(visual.iconRes)
-        iconCdnPulling.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusCdnPulling.text = getString(R.string.main_status_stopped)
-        statusCdnPulling.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconCdnPulling, statusCdnPulling)
         textCdnPullingSummary.text = stageStoppedMessage(stage)
         cdnPullingResponses.removeAllViews()
         cdnPullingResponses.visibility = View.GONE
@@ -1598,11 +1524,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showBypassStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconBypass.setImageResource(visual.iconRes)
-        iconBypass.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusBypass.text = getString(R.string.main_status_stopped)
-        statusBypass.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconBypass, statusBypass)
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
         textBypassProgress.text = stageStoppedMessage(stage)
