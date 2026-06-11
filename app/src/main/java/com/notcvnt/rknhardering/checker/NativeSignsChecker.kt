@@ -36,6 +36,8 @@ object NativeSignsChecker {
         "libzygisk",
     )
 
+    private const val ARPHRD_TUNTAP = 65534
+
     private val HIGH_CONFIDENCE_ROOT_MOUNT_MARKERS = setOf(
         "magisk",
         "zygisk",
@@ -95,10 +97,17 @@ object NativeSignsChecker {
         detected = detected || mismatchOutcome.detected
         needsReview = needsReview || mismatchOutcome.needsReview
 
-        val routeOutcome = evaluateRoutes(context)
+        val nativeRoutes = runCatching { NativeInterfaceProbe.collectRoutes() }.getOrDefault(emptyList())
+        val routeOutcome = evaluateRoutes(context, nativeRoutes)
         findings += routeOutcome.findings
         evidence += routeOutcome.evidence
         detected = detected || routeOutcome.detected
+
+        val hostRouteOutcome = evaluateHostRoutes(context, nativeRoutes)
+        findings += hostRouteOutcome.findings
+        evidence += hostRouteOutcome.evidence
+        detected = detected || hostRouteOutcome.detected
+        needsReview = needsReview || hostRouteOutcome.needsReview
 
         val hookOutcome = evaluateHookMarkers(context)
         findings += hookOutcome.findings
@@ -188,6 +197,27 @@ object NativeSignsChecker {
                 detected = true,
                 confidence = EvidenceConfidence.HIGH,
                 description = "Native getifaddrs() reports VPN-like interface ${iface.name} (index ${iface.index})",
+            )
+            detected = true
+        }
+
+        val tuntapByType = uniqueByName.filter { iface ->
+            iface.isUp &&
+                iface.ifaceType == ARPHRD_TUNTAP &&
+                !NetworkInterfacePatterns.isVpnInterface(iface.name)
+        }
+        for (iface in tuntapByType) {
+            findings += Finding(
+                description = context.getString(R.string.checker_native_tuntap_type, iface.name),
+                detected = true,
+                source = EvidenceSource.NATIVE_INTERFACE,
+                confidence = EvidenceConfidence.HIGH,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_INTERFACE,
+                detected = true,
+                confidence = EvidenceConfidence.HIGH,
+                description = "Interface ${iface.name} reports ARPHRD_TUNTAP (type $ARPHRD_TUNTAP) despite non-tunnel name",
             )
             detected = true
         }
@@ -332,8 +362,7 @@ object NativeSignsChecker {
         return PartialOutcome(findings, evidence, detected = detected, needsReview = needsReview)
     }
 
-    internal fun evaluateRoutes(context: Context): PartialOutcome {
-        val routes = runCatching { NativeInterfaceProbe.collectRoutes() }.getOrDefault(emptyList())
+    internal fun evaluateRoutes(context: Context, routes: List<NativeRouteEntry>): PartialOutcome {
         if (routes.isEmpty()) {
             return PartialOutcome(
                 findings = listOf(
@@ -419,6 +448,56 @@ object NativeSignsChecker {
         }
 
         return PartialOutcome(findings, evidence, detected = detected)
+    }
+
+    internal fun evaluateHostRoutes(
+        context: Context,
+        routes: List<NativeRouteEntry>,
+    ): PartialOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var detected = false
+
+        val hostRoutes = routes.filter { route ->
+            route.source == NativeRouteEntry.RouteSource.NETLINK &&
+                !route.isDefault &&
+                (route.prefixLen == 32 || route.prefixLen == 128) &&
+                route.destination != null &&
+                isPublicRoutableAddress(route.destination) &&
+                NetworkInterfacePatterns.isStandardInterface(route.interfaceName)
+        }
+
+        for (route in hostRoutes) {
+            val dst = route.destination ?: continue
+            findings += Finding(
+                description = context.getString(
+                    R.string.checker_native_host_route_leak,
+                    dst,
+                    route.interfaceName,
+                ),
+                detected = true,
+                source = EvidenceSource.NATIVE_ROUTE,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_ROUTE,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Host route to $dst via physical interface ${route.interfaceName}",
+            )
+            detected = true
+        }
+
+        return PartialOutcome(findings, evidence, detected = detected)
+    }
+
+    internal fun isPublicRoutableAddress(addr: String): Boolean {
+        if (!com.notcvnt.rknhardering.customcheck.UrlSanitizer.isPublicAddress(addr)) return false
+        // UrlSanitizer does not cover IPv6 ULA fc00::/7 — add it here
+        val inet = runCatching { java.net.InetAddress.getByName(addr) }.getOrNull() ?: return false
+        val bytes = inet.address ?: return false
+        if (bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC) return false
+        return true
     }
 
     internal fun evaluateHookMarkers(context: Context): PartialOutcome {

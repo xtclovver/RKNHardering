@@ -229,6 +229,15 @@ object DirectSignsChecker {
                     description = "NetworkCapabilities string contains VpnTransportInfo",
                 ),
             )
+            readVpnTransportType(caps)?.let { typeLabel ->
+                findings.add(
+                    Finding(
+                        description = context.getString(R.string.checker_direct_vpn_type, typeLabel),
+                        isInformational = true,
+                        source = EvidenceSource.DIRECT_NETWORK_CAPABILITIES,
+                    ),
+                )
+            }
         }
 
         return SignalOutcome(detected = detected)
@@ -808,6 +817,24 @@ object DirectSignsChecker {
         }
 
         return SignalOutcome(detected = detected, needsReview = needsReview)
+    }
+
+    internal fun vpnTypeLabel(type: Int): String? = when (type) {
+        1 -> "SERVICE"
+        2 -> "PLATFORM"
+        3 -> "LEGACY"
+        4 -> "OEM"
+        else -> null
+    }
+
+    private fun readVpnTransportType(caps: NetworkCapabilities): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        return runCatching {
+            val info = caps.transportInfo ?: return null
+            if (!info.javaClass.name.contains("VpnTransportInfo")) return null
+            val type = info.javaClass.getMethod("getType").invoke(info) as? Int ?: return null
+            vpnTypeLabel(type)
+        }.getOrNull()
     }
 
     internal fun isKnownProxyPort(port: String?): Boolean {

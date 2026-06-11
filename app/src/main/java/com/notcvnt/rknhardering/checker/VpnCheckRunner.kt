@@ -54,7 +54,9 @@ import kotlinx.coroutines.withContext
 data class CheckSettings(
     val splitTunnelEnabled: Boolean = true,
     val proxyScanEnabled: Boolean = true,
+    val proxyAuthProbeEnabled: Boolean = false,
     val xrayApiScanEnabled: Boolean = true,
+    val clashApiScanEnabled: Boolean = true,
     val networkRequestsEnabled: Boolean = true,
     val callTransportProbeEnabled: Boolean = false,
     val cdnPullingEnabled: Boolean = false,
@@ -186,6 +188,8 @@ object VpnCheckRunner {
             Boolean,
             Boolean,
             Boolean,
+            Boolean,
+            Boolean,
             String,
             Int,
             Int,
@@ -196,13 +200,15 @@ object VpnCheckRunner {
             kotlinx.coroutines.Deferred<UnderlyingNetworkProber.ProbeResult>?,
             (suspend (BypassChecker.Progress) -> Unit)?,
         ) -> BypassResult =
-            { ctx, resolverConfig, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, portRange, portRangeStart, portRangeEnd, connectTimeoutMs, checkUnderlyingNetwork, checkVpnNetworkBinding, checkMtprotoViaProxy, underlyingProbeDeferred, onProgress ->
+            { ctx, resolverConfig, splitTunnelEnabled, proxyScanEnabled, proxyAuthProbeEnabled, xrayApiScanEnabled, clashApiScanEnabled, portRange, portRangeStart, portRangeEnd, connectTimeoutMs, checkUnderlyingNetwork, checkVpnNetworkBinding, checkMtprotoViaProxy, underlyingProbeDeferred, onProgress ->
                 BypassChecker.check(
                     ctx,
                     resolverConfig,
                     splitTunnelEnabled,
                     proxyScanEnabled,
+                    proxyAuthProbeEnabled,
                     xrayApiScanEnabled,
+                    clashApiScanEnabled,
                     portRange,
                     portRangeStart,
                     portRangeEnd,
@@ -527,7 +533,9 @@ object VpnCheckRunner {
                     settings.resolverConfig,
                     settings.splitTunnelEnabled,
                     settings.proxyScanEnabled,
+                    settings.proxyAuthProbeEnabled,
                     settings.xrayApiScanEnabled,
+                    settings.clashApiScanEnabled,
                     settings.portRange,
                     settings.portRangeStart,
                     settings.portRangeEnd,

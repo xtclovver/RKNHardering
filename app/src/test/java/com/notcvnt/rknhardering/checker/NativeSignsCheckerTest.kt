@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.probe.NativeInterface
+import com.notcvnt.rknhardering.probe.NativeRouteEntry
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -184,6 +186,57 @@ class NativeSignsCheckerTest {
         assertTrue(
             result.evidence.any { it.source == EvidenceSource.NATIVE_ROOT_DETECTION && it.detected },
         )
+    }
+
+    @Test
+    fun `host route to public ip via physical interface emits NATIVE_ROUTE evidence`() {
+        val routes = listOf(
+            NativeRouteEntry(
+                interfaceName = "wlan0",
+                destinationHex = "08080808",
+                gatewayHex = "C0A80101",
+                flags = 0,
+                isDefault = false,
+                source = NativeRouteEntry.RouteSource.NETLINK,
+                family = 2,
+                destination = "8.8.8.8",
+                prefixLen = 32,
+            ),
+        )
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, routes)
+        assertTrue(outcome.detected)
+        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_ROUTE && it.detected })
+    }
+
+    @Test
+    fun `host route to private ip or via tun does not emit evidence`() {
+        val privateViaWlan = NativeRouteEntry(
+            interfaceName = "wlan0", destinationHex = "0A080001", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "10.8.0.1", prefixLen = 32,
+        )
+        val publicViaTun = NativeRouteEntry(
+            interfaceName = "tun0", destinationHex = "08080808", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "8.8.8.8", prefixLen = 32,
+        )
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(privateViaWlan, publicViaTun))
+        assertFalse(outcome.detected)
+    }
+
+    @Test
+    fun `interface with tuntap type and nonstandard name emits NATIVE_INTERFACE evidence`() {
+        val ifaces = listOf(
+            NativeInterface(
+                name = "mynet0", canonicalName = "mynet0", index = 9,
+                flags = NativeInterface.IFF_UP, family = "inet",
+                address = "10.9.0.2", netmask = "255.255.255.0", mtu = 1400,
+                ifaceType = 65534,
+            ),
+        )
+        val outcome = NativeSignsChecker.evaluateInterfaces(context, ifaces)
+        assertTrue(outcome.detected)
+        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_INTERFACE && it.detected })
     }
 
     @Suppress("unused")

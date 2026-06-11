@@ -187,6 +187,91 @@ class ProxyProberTest {
         }
     }
 
+    @Test
+    fun `socks5 auth probe succeeds on weak credentials`() {
+        val server = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))
+        val port = server.localPort
+        val acceptor = Thread {
+            server.accept().use { sock ->
+                val input = sock.getInputStream()
+                val out = sock.getOutputStream()
+                val greeting = ByteArray(3); input.read(greeting)
+                out.write(byteArrayOf(0x05, 0x02)); out.flush()
+                input.read(); val ulen = input.read()
+                input.readNBytes(ulen); val plen = input.read(); input.readNBytes(plen)
+                out.write(byteArrayOf(0x01, 0x00)); out.flush()
+            }
+        }
+        acceptor.start()
+        val cracked = ProxyProber.probeSocks5Auth("127.0.0.1", port, 500, 500, "admin", "admin")
+        acceptor.join(2000)
+        server.close()
+        assertTrue(cracked)
+    }
+
+    @Test
+    fun `socks5 auth probe fails on rejected credentials`() {
+        val server = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))
+        val port = server.localPort
+        val acceptor = Thread {
+            server.accept().use { sock ->
+                val input = sock.getInputStream(); val out = sock.getOutputStream()
+                input.read(ByteArray(3))
+                out.write(byteArrayOf(0x05, 0x02)); out.flush()
+                input.read(); val ulen = input.read(); input.readNBytes(ulen)
+                val plen = input.read(); input.readNBytes(plen)
+                out.write(byteArrayOf(0x01, 0x01)); out.flush()
+            }
+        }
+        acceptor.start()
+        val cracked = ProxyProber.probeSocks5Auth("127.0.0.1", port, 500, 500, "admin", "admin")
+        acceptor.join(2000)
+        server.close()
+        assertFalse(cracked)
+    }
+
+    @Test
+    fun `udp associate probe succeeds when proxy grants it`() {
+        val server = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))
+        val port = server.localPort
+        val acceptor = Thread {
+            server.accept().use { sock ->
+                val input = sock.getInputStream(); val out = sock.getOutputStream()
+                input.read(ByteArray(3))
+                out.write(byteArrayOf(0x05, 0x00)); out.flush()
+                input.readNBytes(10)
+                // Reply: ver, rep=success, rsv, atyp=ipv4, bnd.addr (4), bnd.port (2)
+                out.write(byteArrayOf(0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x04, 0x38)); out.flush()
+            }
+        }
+        acceptor.start()
+        val open = ProxyProber.probeUdpAssociate("127.0.0.1", port, 500, 500)
+        acceptor.join(2000)
+        server.close()
+        assertTrue(open)
+    }
+
+    @Test
+    fun `udp associate probe fails when proxy refuses it`() {
+        val server = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))
+        val port = server.localPort
+        val acceptor = Thread {
+            server.accept().use { sock ->
+                val input = sock.getInputStream(); val out = sock.getOutputStream()
+                input.read(ByteArray(3))
+                out.write(byteArrayOf(0x05, 0x00)); out.flush()
+                input.readNBytes(10)
+                // Reply: rep=0x07 command not supported
+                out.write(byteArrayOf(0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0)); out.flush()
+            }
+        }
+        acceptor.start()
+        val open = ProxyProber.probeUdpAssociate("127.0.0.1", port, 500, 500)
+        acceptor.join(2000)
+        server.close()
+        assertFalse(open)
+    }
+
     private fun withScriptedServer(
         handlers: List<(Socket) -> Unit>,
     ): ProxyProber.PortProbeResult {

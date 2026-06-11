@@ -86,7 +86,7 @@ object UrlSanitizer {
     private fun looksLikeIpLiteral(s: String): Boolean =
         s.matches(Regex("^[0-9.]+$")) || s.contains(':')
 
-    private fun isPublicAddress(s: String): Boolean {
+    internal fun isPublicAddress(s: String): Boolean {
         val addr = runCatching { InetAddress.getByName(s) }.getOrNull() ?: return false
         if (addr.isLoopbackAddress) return false
         if (addr.isAnyLocalAddress) return false

@@ -28,6 +28,22 @@ class NativeInterfaceProbeTest {
     }
 
     @Test
+    fun `parseIfAddrRow reads interface type from eighth column`() {
+        val row = "tun0|5|4163|inet|10.8.0.2|255.255.255.0|1500|65534"
+        val iface = NativeInterfaceProbe.parseIfAddrRow(row)
+        assertNotNull(iface)
+        assertEquals(65534, iface!!.ifaceType)
+    }
+
+    @Test
+    fun `parseIfAddrRow tolerates legacy seven-column rows`() {
+        val row = "wlan0|3|4163|inet|192.168.1.5|255.255.255.0|1500"
+        val iface = NativeInterfaceProbe.parseIfAddrRow(row)
+        assertNotNull(iface)
+        assertEquals(null, iface!!.ifaceType)
+    }
+
+    @Test
     fun `parseIfAddrRow handles empty address and mask`() {
         val row = "wlan0|3|65|AF_PACKET|||1500"
         val iface = NativeInterfaceProbe.parseIfAddrRow(row)
@@ -126,5 +142,18 @@ class NativeInterfaceProbeTest {
         val hooked = syms.first { it.symbol == "socket" }
         assertFalse(hooked.missing)
         assertEquals("/data/local/tmp/hook.so", hooked.library)
+    }
+
+    @Test
+    fun `parseNetlinkRoutes preserves prefix length for host routes`() {
+        val rows = arrayOf(
+            "route|family=2|dst=203.0.113.7/32|via=192.168.1.1|dev=wlan0|oif=5",
+            "route|family=2|dst=10.8.0.0/24|dev=tun0|oif=7",
+        )
+        val parsed = NativeInterfaceProbe.parseNetlinkRoutes(rows)
+        val hostRoute = parsed.first { it.destination == "203.0.113.7" }
+        assertEquals(32, hostRoute.prefixLen)
+        val subnet = parsed.first { it.destination == "10.8.0.0" }
+        assertEquals(24, subnet.prefixLen)
     }
 }

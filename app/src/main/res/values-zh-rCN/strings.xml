@@ -45,6 +45,10 @@
     <string name="settings_proxy_scan_desc">扫描 localhost 上开放的 SOCKS5/HTTP 代理端口。</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API 扫描</string>
     <string name="settings_xray_api_scan_desc">扫描 localhost 上暴露的 Xray gRPC API 端口。</string>
+    <string name="settings_clash_api_scan_title">扫描 Clash/sing-box REST API</string>
+    <string name="settings_clash_api_scan_desc">扫描 localhost 上暴露的 Clash/mihomo/sing-box REST API，该接口会泄露 VPN 服务器 IP。</string>
+    <string name="settings_proxy_auth_probe">探测本地代理身份验证</string>
+    <string name="settings_proxy_auth_probe_summary">测试设备上的代理是否存在弱凭据和 UDP 中继（仅 loopback）</string>
     <string name="settings_port_range">端口范围</string>
     <string name="settings_port_range_desc_scans">供已启用的本地代理和 Xray 扫描使用。</string>
     <string name="settings_port_popular">常用</string>
@@ -422,6 +426,7 @@
     <string name="checker_direct_not_detected">未发现</string>
     <string name="checker_direct_flag_is_vpn">在 capabilities 中发现了 IS_VPN 标记</string>
     <string name="checker_direct_vpn_transport_info">在 transport info 中发现了 VpnTransportInfo</string>
+    <string name="checker_direct_vpn_type">VPN 传输类型：%1$s</string>
     <string name="checker_direct_http_proxy">HTTP 代理</string>
     <string name="checker_direct_socks_proxy">SOCKS 代理</string>
     <string name="checker_direct_proxy_not_configured">%1$s：未配置</string>
@@ -492,6 +497,7 @@
     <string name="checker_bypass_progress_full_scan">完整扫描</string>
     <string name="checker_bypass_progress_port_detail">端口 %1$d（%2$d%%）</string>
     <string name="checker_bypass_progress_xray_detail">正在查找 localhost 上的 gRPC API&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">正在查找 localhost 上的 Clash/sing-box REST API&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">正在检查非 VPN 网络访问能力&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP 检查</string>
     <string name="checker_bypass_progress_ip_detail">正在获取直接 IP 和经代理的 IP&#8230;</string>
@@ -500,6 +506,8 @@
     <string name="checker_bypass_direct_ip">直接 IP：%1$s</string>
     <string name="checker_bypass_proxy_ip">经代理的 IP：%1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass：已确认（IP 不同）</string>
+    <string name="checker_bypass_proxy_weak_auth">本地 SOCKS5 代理 %1$s 接受弱凭据</string>
+    <string name="checker_bypass_proxy_udp_associate">本地 SOCKS5 代理 %1$s 允许无身份验证的 UDP ASSOCIATE</string>
     <string name="checker_bypass_split_disabled">Per-app split 已关闭：IP 相同</string>
     <string name="checker_bypass_auth_required">代理需要身份验证：绕过状态未确认</string>
     <string name="checker_bypass_mtproto_reachable">MTProto 代理：Telegram DC 可通过 %1$s -&gt; %2$s 访问</string>
@@ -512,6 +520,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService：%1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds 不可用；未暴露出站地址。</string>
     <string name="checker_bypass_xray_stats_sample">StatsService 计数器：%1$s</string>
+    <string name="checker_bypass_no_clash_api">Clash/sing-box REST API：未找到</string>
+    <string name="checker_bypass_clash_api">位于 %1$s 的 Clash/sing-box REST API</string>
+    <string name="checker_bypass_clash_leak">泄露的 VPN 服务器 IP：%1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="other">&#160;&#160;&#8230;还有 %1$d 个 outbound</item>
     </plurals>
@@ -589,6 +600,7 @@
     <string name="checker_native_interfaces_empty">getifaddrs() 未返回任何接口</string>
     <string name="checker_native_interfaces_summary">getifaddrs()：%1$d 个接口（%2$d 活动）</string>
     <string name="checker_native_vpn_interface">原生 VPN 接口：%1$s（索引 %2$d，MTU %3$d）</string>
+    <string name="checker_native_tuntap_type">接口 %1$s 具有 TUN/TAP 类型（ARPHRD_TUNTAP），与名称无关</string>
     <string name="checker_native_ipsec_interface">原生 IPsec 接口：%1$s（索引 %2$d）</string>
     <string name="checker_native_mismatch_missing_in_jvm">接口 %1$s：原生可见但 JVM 不可见</string>
     <string name="checker_native_mismatch_missing_in_native">接口 %1$s：JVM 可见但原生不可见</string>
@@ -616,6 +628,7 @@
     <string name="checker_native_root_selinux_absent">SELinux 强制执行状态不可访问</string>
     <string name="checker_native_root_uid">进程以 root UID 运行：%1$s</string>
     <string name="checker_native_root_magisk_prop">检测到 Magisk 属性：%1$s</string>
+    <string name="checker_native_host_route_leak">通过物理接口 %2$s 到 %1$s 的主机路由（VPN 服务器 IP 泄露）</string>
 
     <!-- App update checker -->
     <string name="update_dialog_title">有更新可用</string>

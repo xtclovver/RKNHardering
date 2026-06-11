@@ -12,7 +12,9 @@ object VerdictEngine {
 
     private val HARD_DETECT_BYPASS = setOf(
         EvidenceSource.SPLIT_TUNNEL_BYPASS,
+        EvidenceSource.PROXY_AUTH_BYPASS,
         EvidenceSource.XRAY_API,
+        EvidenceSource.CLASH_API,
         EvidenceSource.VPN_GATEWAY_LEAK,
         EvidenceSource.VPN_NETWORK_BINDING,
     )

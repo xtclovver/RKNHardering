@@ -27,6 +27,10 @@ internal class SettingsSplitTunnelFragment : Fragment(R.layout.fragment_settings
     private lateinit var switchProxyScan: MaterialSwitch
     private lateinit var cardXrayApiScan: MaterialCardView
     private lateinit var switchXrayApiScan: MaterialSwitch
+    private lateinit var cardClashApiScan: MaterialCardView
+    private lateinit var switchClashApiScan: MaterialSwitch
+    private lateinit var cardProxyAuthProbe: MaterialCardView
+    private lateinit var switchProxyAuthProbe: MaterialSwitch
     private lateinit var cardPortRange: MaterialCardView
     private lateinit var chipGroupPortRange: ChipGroup
     private lateinit var customPortRangeContainer: LinearLayout
@@ -50,6 +54,10 @@ internal class SettingsSplitTunnelFragment : Fragment(R.layout.fragment_settings
         switchProxyScan = view.findViewById(R.id.switchProxyScan)
         cardXrayApiScan = view.findViewById(R.id.cardXrayApiScan)
         switchXrayApiScan = view.findViewById(R.id.switchXrayApiScan)
+        cardClashApiScan = view.findViewById(R.id.cardClashApiScan)
+        switchClashApiScan = view.findViewById(R.id.switchClashApiScan)
+        cardProxyAuthProbe = view.findViewById(R.id.cardProxyAuthProbe)
+        switchProxyAuthProbe = view.findViewById(R.id.switchProxyAuthProbe)
         cardPortRange = view.findViewById(R.id.cardPortRange)
         chipGroupPortRange = view.findViewById(R.id.chipGroupPortRange)
         customPortRangeContainer = view.findViewById(R.id.customPortRangeContainer)
@@ -63,6 +71,8 @@ internal class SettingsSplitTunnelFragment : Fragment(R.layout.fragment_settings
         switchSplitTunnel.isChecked = prefs.getBoolean(SettingsPrefs.PREF_SPLIT_TUNNEL_ENABLED, true)
         switchProxyScan.isChecked = prefs.getBoolean(SettingsPrefs.PREF_PROXY_SCAN_ENABLED, true)
         switchXrayApiScan.isChecked = prefs.getBoolean(SettingsPrefs.PREF_XRAY_API_SCAN_ENABLED, true)
+        switchClashApiScan.isChecked = prefs.getBoolean(SettingsPrefs.PREF_CLASH_API_SCAN_ENABLED, true)
+        switchProxyAuthProbe.isChecked = prefs.getBoolean(SettingsPrefs.PREF_PROXY_AUTH_PROBE_ENABLED, false)
 
         updateLocalScanTogglesEnabled(switchSplitTunnel.isChecked)
         updateTunProbeModeEnabled(switchSplitTunnel.isChecked)
@@ -105,6 +115,14 @@ internal class SettingsSplitTunnelFragment : Fragment(R.layout.fragment_settings
             updatePortRangePreview()
         }
 
+        switchClashApiScan.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(SettingsPrefs.PREF_CLASH_API_SCAN_ENABLED, isChecked) }
+        }
+
+        switchProxyAuthProbe.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(SettingsPrefs.PREF_PROXY_AUTH_PROBE_ENABLED, isChecked) }
+        }
+
         chipGroupPortRange.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val value = when (checkedIds.first()) {
@@ -141,6 +159,10 @@ internal class SettingsSplitTunnelFragment : Fragment(R.layout.fragment_settings
         setViewAndChildrenEnabled(cardProxyScan, enabled)
         cardXrayApiScan.alpha = if (enabled) 1.0f else 0.5f
         setViewAndChildrenEnabled(cardXrayApiScan, enabled)
+        cardClashApiScan.alpha = if (enabled) 1.0f else 0.5f
+        setViewAndChildrenEnabled(cardClashApiScan, enabled)
+        cardProxyAuthProbe.alpha = if (enabled) 1.0f else 0.5f
+        setViewAndChildrenEnabled(cardProxyAuthProbe, enabled)
     }
 
     private fun updateTunProbeModeEnabled(enabled: Boolean) {

@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.model
 import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.TunProbeDiagnostics
+import com.notcvnt.rknhardering.probe.ClashApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 
 data class GeoIpFacts(
@@ -59,7 +60,9 @@ enum class EvidenceSource {
     ACTIVE_VPN,
     LOCAL_PROXY,
     XRAY_API,
+    CLASH_API,
     SPLIT_TUNNEL_BYPASS,
+    PROXY_AUTH_BYPASS,
     NETWORK_INTERFACE,
     ROUTING,
     DNS,
@@ -290,6 +293,7 @@ data class BypassResult(
     val vpnNetworkIp: String? = null,
     val underlyingIp: String? = null,
     val xrayApiScanResult: XrayApiScanResult?,
+    val clashApiScanResult: ClashApiScanResult? = null,
     val proxyChecks: List<LocalProxyCheckResult> = emptyList(),
     val findings: List<Finding>,
     val detected: Boolean,

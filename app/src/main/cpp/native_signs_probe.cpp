@@ -126,6 +126,8 @@ jobjectArray toStringArray(JNIEnv *env, const std::vector<std::string> &items) {
     return arr;
 }
 
+int readIntFromSysfs(const std::string &path, int fallback);
+
 jobjectArray nativeGetIfAddrs(JNIEnv *env, jclass /*clazz*/) {
     std::vector<std::string> rows;
     struct ifaddrs *head = nullptr;
@@ -158,6 +160,9 @@ jobjectArray nativeGetIfAddrs(JNIEnv *env, jclass /*clazz*/) {
         row.append(netmask);
         row.push_back('|');
         row.append(std::to_string(mtu));
+        row.push_back('|');
+        int iface_type = readIntFromSysfs("/sys/class/net/" + std::string(name) + "/type", -1);
+        row.append(std::to_string(iface_type));
         rows.push_back(row);
     }
 

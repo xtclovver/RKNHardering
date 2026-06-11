@@ -21,6 +21,8 @@ data class ProxyEndpoint(
     val port: Int,
     val type: ProxyType,
     val authRequired: Boolean = false,
+    val weakAuthCracked: Boolean = false,
+    val udpAssociateOpen: Boolean = false,
 )
 
 data class ScanProgress(

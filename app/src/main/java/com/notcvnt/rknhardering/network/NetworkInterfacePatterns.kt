@@ -6,9 +6,16 @@ object NetworkInterfacePatterns {
         Regex("^tap\\d+"),
         Regex("^wg\\d+"),
         Regex("^ppp\\d+"),
+        Regex("^utun\\d*"),
+        Regex("^zt.*"),
+        Regex("^tailscale\\d*"),
+        Regex("^svpn\\d*"),
+        Regex("^gre\\d+"),
+        Regex("^l2tp\\d+"),
+        Regex("^he-ipv6.*"),
     )
 
-    val IPSEC_INTERFACE_PATTERN: Regex = Regex("^ipsec.*")
+    val IPSEC_INTERFACE_PATTERN: Regex = Regex("^(ipsec|xfrm).*")
 
     val STANDARD_INTERFACES: List<Regex> = listOf(
         Regex("^wlan.*"),

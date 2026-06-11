@@ -21,9 +21,30 @@ class ProxyScanner(
     private val readTimeoutMs: Int = 120,
     private val maxConcurrency: Int = 200,
     private val progressUpdateEvery: Int = 256,
+    private val authProbeEnabled: Boolean = false,
     private val probePort: suspend (String, Int, Int, Int) -> ProxyProber.ProbeResult? =
         { host, port, connectTimeout, readTimeout ->
             ProxyProber.probeProxyType(
+                host = host,
+                port = port,
+                connectTimeoutMs = connectTimeout,
+                readTimeoutMs = readTimeout,
+            )
+        },
+    private val probeSocks5Auth: suspend (String, Int, Int, Int, String, String) -> Boolean =
+        { host, port, connectTimeout, readTimeout, user, pass ->
+            ProxyProber.probeSocks5Auth(
+                host = host,
+                port = port,
+                connectTimeoutMs = connectTimeout,
+                readTimeoutMs = readTimeout,
+                username = user,
+                password = pass,
+            )
+        },
+    private val probeUdpAssociate: suspend (String, Int, Int, Int) -> Boolean =
+        { host, port, connectTimeout, readTimeout ->
+            ProxyProber.probeUdpAssociate(
                 host = host,
                 port = port,
                 connectTimeoutMs = connectTimeout,
@@ -161,8 +182,35 @@ class ProxyScanner(
             val result = probePort(host, port, connectTimeoutMs, readTimeoutMs) ?: continue
             if (preferredType != null && result.type != preferredType) continue
 
-            return@withContext ProxyEndpoint(host, port, result.type, result.authRequired)
+            val base = ProxyEndpoint(host, port, result.type, result.authRequired)
+            return@withContext maybeProbeAuth(base)
         }
         null
+    }
+
+    // Opt-in, strictly loopback offensive probes: weak-credential brute and
+    // UDP ASSOCIATE bypass against an on-device SOCKS5 proxy. The loopback
+    // guard is defence-in-depth on top of the loopback-only host list.
+    private suspend fun maybeProbeAuth(endpoint: ProxyEndpoint): ProxyEndpoint {
+        if (!authProbeEnabled) return endpoint
+        if (endpoint.type != ProxyType.SOCKS5) return endpoint
+        if (!isLoopback(endpoint.host)) return endpoint
+
+        var weakAuthCracked = false
+        if (endpoint.authRequired) {
+            for ((user, pass) in ProxyProber.WEAK_CREDENTIALS) {
+                if (probeSocks5Auth(endpoint.host, endpoint.port, connectTimeoutMs, readTimeoutMs, user, pass)) {
+                    weakAuthCracked = true
+                    break
+                }
+            }
+        }
+        val udpAssociateOpen = probeUdpAssociate(endpoint.host, endpoint.port, connectTimeoutMs, readTimeoutMs)
+        return endpoint.copy(weakAuthCracked = weakAuthCracked, udpAssociateOpen = udpAssociateOpen)
+    }
+
+    private fun isLoopback(host: String): Boolean {
+        val normalized = host.substringBefore('%').lowercase()
+        return normalized == "::1" || normalized == "0:0:0:0:0:0:0:1" || normalized.startsWith("127.")
     }
 }

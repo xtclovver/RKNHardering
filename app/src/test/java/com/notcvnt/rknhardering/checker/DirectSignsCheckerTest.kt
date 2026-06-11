@@ -509,6 +509,17 @@ class DirectSignsCheckerTest {
     }
 
     @Test
+    fun `maps vpn transport info type constants to labels`() {
+        assertEquals("SERVICE", DirectSignsChecker.vpnTypeLabel(1))
+        assertEquals("PLATFORM", DirectSignsChecker.vpnTypeLabel(2))
+        assertEquals("LEGACY", DirectSignsChecker.vpnTypeLabel(3))
+        assertEquals("OEM", DirectSignsChecker.vpnTypeLabel(4))
+        assertEquals(null, DirectSignsChecker.vpnTypeLabel(-1))
+        assertEquals(null, DirectSignsChecker.vpnTypeLabel(0))
+        assertEquals(null, DirectSignsChecker.vpnTypeLabel(99))
+    }
+
+    @Test
     fun `when checkVpnService=false then no vpn service finding is produced`() {
         // checkVpnService controls the InstalledVpnAppDetector path which produces
         // matchedApps entries and related evidence. In Robolectric's empty package

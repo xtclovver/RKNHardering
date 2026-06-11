@@ -4,6 +4,8 @@ internal object SettingsPrefs {
     const val PREF_SPLIT_TUNNEL_ENABLED = "pref_split_tunnel_enabled"
     const val PREF_PROXY_SCAN_ENABLED = "pref_proxy_scan_enabled"
     const val PREF_XRAY_API_SCAN_ENABLED = "pref_xray_api_scan_enabled"
+    const val PREF_CLASH_API_SCAN_ENABLED = "pref_clash_api_scan_enabled"
+    const val PREF_PROXY_AUTH_PROBE_ENABLED = "pref_proxy_auth_probe_enabled"
     const val PREF_PORT_RANGE = "pref_port_range"
     const val PREF_PORT_RANGE_START = "pref_port_range_start"
     const val PREF_PORT_RANGE_END = "pref_port_range_end"

@@ -30,6 +30,8 @@ import com.notcvnt.rknhardering.probe.ProxyType
 import com.notcvnt.rknhardering.probe.ScanMode
 import com.notcvnt.rknhardering.probe.ScanPhase
 import com.notcvnt.rknhardering.probe.TunProbeResolveStrategy
+import com.notcvnt.rknhardering.probe.ClashApiScanResult
+import com.notcvnt.rknhardering.probe.ClashApiScanner
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
@@ -76,6 +78,7 @@ object BypassChecker {
     enum class ProgressLine {
         BYPASS,
         XRAY_API,
+        CLASH_API,
         UNDERLYING_NETWORK,
     }
 
@@ -97,7 +100,9 @@ object BypassChecker {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         splitTunnelEnabled: Boolean = true,
         proxyScanEnabled: Boolean = true,
+        proxyAuthProbeEnabled: Boolean = false,
         xrayApiScanEnabled: Boolean = true,
+        clashApiScanEnabled: Boolean = true,
         portRange: String = "full",
         portRangeStart: Int = 1024,
         portRangeEnd: Int = 65535,
@@ -128,6 +133,7 @@ object BypassChecker {
                 popularPorts = it.popularPorts,
                 scanRange = it.scanRange,
                 connectTimeoutMs = effectiveConnectTimeoutMs,
+                authProbeEnabled = proxyAuthProbeEnabled,
             )
         }
         val xrayScanner = scanPlan?.let {
@@ -151,6 +157,12 @@ object BypassChecker {
 
         val xrayDeferred = if (splitTunnelEnabled && xrayApiScanEnabled && xrayScanner != null) {
             startXrayScanAsync(context, xrayScanner, onProgress)
+        } else {
+            null
+        }
+
+        val clashDeferred = if (splitTunnelEnabled && clashApiScanEnabled) {
+            startClashScanAsync(context, ClashApiScanner(), onProgress)
         } else {
             null
         }
@@ -187,6 +199,7 @@ object BypassChecker {
             null
         }
         val xrayApiScanResult = xrayDeferred?.await()
+        val clashApiScanResult = clashDeferred?.await()
         val underlyingResult = underlyingDeferred?.await() ?: UnderlyingNetworkProber.ProbeResult(
             vpnActive = false,
             underlyingReachable = false,
@@ -196,13 +209,21 @@ object BypassChecker {
         if (splitTunnelEnabled && xrayApiScanEnabled) {
             reportXrayApiResult(context, xrayApiScanResult, findings, evidence)
         }
+        val clashApiDetected = if (splitTunnelEnabled && clashApiScanEnabled) {
+            reportClashApiResult(context, clashApiScanResult, findings, evidence)
+        } else {
+            false
+        }
         val underlyingEvaluation = if (splitTunnelEnabled && checkUnderlyingNetwork && checkVpnNetworkBinding) {
             reportUnderlyingNetworkResult(context, underlyingResult, findings, evidence)
         } else {
             UnderlyingEvaluation(detected = false, needsReview = false)
         }
 
-        val detected = proxyEvaluation.confirmedBypass || xrayApiScanResult != null || underlyingEvaluation.detected
+        val detected = proxyEvaluation.confirmedBypass ||
+            xrayApiScanResult != null ||
+            clashApiDetected ||
+            underlyingEvaluation.detected
         val needsReview = !detected && (
             proxyChecksNeedReview(proxyEvaluation.proxyChecks) ||
                 underlyingEvaluation.needsReview
@@ -216,6 +237,7 @@ object BypassChecker {
             vpnNetworkIp = underlyingResult.vpnIp,
             underlyingIp = underlyingResult.underlyingIp,
             xrayApiScanResult = xrayApiScanResult,
+            clashApiScanResult = clashApiScanResult,
             proxyChecks = proxyEvaluation.proxyChecks,
             findings = findings,
             detected = detected,
@@ -301,6 +323,30 @@ object BypassChecker {
                     line = ProgressLine.XRAY_API,
                     phase = "Xray API",
                     detail = "${progress.host}:${progress.currentPort} ($percent%)",
+                ),
+            )
+        }
+    }
+
+    private fun CoroutineScope.startClashScanAsync(
+        context: Context,
+        clashScanner: ClashApiScanner,
+        onProgress: (suspend (Progress) -> Unit)?,
+    ): Deferred<ClashApiScanResult?> = async {
+        onProgress?.invoke(
+            Progress(
+                line = ProgressLine.CLASH_API,
+                phase = "Clash API",
+                detail = context.getString(R.string.checker_bypass_progress_clash_detail),
+            ),
+        )
+        clashScanner.findClashApi { scanned, total ->
+            val percent = if (total > 0) (scanned * 100 / total) else 0
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.CLASH_API,
+                    phase = "Clash API",
+                    detail = "$percent%",
                 ),
             )
         }
@@ -447,7 +493,9 @@ object BypassChecker {
             summaryProxyIp = summaryCheck?.proxyIp,
             proxyChecks = proxyChecks,
             confirmedBypass = proxyChecks.any {
-                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS
+                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS ||
+                    it.endpoint.weakAuthCracked ||
+                    it.endpoint.udpAssociateOpen
             },
         )
     }
@@ -536,6 +584,40 @@ object BypassChecker {
                         append(formatOwnerSuffix(context, proxyCheck.owner, proxyCheck.ownerStatus))
                         append(ownerMetadataSuffix)
                     },
+                    family = familySuffix,
+                    packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
+                ),
+            )
+        }
+
+        if (proxyEndpoint.weakAuthCracked || proxyEndpoint.udpAssociateOpen) {
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.PROXY_AUTH_BYPASS,
+                    detected = true,
+                    confidence = EvidenceConfidence.HIGH,
+                    description = if (proxyEndpoint.weakAuthCracked) {
+                        "SOCKS5 proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)} accepts weak credentials"
+                    } else {
+                        "SOCKS5 proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)} allows UDP ASSOCIATE without auth"
+                    },
+                    family = familySuffix,
+                    packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
+                ),
+            )
+            findings.add(
+                Finding(
+                    description = context.getString(
+                        if (proxyEndpoint.weakAuthCracked) {
+                            R.string.checker_bypass_proxy_weak_auth
+                        } else {
+                            R.string.checker_bypass_proxy_udp_associate
+                        },
+                        formatHostPort(proxyEndpoint.host, proxyEndpoint.port),
+                    ),
+                    detected = true,
+                    source = EvidenceSource.PROXY_AUTH_BYPASS,
+                    confidence = EvidenceConfidence.HIGH,
                     family = familySuffix,
                     packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
                 ),
@@ -693,6 +775,62 @@ object BypassChecker {
                 ),
             )
         }
+    }
+
+    /**
+     * Emits findings/evidence for a discovered Clash/mihomo/sing-box REST API.
+     * Returns true when a live API was detected (config reachable or destination
+     * IPs leaked), which feeds R1 hard-detect via [EvidenceSource.CLASH_API].
+     */
+    private fun reportClashApiResult(
+        context: Context,
+        clashApiScanResult: ClashApiScanResult?,
+        findings: MutableList<Finding>,
+        evidence: MutableList<EvidenceItem>,
+    ): Boolean {
+        if (clashApiScanResult == null ||
+            (!clashApiScanResult.configAvailable && clashApiScanResult.leakedDestIps.isEmpty())
+        ) {
+            findings.add(Finding(context.getString(R.string.checker_bypass_no_clash_api)))
+            return false
+        }
+
+        val ep = clashApiScanResult.endpoint
+        findings.add(
+            Finding(
+                description = context.getString(
+                    R.string.checker_bypass_clash_api,
+                    formatHostPort(ep.host, ep.port),
+                ),
+                detected = true,
+                source = EvidenceSource.CLASH_API,
+                confidence = EvidenceConfidence.HIGH,
+                family = VpnAppCatalog.FAMILY_CLASH,
+            ),
+        )
+        evidence.add(
+            EvidenceItem(
+                source = EvidenceSource.CLASH_API,
+                detected = true,
+                confidence = EvidenceConfidence.HIGH,
+                description = "Detected Clash/sing-box REST API at ${formatHostPort(ep.host, ep.port)}",
+                family = VpnAppCatalog.FAMILY_CLASH,
+            ),
+        )
+
+        for (ip in clashApiScanResult.leakedDestIps.distinct().take(10)) {
+            findings.add(
+                Finding(
+                    description = context.getString(R.string.checker_bypass_clash_leak, ip),
+                    detected = true,
+                    source = EvidenceSource.CLASH_API,
+                    confidence = EvidenceConfidence.HIGH,
+                    family = VpnAppCatalog.FAMILY_CLASH,
+                ),
+            )
+        }
+
+        return true
     }
 
     internal fun reportUnderlyingNetworkResult(

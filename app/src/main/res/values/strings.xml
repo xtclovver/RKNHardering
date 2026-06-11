@@ -44,6 +44,10 @@
     <string name="settings_proxy_scan_desc">Scans localhost for open SOCKS5/HTTP proxy ports.</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API scan</string>
     <string name="settings_xray_api_scan_desc">Scans localhost for exposed Xray gRPC API ports.</string>
+    <string name="settings_clash_api_scan_title">Clash/sing-box REST API scan</string>
+    <string name="settings_clash_api_scan_desc">Scans localhost for an exposed Clash/mihomo/sing-box REST API that leaks VPN server IPs.</string>
+    <string name="settings_proxy_auth_probe">Probe local proxy authentication</string>
+    <string name="settings_proxy_auth_probe_summary">Test on-device proxies for weak credentials and UDP relay (loopback only)</string>
     <string name="settings_port_range">Port range</string>
     <string name="settings_port_range_desc_scans">Used by enabled localhost proxy and Xray scans.</string>
     <string name="settings_port_popular">Popular</string>
@@ -407,6 +411,7 @@
     <string name="checker_direct_not_detected">not detected</string>
     <string name="checker_direct_flag_is_vpn">IS_VPN flag found in capabilities</string>
     <string name="checker_direct_vpn_transport_info">VpnTransportInfo found in transport info</string>
+    <string name="checker_direct_vpn_type">VPN transport type: %1$s</string>
     <string name="checker_direct_http_proxy">HTTP proxy</string>
     <string name="checker_direct_socks_proxy">SOCKS proxy</string>
     <string name="checker_direct_proxy_not_configured">%1$s: not configured</string>
@@ -478,6 +483,7 @@
     <string name="checker_bypass_progress_full_scan">Full scan</string>
     <string name="checker_bypass_progress_port_detail">Port %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">Looking for a gRPC API on localhost&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">Looking for a Clash/sing-box REST API on localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">Checking access to the non-VPN network&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP check</string>
     <string name="checker_bypass_progress_ip_detail">Obtaining the direct IP and the IP via proxy&#8230;</string>
@@ -486,6 +492,8 @@
     <string name="checker_bypass_direct_ip">Direct IP: %1$s</string>
     <string name="checker_bypass_proxy_ip">IP via proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: confirmed (IPs differ)</string>
+    <string name="checker_bypass_proxy_weak_auth">Local SOCKS5 proxy %1$s accepts weak credentials</string>
+    <string name="checker_bypass_proxy_udp_associate">Local SOCKS5 proxy %1$s allows UDP ASSOCIATE without auth</string>
     <string name="checker_bypass_split_disabled">Per-app split is disabled: IPs match</string>
     <string name="checker_bypass_auth_required">Proxy requires authentication: bypass status unconfirmed</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC is reachable via %1$s -&gt; %2$s</string>
@@ -498,6 +506,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds is unavailable; outbound addresses were not exposed.</string>
     <string name="checker_bypass_xray_stats_sample">StatsService counters: %1$s</string>
+    <string name="checker_bypass_no_clash_api">Clash/sing-box REST API: not found</string>
+    <string name="checker_bypass_clash_api">Clash/sing-box REST API at %1$s</string>
+    <string name="checker_bypass_clash_leak">Leaked VPN server IP: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;%1$d more outbound</item>
         <item quantity="other">&#160;&#160;&#8230;%1$d more outbounds</item>
@@ -617,6 +628,7 @@
     <string name="checker_native_interfaces_empty">getifaddrs() returned no interfaces</string>
     <string name="checker_native_interfaces_summary">getifaddrs(): %1$d interfaces (%2$d up)</string>
     <string name="checker_native_vpn_interface">Native VPN-like interface: %1$s (index %2$d, MTU %3$d)</string>
+    <string name="checker_native_tuntap_type">Interface %1$s has TUN/TAP type (ARPHRD_TUNTAP) regardless of name</string>
     <string name="checker_native_ipsec_interface">Native IPsec-like interface: %1$s (index %2$d)</string>
     <string name="checker_native_mismatch_missing_in_jvm">Interface %1$s: visible in native but missing in JVM</string>
     <string name="checker_native_mismatch_missing_in_native">Interface %1$s: visible in JVM but missing in native</string>
@@ -644,6 +656,7 @@
     <string name="checker_native_root_selinux_absent">SELinux enforcement status is not accessible</string>
     <string name="checker_native_root_uid">Process is running with root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Magisk property detected: %1$s</string>
+    <string name="checker_native_host_route_leak">Host route to %1$s via physical interface %2$s (VPN server IP leak)</string>
 
     <!-- App update checker -->
     <string name="update_dialog_title">Update available</string>
