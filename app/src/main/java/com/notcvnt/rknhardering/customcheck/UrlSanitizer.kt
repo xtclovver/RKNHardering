@@ -21,6 +21,11 @@ object UrlSanitizer {
     private const val MAX_URL_LEN = 512
     private const val MAX_HOST_LEN = 253
 
+    private const val IP_PLACEHOLDER = "{ip}"
+    // Public, routable literal used only to validate a placeholder URL. Must pass
+    // isPublicAddress (TEST-NET ranges like 203.0.113.x are rejected there).
+    private const val IP_PLACEHOLDER_PROBE = "8.8.8.8"
+
     private val DISALLOWED_HOST_SUFFIXES = listOf(".local", ".localhost", ".internal", ".lan", ".home")
     private val DISALLOWED_HOST_EXACT = setOf("localhost", "broadcasthost")
 
@@ -31,6 +36,20 @@ object UrlSanitizer {
         if (scheme != "https") return ""
         val host = uri.host ?: return ""
         if (!isPublicHost(host)) return ""
+        return raw
+    }
+
+    // GeoIP custom providers may embed the documented "{ip}" placeholder in the
+    // URL (see GeoIpChecker.fetchCustomProvider). The raw "{" / "}" are illegal in
+    // a java.net.URI, so the generic sanitizeHttpsUrl drops such URLs. This variant
+    // validates a copy with "{ip}" replaced by a public IP literal and returns the
+    // ORIGINAL string (placeholder intact) when that copy passes. Only the GeoIP
+    // provider path substitutes "{ip}" at fetch time; do not use this for endpoints
+    // that send the URL verbatim.
+    fun sanitizeGeoIpProviderUrl(raw: String): String {
+        if (raw.isBlank() || raw.length > MAX_URL_LEN) return ""
+        val probe = raw.replace(IP_PLACEHOLDER, IP_PLACEHOLDER_PROBE)
+        if (sanitizeHttpsUrl(probe).isEmpty()) return ""
         return raw
     }
 

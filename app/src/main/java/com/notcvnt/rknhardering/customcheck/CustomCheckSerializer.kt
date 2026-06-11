@@ -394,7 +394,7 @@ object CustomCheckSerializer {
             val arr = obj.getJSONArray("custom_providers")
             for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
-                val sanitizedUrl = UrlSanitizer.sanitizeHttpsUrl(e.optString("url", ""))
+                val sanitizedUrl = UrlSanitizer.sanitizeGeoIpProviderUrl(e.optString("url", ""))
                 if (sanitizedUrl.isEmpty()) continue
                 customProviders.add(
                     CustomGeoIpProvider(

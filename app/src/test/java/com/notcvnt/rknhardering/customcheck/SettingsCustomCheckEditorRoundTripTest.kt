@@ -62,10 +62,9 @@ class SettingsCustomCheckEditorRoundTripTest {
                         "iplookup.it" to true,
                         "ipbot.com" to true,
                     ),
-                    // Note: a {ip}-placeholder URL would be silently dropped by
-                    // UrlSanitizer on reload (pre-existing bug, tracked separately).
                     customProviders = listOf(
                         CustomGeoIpProvider(name = "p1", url = "https://geo.example/?q="),
+                        CustomGeoIpProvider(name = "p2", url = "https://geo.example/{ip}"),
                     ),
                 ),
                 ipComparison = IpComparisonConfig(

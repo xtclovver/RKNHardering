@@ -86,6 +86,26 @@ class CustomCheckSerializerTest {
     }
 
     @Test
+    fun `roundtrip preserves custom geoip provider with ip placeholder`() {
+        val provider = CustomGeoIpProvider(
+            name = "MyAPI",
+            url = "https://example.com/geoip/{ip}?format=json",
+            enabled = true,
+            responseMapping = ResponseMapping(responseType = ResponseType.JSON, ipPath = "$.ip"),
+        )
+        val profile = defaultProfile().copy(
+            checksConfig = ChecksConfig(geoIp = GeoIpConfig(customProviders = listOf(provider)))
+        )
+        val restored = CustomCheckSerializer.deserialize(CustomCheckSerializer.serialize(profile))
+
+        assertEquals(1, restored.checksConfig.geoIp.customProviders.size)
+        assertEquals(
+            "https://example.com/geoip/{ip}?format=json",
+            restored.checksConfig.geoIp.customProviders.first().url,
+        )
+    }
+
+    @Test
     fun `roundtrip preserves custom ip endpoints`() {
         val endpoint = CustomIpEndpoint(
             label = "My Checker",
