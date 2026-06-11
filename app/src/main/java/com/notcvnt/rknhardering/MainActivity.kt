@@ -751,6 +751,7 @@ class MainActivity : AppCompatActivity() {
     private fun runCheck() {
         val splitTunnelEnabled = prefs.getBoolean(SettingsActivity.PREF_SPLIT_TUNNEL_ENABLED, true)
         val proxyScanEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_SCAN_ENABLED, true)
+        val proxyAuthProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_AUTH_PROBE_ENABLED, false)
         val xrayApiScanEnabled = prefs.getBoolean(SettingsActivity.PREF_XRAY_API_SCAN_ENABLED, true)
         val networkRequestsEnabled = prefs.getBoolean(SettingsActivity.PREF_NETWORK_REQUESTS_ENABLED, true)
         val callTransportProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
@@ -780,6 +781,7 @@ class MainActivity : AppCompatActivity() {
         val baseSettings = CheckSettings(
             splitTunnelEnabled = splitTunnelEnabled,
             proxyScanEnabled = proxyScanEnabled,
+            proxyAuthProbeEnabled = proxyAuthProbeEnabled,
             xrayApiScanEnabled = xrayApiScanEnabled,
             networkRequestsEnabled = networkRequestsEnabled,
             callTransportProbeEnabled = callTransportProbeEnabled,

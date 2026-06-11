@@ -60,6 +60,7 @@ enum class EvidenceSource {
     LOCAL_PROXY,
     XRAY_API,
     SPLIT_TUNNEL_BYPASS,
+    PROXY_AUTH_BYPASS,
     NETWORK_INTERFACE,
     ROUTING,
     DNS,

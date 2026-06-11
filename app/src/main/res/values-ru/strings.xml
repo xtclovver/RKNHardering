@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">Проверяет localhost на открытые SOCKS5/HTTP proxy-порты.</string>
     <string name="settings_xray_api_scan_title">Скан Xray gRPC API</string>
     <string name="settings_xray_api_scan_desc">Проверяет localhost на открытые порты Xray gRPC API.</string>
+    <string name="settings_proxy_auth_probe">Проверка авторизации локальных прокси</string>
+    <string name="settings_proxy_auth_probe_summary">Тестирует прокси на устройстве на слабые учётные данные и UDP-ретрансляцию (только loopback)</string>
     <string name="settings_port_range">Диапазон портов</string>
     <string name="settings_port_range_desc_scans">Используется для включённых localhost-сканов proxy и Xray.</string>
     <string name="settings_port_popular">Популярные</string>
@@ -489,6 +491,8 @@
     <string name="checker_bypass_direct_ip">Прямой IP: %1$s</string>
     <string name="checker_bypass_proxy_ip">IP через прокси: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: подтвержден (IP отличаются)</string>
+    <string name="checker_bypass_proxy_weak_auth">Локальный SOCKS5-прокси %1$s принимает слабые учётные данные</string>
+    <string name="checker_bypass_proxy_udp_associate">Локальный SOCKS5-прокси %1$s разрешает UDP ASSOCIATE без авторизации</string>
     <string name="checker_bypass_split_disabled">Per-app split отключен: IP совпадают</string>
     <string name="checker_bypass_auth_required">Прокси требует аутентификацию: обход не подтверждён</string>
     <string name="checker_bypass_mtproto_reachable">MTProto-прокси: Telegram DC доступен через %1$s -> %2$s</string>

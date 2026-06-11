@@ -44,6 +44,8 @@
     <string name="settings_proxy_scan_desc">Scans localhost for open SOCKS5/HTTP proxy ports.</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API scan</string>
     <string name="settings_xray_api_scan_desc">Scans localhost for exposed Xray gRPC API ports.</string>
+    <string name="settings_proxy_auth_probe">Probe local proxy authentication</string>
+    <string name="settings_proxy_auth_probe_summary">Test on-device proxies for weak credentials and UDP relay (loopback only)</string>
     <string name="settings_port_range">Port range</string>
     <string name="settings_port_range_desc_scans">Used by enabled localhost proxy and Xray scans.</string>
     <string name="settings_port_popular">Popular</string>
@@ -487,6 +489,8 @@
     <string name="checker_bypass_direct_ip">Direct IP: %1$s</string>
     <string name="checker_bypass_proxy_ip">IP via proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: confirmed (IPs differ)</string>
+    <string name="checker_bypass_proxy_weak_auth">Local SOCKS5 proxy %1$s accepts weak credentials</string>
+    <string name="checker_bypass_proxy_udp_associate">Local SOCKS5 proxy %1$s allows UDP ASSOCIATE without auth</string>
     <string name="checker_bypass_split_disabled">Per-app split is disabled: IPs match</string>
     <string name="checker_bypass_auth_required">Proxy requires authentication: bypass status unconfirmed</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC is reachable via %1$s -&gt; %2$s</string>

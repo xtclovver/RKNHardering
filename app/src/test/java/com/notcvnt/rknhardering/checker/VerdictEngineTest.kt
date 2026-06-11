@@ -431,6 +431,22 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `proxy auth bypass override returns detected`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(
+                evidence = listOf(evidence(EvidenceSource.PROXY_AUTH_BYPASS, EvidenceConfidence.HIGH)),
+            ),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
     fun `vpn gateway leak override returns detected`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),

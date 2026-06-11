@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">扫描 localhost 上开放的 SOCKS5/HTTP 代理端口。</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API 扫描</string>
     <string name="settings_xray_api_scan_desc">扫描 localhost 上暴露的 Xray gRPC API 端口。</string>
+    <string name="settings_proxy_auth_probe">探测本地代理身份验证</string>
+    <string name="settings_proxy_auth_probe_summary">测试设备上的代理是否存在弱凭据和 UDP 中继（仅 loopback）</string>
     <string name="settings_port_range">端口范围</string>
     <string name="settings_port_range_desc_scans">供已启用的本地代理和 Xray 扫描使用。</string>
     <string name="settings_port_popular">常用</string>
@@ -501,6 +503,8 @@
     <string name="checker_bypass_direct_ip">直接 IP：%1$s</string>
     <string name="checker_bypass_proxy_ip">经代理的 IP：%1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass：已确认（IP 不同）</string>
+    <string name="checker_bypass_proxy_weak_auth">本地 SOCKS5 代理 %1$s 接受弱凭据</string>
+    <string name="checker_bypass_proxy_udp_associate">本地 SOCKS5 代理 %1$s 允许无身份验证的 UDP ASSOCIATE</string>
     <string name="checker_bypass_split_disabled">Per-app split 已关闭：IP 相同</string>
     <string name="checker_bypass_auth_required">代理需要身份验证：绕过状态未确认</string>
     <string name="checker_bypass_mtproto_reachable">MTProto 代理：Telegram DC 可通过 %1$s -&gt; %2$s 访问</string>

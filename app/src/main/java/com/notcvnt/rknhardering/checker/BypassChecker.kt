@@ -97,6 +97,7 @@ object BypassChecker {
         resolverConfig: DnsResolverConfig = DnsResolverConfig.system(),
         splitTunnelEnabled: Boolean = true,
         proxyScanEnabled: Boolean = true,
+        proxyAuthProbeEnabled: Boolean = false,
         xrayApiScanEnabled: Boolean = true,
         portRange: String = "full",
         portRangeStart: Int = 1024,
@@ -128,6 +129,7 @@ object BypassChecker {
                 popularPorts = it.popularPorts,
                 scanRange = it.scanRange,
                 connectTimeoutMs = effectiveConnectTimeoutMs,
+                authProbeEnabled = proxyAuthProbeEnabled,
             )
         }
         val xrayScanner = scanPlan?.let {
@@ -447,7 +449,9 @@ object BypassChecker {
             summaryProxyIp = summaryCheck?.proxyIp,
             proxyChecks = proxyChecks,
             confirmedBypass = proxyChecks.any {
-                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS
+                it.status == LocalProxyCheckStatus.CONFIRMED_BYPASS ||
+                    it.endpoint.weakAuthCracked ||
+                    it.endpoint.udpAssociateOpen
             },
         )
     }
@@ -536,6 +540,40 @@ object BypassChecker {
                         append(formatOwnerSuffix(context, proxyCheck.owner, proxyCheck.ownerStatus))
                         append(ownerMetadataSuffix)
                     },
+                    family = familySuffix,
+                    packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
+                ),
+            )
+        }
+
+        if (proxyEndpoint.weakAuthCracked || proxyEndpoint.udpAssociateOpen) {
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.PROXY_AUTH_BYPASS,
+                    detected = true,
+                    confidence = EvidenceConfidence.HIGH,
+                    description = if (proxyEndpoint.weakAuthCracked) {
+                        "SOCKS5 proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)} accepts weak credentials"
+                    } else {
+                        "SOCKS5 proxy at ${formatHostPort(proxyEndpoint.host, proxyEndpoint.port)} allows UDP ASSOCIATE without auth"
+                    },
+                    family = familySuffix,
+                    packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
+                ),
+            )
+            findings.add(
+                Finding(
+                    description = context.getString(
+                        if (proxyEndpoint.weakAuthCracked) {
+                            R.string.checker_bypass_proxy_weak_auth
+                        } else {
+                            R.string.checker_bypass_proxy_udp_associate
+                        },
+                        formatHostPort(proxyEndpoint.host, proxyEndpoint.port),
+                    ),
+                    detected = true,
+                    source = EvidenceSource.PROXY_AUTH_BYPASS,
+                    confidence = EvidenceConfidence.HIGH,
                     family = familySuffix,
                     packageName = LocalProxyOwnerFormatter.packageName(proxyCheck.owner),
                 ),

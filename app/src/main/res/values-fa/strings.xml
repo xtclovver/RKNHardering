@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">localhost را برای پورت‌های باز SOCKS5/HTTP proxy اسکن می‌کند.</string>
     <string name="settings_xray_api_scan_title">اسکن API gRPC Xray</string>
     <string name="settings_xray_api_scan_desc">localhost را برای پورت‌های آشکار API gRPC Xray اسکن می‌کند.</string>
+    <string name="settings_proxy_auth_probe">بررسی احراز هویت پراکسی محلی</string>
+    <string name="settings_proxy_auth_probe_summary">پراکسی‌های روی دستگاه را برای اعتبارنامه‌های ضعیف و رله UDP آزمایش می‌کند (فقط loopback)</string>
     <string name="settings_port_range">بازه پورت</string>
     <string name="settings_port_range_desc_scans">برای اسکن‌های فعال proxy محلی و Xray استفاده می‌شود.</string>
     <string name="settings_port_popular">رایج</string>
@@ -502,6 +504,8 @@
     <string name="checker_bypass_direct_ip">IP مستقیم: %1$s</string>
     <string name="checker_bypass_proxy_ip">IP از طریق proxy: %1$s</string>
     <string name="checker_bypass_split_confirmed">Per-app split bypass: تأیید شد (IPها متفاوت‌اند)</string>
+    <string name="checker_bypass_proxy_weak_auth">پراکسی محلی SOCKS5 %1$s اعتبارنامه‌های ضعیف را می‌پذیرد</string>
+    <string name="checker_bypass_proxy_udp_associate">پراکسی محلی SOCKS5 %1$s بدون احراز هویت UDP ASSOCIATE را مجاز می‌کند</string>
     <string name="checker_bypass_split_disabled">Per-app split غیرفعال است: IPها یکسان‌اند</string>
     <string name="checker_bypass_auth_required">پروکسی نیاز به احراز هویت دارد: دور زدن تأیید نشده</string>
     <string name="checker_bypass_mtproto_reachable">MTProto proxy: Telegram DC از طریق %1$s -&gt; %2$s در دسترس است</string>

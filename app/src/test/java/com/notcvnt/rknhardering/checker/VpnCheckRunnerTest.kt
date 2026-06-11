@@ -90,7 +90,7 @@ class VpnCheckRunnerTest {
                 )
             },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -123,7 +123,7 @@ class VpnCheckRunnerTest {
             directCheck = { _, _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, splitTunnelEnabled, proxyScanEnabled, xrayApiScanEnabled, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, splitTunnelEnabled, proxyScanEnabled, _, xrayApiScanEnabled, _, _, _, _, _, _, _, _, _ ->
                 assertTrue(splitTunnelEnabled)
                 capturedProxyScanEnabled = proxyScanEnabled
                 capturedXrayApiScanEnabled = xrayApiScanEnabled
@@ -178,7 +178,7 @@ class VpnCheckRunnerTest {
             directCheck = { _, _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -243,7 +243,7 @@ class VpnCheckRunnerTest {
             },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -269,7 +269,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -297,7 +297,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> throw java.io.IOException("indirect failed") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -327,7 +327,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> throw java.io.IOException("indirect failed") },
             locationCheck = { _, _, _, _ -> throw java.io.IOException("location failed") },
             nativeCheck = { _ -> throw java.io.IOException("native failed") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -376,7 +376,7 @@ class VpnCheckRunnerTest {
             },
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, underlyingProbeDeferred, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, underlyingProbeDeferred, _ ->
                 bypassProbeResult = underlyingProbeDeferred?.await()
                 BypassResult(
                     proxyEndpoint = null,
@@ -417,7 +417,7 @@ class VpnCheckRunnerTest {
                 category("indirect")
             },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 BypassResult(
                     proxyEndpoint = null,
                     directIp = null,
@@ -469,7 +469,7 @@ class VpnCheckRunnerTest {
             directCheck = { _, _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -542,7 +542,7 @@ class VpnCheckRunnerTest {
                 )
             },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -580,7 +580,7 @@ class VpnCheckRunnerTest {
             directCheck = { _, _, _, _ -> category("direct") },
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -641,7 +641,7 @@ class VpnCheckRunnerTest {
                 awaitRelease()
                 category("native")
             },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -681,7 +681,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -711,7 +711,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -741,7 +741,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )
@@ -772,7 +772,7 @@ class VpnCheckRunnerTest {
             indirectCheck = { _, _, _, _, _, _ -> category("indirect") },
             locationCheck = { _, _, _, _ -> category("location") },
             nativeCheck = { _ -> category("native") },
-            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
+            bypassCheck = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ ->
                 error("BypassChecker should not run when split tunnel is disabled")
             },
         )

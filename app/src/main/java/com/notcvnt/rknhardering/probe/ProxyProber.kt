@@ -25,6 +25,91 @@ object ProxyProber {
         val authRequired: Boolean,
     )
 
+    // RFC 1929 weak-credential dictionary used against loopback-only SOCKS5
+    // proxies. Offensive technique; gated by an opt-in setting and never run
+    // against non-loopback hosts.
+    val WEAK_CREDENTIALS: List<Pair<String, String>> = listOf(
+        "" to "", "admin" to "admin", "user" to "password", "proxy" to "proxy",
+        "1" to "1", "test" to "test", "socks" to "socks",
+    )
+
+    fun probeSocks5Auth(
+        host: String,
+        port: Int,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+        username: String,
+        password: String,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): Boolean {
+        return Socket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerSocket(socket)
+            try {
+                executionContext.throwIfCancelled()
+                socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+                socket.soTimeout = readTimeoutMs
+                socket.tcpNoDelay = true
+                val out = socket.getOutputStream()
+                val input = socket.getInputStream()
+                // Greeting: VER=5, NMETHODS=1, METHOD=0x02 (username/password)
+                out.write(byteArrayOf(0x05, 0x01, 0x02)); out.flush()
+                val methodResp = input.readExactly(2) ?: return false
+                if ((methodResp[0].toInt() and 0xFF) != 0x05) return false
+                if ((methodResp[1].toInt() and 0xFF) != 0x02) return false
+                val u = username.encodeToByteArray()
+                val p = password.encodeToByteArray()
+                val authReq = ByteArray(3 + u.size + p.size)
+                authReq[0] = 0x01
+                authReq[1] = u.size.toByte()
+                u.copyInto(authReq, 2)
+                authReq[2 + u.size] = p.size.toByte()
+                p.copyInto(authReq, 3 + u.size)
+                out.write(authReq); out.flush()
+                val authResp = input.readExactly(2) ?: return false
+                (authResp[1].toInt() and 0xFF) == 0x00
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
+                false
+            } finally {
+                registration.dispose()
+            }
+        }
+    }
+
+    fun probeUdpAssociate(
+        host: String,
+        port: Int,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+        executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
+    ): Boolean {
+        return Socket().use { socket ->
+            val registration = executionContext.cancellationSignal.registerSocket(socket)
+            try {
+                executionContext.throwIfCancelled()
+                socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+                socket.soTimeout = readTimeoutMs
+                socket.tcpNoDelay = true
+                val out = socket.getOutputStream()
+                val input = socket.getInputStream()
+                // Greeting: VER=5, NMETHODS=1, METHOD=0x00 (no auth)
+                out.write(byteArrayOf(0x05, 0x01, 0x00)); out.flush()
+                val methodResp = input.readExactly(2) ?: return false
+                if ((methodResp[0].toInt() and 0xFF) != 0x05) return false
+                if ((methodResp[1].toInt() and 0xFF) != 0x00) return false
+                // UDP ASSOCIATE request: VER=5, CMD=3, RSV=0, ATYP=1 (ipv4), 0.0.0.0:0
+                out.write(byteArrayOf(0x05, 0x03, 0x00, 0x01, 0, 0, 0, 0, 0, 0)); out.flush()
+                val reply = input.readExactly(2) ?: return false
+                (reply[0].toInt() and 0xFF) == 0x05 && (reply[1].toInt() and 0xFF) == 0x00
+            } catch (error: Exception) {
+                rethrowIfCancellation(error, executionContext)
+                false
+            } finally {
+                registration.dispose()
+            }
+        }
+    }
+
     fun probeProxyType(
         host: String,
         port: Int,
