@@ -1,0 +1,5 @@
+1. Added six new VPN/proxy detectors: extended interface patterns (utun, ZeroTier, Tailscale, IPsec/xfrm, GRE, L2TP), VPN transport type detection, TUN/TAP by sysfs interface type, host-route /32 heuristic, a Clash/mihomo/sing-box REST API scanner, and a local SOCKS5 weak-credentials probe. The last two scanners are optional and enabled in settings.
+2. Added emulator detection (QEMU, Genymotion, BlueStacks) and isolated-context detection (secondary user, cloned app, work profile). Network tests are unreliable in these cases, so the verdict is "needs review" rather than "detected".
+3. Three new marketplace profiles: Stealth Check (local-only checks, no network), MTProxy/TG STUN Check (Telegram traffic), and Extended Test (maximum sensitivity).
+4. The marketplace catalog is now verified with an Ed25519 signature, and certificate pinning was added for the GitHub CDN.
+5. Fixes: a custom GeoIP provider with the {ip} placeholder is no longer dropped when saving a profile; the Markdown report export is fully localized (en/fa/zh); a race condition on scan cancellation was eliminated.

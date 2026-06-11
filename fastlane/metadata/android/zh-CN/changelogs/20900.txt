@@ -1,0 +1,5 @@
+1. 新增六个 VPN/代理检测器：扩展的接口模式（utun、ZeroTier、Tailscale、IPsec/xfrm、GRE、L2TP）、VPN 传输类型识别、基于 sysfs 类型的 TUN/TAP 检测、host-route /32 启发式、Clash/mihomo/sing-box REST API 扫描器，以及本地 SOCKS5 弱凭据探测。后两个扫描器为可选项，在设置中启用。
+2. 新增模拟器检测（QEMU、Genymotion、BlueStacks）和隔离环境检测（次要用户、克隆应用、工作资料）。这些情况下网络测试不可靠，因此结果为"需要复查"而非"已检测到"。
+3. 应用市场新增三个配置文件：Stealth Check（仅本地检查，无网络）、MTProxy/TG STUN Check（Telegram 流量）和 Extended Test（最高灵敏度）。
+4. 应用市场目录现在通过 Ed25519 签名验证，并为 GitHub CDN 添加了证书固定。
+5. 修复：带 {ip} 占位符的自定义 GeoIP 提供商在保存配置文件时不再丢失；Markdown 报告导出已完全本地化（en/fa/zh）；消除了取消扫描时的竞态条件。

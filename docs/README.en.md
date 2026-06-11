@@ -61,11 +61,11 @@ VpnCheckRunner
 ├── CallTransportChecker     — STUN/MTProto (leaks and connectivity)
 ├── CdnPullingChecker        — HTTPS requests to CDN/redirector
 ├── LocationSignalsChecker   — MCC/SIM/cell/Wi-Fi/BeaconDB
-├── BypassChecker            — localhost proxy, Xray gRPC API, underlying-network leak
+├── BypassChecker            — localhost proxy, Xray gRPC API, Clash/sing-box REST API, SOCKS5-auth probe, underlying-network leak
 ├── RttTriangulationChecker  — SNITCH (β): RTT triangulation against RU/foreign hosts
 ├── IcmpSpoofingChecker      — operator ICMP spoofing (blocked host replies to ping)
 ├── DomainReachabilityChecker — DNS→TCP→TLS pipeline for DPI blocking detection
-├── NativeSignsChecker       — JNI checks (routes, interfaces, hooks, root)
+├── NativeSignsChecker       — JNI checks (routes, interfaces, host-route /32, TUN/TAP by type, hooks, root, emulator, isolation)
 └── IpConsensusBuilder       — cross-module IP consensus
         └── VerdictEngine    — final verdict logic
 ```
@@ -135,6 +135,8 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 `IS_VPN` and `VpnTransportInfo` are checked through the string representation of `NetworkCapabilities`.
 
+When `VpnTransportInfo` is present (API 29+, via reflection `getType()`), the transport type is added to findings: `SERVICE` (VpnService-based app), `PLATFORM` (always-on / IKEv2), `LEGACY` (legacy VPN framework), or `OEM`. This is an informational field and does not affect `detected`/`needsReview`.
+
 #### 3.2 System proxy (`checkSystemProxy`)
 
 Uses:
@@ -192,7 +194,14 @@ VPN-like interface patterns:
 - `tap\d+`
 - `wg\d+`
 - `ppp\d+`
-- `ipsec.*`
+- `utun\d*` — macOS/iOS-style TUN
+- `zt.*` — ZeroTier
+- `tailscale\d*` — Tailscale
+- `svpn\d*` — Pulse Secure / Ivanti
+- `gre\d+` — GRE tunnels
+- `l2tp\d+` — L2TP
+- `he-ipv6.*` — Hurricane Electric IPv6 tunnel
+- `(ipsec|xfrm).*` — IPsec / kernel XFRM
 
 Any active interface matching these patterns yields `detected = true`.
 
@@ -307,10 +316,11 @@ In the current implementation, `LocationSignalsChecker.detected` is always `fals
 
 ### 6. Bypass check (`BypassChecker`)
 
-Three checks run in parallel:
+Four checks run in parallel:
 
 - `ProxyScanner`
 - `XrayApiScanner`
+- `ClashApiScanner`
 - `UnderlyingNetworkProber`
 
 #### 6.1 Proxy scanner (`ProxyScanner` + `ProxyProber`)
@@ -347,6 +357,13 @@ Additionally:
 - if `SOCKS5` is found, but HTTP IP retrieval through it fails and the port does not look like Xray, `MtProtoProber` is launched;
 - a successful MTProto probe adds an informative finding, but does not affect the final verdict.
 
+**Proxy authentication probe (`ProxyProber`, optional).** Enabled via "Probe local proxy authentication" (`pref_proxy_auth_probe_enabled`, off by default). Applies only to `SOCKS5` endpoints on loopback addresses:
+
+- weak credential dictionary brute-force (RFC 1929): empty pair, `admin/admin`, `user/password`, `proxy/proxy`, `test/test`, etc. — only when the proxy demands authentication;
+- `UDP ASSOCIATE` probe on proxies that require no authentication.
+
+Successful credential match or open `UDP ASSOCIATE` yields `detected = true` (`EvidenceSource.PROXY_AUTH_BYPASS`, counted in `HARD_DETECT_BYPASS`).
+
 #### 6.2 Xray gRPC API scanner (`XrayApiScanner` + `XrayApiClient`)
 
 Scans `127.0.0.1` and `::1`.
@@ -376,9 +393,26 @@ If VPN is active on the device, the module:
 
 If the underlying network is reachable while VPN is active, this is treated as `VPN gateway leak` and yields `detected = true`.
 
+#### 6.4 Clash/sing-box REST API scanner (`ClashApiScanner` + `ClashApiClient`)
+
+Optional check, enabled via "Clash/sing-box REST API scan" (`pref_clash_api_scan_enabled`, on by default). Scans the loopback (`127.0.0.1`, `::1`) for the REST API of Clash, mihomo, and sing-box managers.
+
+Parameters:
+
+- ports `9090`, `19090`, `9091`, `9097`
+- TCP connect probe `200 ms`, then connect/read `600 ms`
+
+Logic:
+
+- `GET /configs` — if valid JSON is returned the API is considered live;
+- `GET /connections` — VPN server IPs are extracted from `metadata.destinationIP` (up to 10 unique);
+- `GET /proxies` — proxy node names are collected.
+
+A live API or a non-empty destination IP list yields `detected = true` (`EvidenceSource.CLASH_API`, counted in `HARD_DETECT_BYPASS`).
+
 Final category result:
 
-- `detected = confirmed split tunnel || xrayApiFound || vpnGatewayLeak || vpnNetworkBinding`
+- `detected = confirmed split tunnel || xrayApiFound || clashApiFound || proxyAuthBypass || vpnGatewayLeak || vpnNetworkBinding`
 - `needsReview = true` if an open proxy is found but the bypass is not confirmed
 
 ---
@@ -460,6 +494,30 @@ Performs low-level JNI checks directly from C++:
 - Root detection (su binaries, magisk properties, selinux, rw /system, etc.)
 
 Native findings can translate into `needsReview` or generic indirect routing signals.
+
+#### 12.1 TUN/TAP by interface type
+
+For every interface, `/sys/class/net/<name>/type` is read. A value of `65534` (`ARPHRD_TUNTAP`) on an active interface whose name does not match any known VPN pattern indicates a TUN/TAP interface masquerading as a regular one. Result: `detected = true` (`EvidenceSource.NATIVE_INTERFACE`).
+
+#### 12.2 Host-route /32 heuristic
+
+The routing table (NETLINK) is scanned for a non-default route with a `/32` prefix (IPv4) or `/128` (IPv6) to a publicly routable address via a physical interface (`wlan0`, `rmnet`, `eth0`). This is the classic VPN client host-route to the server IP that bypasses the tunnel — a leak of the real VPN server IP. Result: `detected = true` (`EvidenceSource.NATIVE_ROUTE`).
+
+#### 12.3 Emulator detector
+
+JNI checks (`nativeDetectEmulator`): QEMU system properties (`ro.kernel.qemu*`, `ro.boot.qemu`), goldfish/ranchu hardware, pipe devices (`/dev/qemu_pipe`, `/dev/socket/genyd` for Genymotion), goldfish driver in `/proc/tty/drivers`, BlueStacks artifacts. Additionally, Build heuristics (`FINGERPRINT`, `MODEL`, `HARDWARE`, `PRODUCT`, `MANUFACTURER == "Genymotion"`).
+
+Network tests are unreliable on an emulator, so the result is `needsReview = true` (`EvidenceSource.NATIVE_EMULATOR`), never `detected`.
+
+#### 12.4 Isolation detector
+
+Identifies contexts where another user's or profile's VPN is invisible to network detectors:
+
+- secondary Android user (`userId > 0`, extracted from the `dataDir` path);
+- app clone / dual-app (`userId == 999` or the MIUI range `950..959`);
+- work profile (`DevicePolicyManager.isProfileOwnerApp`).
+
+Any of these signals yields `needsReview = true` (`EvidenceSource.SANDBOX_ISOLATION`), never `detected`.
 
 ---
 

@@ -63,11 +63,11 @@ VpnCheckRunner
 ├── CallTransportChecker     — نشست‌های STUN/MTProto (نشت‌ها و دسترسی‌پذیری)
 ├── CdnPullingChecker        — درخواست‌های HTTPS به CDN/redirector
 ├── LocationSignalsChecker   — MCC/SIM/cell/Wi-Fi/BeaconDB
-├── BypassChecker            — localhost proxy، Xray gRPC API، underlying-network leak
+├── BypassChecker            — localhost proxy، Xray gRPC API، Clash/sing-box REST API، SOCKS5-auth پروب، underlying-network leak
 ├── RttTriangulationChecker  — SNITCH (β): مثلث‌بندی RTT با هاست‌های RU/خارجی
 ├── IcmpSpoofingChecker      — جعل ICMP اپراتور (هاست مسدودشده به ping پاسخ می‌دهد)
 ├── DomainReachabilityChecker — پایپ‌لاین DNS→TCP→TLS برای تشخیص فیلترینگ DPI
-├── NativeSignsChecker       — بررسی‌های JNI (مسیرها، اینترفیس‌ها، هوک‌ها، root)
+├── NativeSignsChecker       — بررسی‌های JNI (مسیرها، اینترفیس‌ها، host-route /32، TUN/TAP بر اساس نوع، هوک‌ها، root، شبیه‌ساز، ایزولاسیون)
 └── IpConsensusBuilder       — اجماع IP بین‌ماژولی
         └── VerdictEngine    — منطق نتیجه نهایی
 ```
@@ -137,6 +137,8 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 `IS_VPN` و `VpnTransportInfo` از روی نمایش رشته‌ای `NetworkCapabilities` بررسی می‌شوند.
 
+در صورت وجود `VpnTransportInfo` (API 29+، از طریق reflection `getType()`) نوع transport در findings اضافه می‌شود: `SERVICE` (برنامه VpnService)، `PLATFORM` (always-on / IKEv2)، `LEGACY` (چارچوب legacy VPN) یا `OEM`. این یک فیلد اطلاعاتی است و روی `detected`/`needsReview` اثر نمی‌گذارد.
+
 #### 3.2 System proxy (`checkSystemProxy`)
 
 منابع:
@@ -194,7 +196,14 @@ API: `NetworkInterface.getNetworkInterfaces()`. فقط اینترفیس‌های
 - `tap\d+`
 - `wg\d+`
 - `ppp\d+`
-- `ipsec.*`
+- `utun\d*` — TUN به سبک macOS/iOS
+- `zt.*` — ZeroTier
+- `tailscale\d*` — Tailscale
+- `svpn\d*` — Pulse Secure / Ivanti
+- `gre\d+` — تانل‌های GRE
+- `l2tp\d+` — L2TP
+- `he-ipv6.*` — تانل IPv6 Hurricane Electric
+- `(ipsec|xfrm).*` — IPsec / XFRM هسته
 
 هر اینترفیس فعالی که با این الگوها تطبیق کند، `detected = true` می‌دهد.
 
@@ -309,10 +318,11 @@ DNS همراه با snapshot شبکه‌های underlying ارزیابی می‌
 
 ### 6. بررسی bypass (`BypassChecker`)
 
-سه بررسی به‌صورت موازی اجرا می‌شوند:
+بررسی‌ها به‌صورت موازی اجرا می‌شوند:
 
 - `ProxyScanner`
 - `XrayApiScanner`
+- `ClashApiScanner`
 - `UnderlyingNetworkProber`
 
 #### 6.1 اسکنر proxy (`ProxyScanner` + `ProxyProber`)
@@ -349,6 +359,13 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 - اگر `SOCKS5` پیدا شود، ولی دریافت HTTP IP از طریق آن ناموفق باشد و پورت شبیه Xray نباشد، `MtProtoProber` اجرا می‌شود؛
 - MTProto probe موفق فقط یک finding اطلاعاتی اضافه می‌کند و روی verdict نهایی اثری ندارد.
 
+**پروب احراز هویت (`ProxyProber`، اختیاری).** با تنظیم «Probe local proxy authentication» (`pref_proxy_auth_probe_enabled`، پیش‌فرض غیرفعال) فعال می‌شود. فقط روی endpointهای `SOCKS5` روی آدرس‌های loopback اعمال می‌شود:
+
+- امتحان فرهنگ لغت اعتبارنامه‌های ضعیف (RFC 1929): جفت خالی، `admin/admin`، `user/password`، `proxy/proxy`، `test/test` و موارد مشابه — فقط اگر proxy احراز هویت بخواهد؛
+- پروب `UDP ASSOCIATE` روی proxy بدون احراز هویت.
+
+اعتبارنامه موفق یا `UDP ASSOCIATE` باز، `detected = true` می‌دهند (`EvidenceSource.PROXY_AUTH_BYPASS`، در `HARD_DETECT_BYPASS` جای می‌گیرد).
+
 #### 6.2 اسکنر Xray gRPC API (`XrayApiScanner` + `XrayApiClient`)
 
 آدرس‌های `127.0.0.1` و `::1` اسکن می‌شوند.
@@ -378,9 +395,26 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 
 اگر هنگام فعال بودن VPN، شبکه underlying در دسترس باشد، این وضعیت به‌عنوان `VPN gateway leak` تعبیر می‌شود و `detected = true` می‌دهد.
 
+#### 6.4 اسکنر REST API Clash/sing-box (`ClashApiScanner` + `ClashApiClient`)
+
+بررسی اختیاری، تنظیم «Clash/sing-box REST API scan» (`pref_clash_api_scan_enabled`، پیش‌فرض فعال). loopback (`127.0.0.1`، `::1`) را برای REST API مدیران Clash، mihomo و sing-box اسکن می‌کند.
+
+پارامترها:
+
+- پورت‌ها: `9090`، `19090`، `9091`، `9097`
+- TCP connect probe برابر `200 ms`، سپس connect/read برابر `600 ms`
+
+منطق:
+
+- `GET /configs` — اگر JSON معتبر برگردد، API زنده محسوب می‌شود؛
+- `GET /connections` — از `metadata.destinationIP` آدرس‌های IP سرورهای VPN استخراج می‌شوند (تا ۱۰ مورد یکتا)؛
+- `GET /proxies` — نام گره‌های proxy جمع‌آوری می‌شوند.
+
+API زنده یا لیست غیرخالی IP مقصد، `detected = true` می‌دهد (`EvidenceSource.CLASH_API`، در `HARD_DETECT_BYPASS` جای می‌گیرد).
+
 نتیجه نهایی دسته:
 
-- `detected = confirmed split tunnel || xrayApiFound || vpnGatewayLeak || vpnNetworkBinding`
+- `detected = confirmed split tunnel || xrayApiFound || clashApiFound || proxyAuthBypass || vpnGatewayLeak || vpnNetworkBinding`
 - اگر open proxy پیدا شود ولی bypass تأیید نشود، `needsReview = true`
 
 ---
@@ -462,6 +496,30 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 - تشخیص Root (فایل‌های باینری su، ویژگی‌های magisk، حالت selinux، دسترسی rw مسیر /system و غیره)
 
 یافته‌های سطح بومی می‌توانند به حالت‌های `needsReview` یا نشانه‌های عمومی غیرمستقیم مسیریابی ترجمه شوند.
+
+#### 12.1 TUN/TAP بر اساس نوع اینترفیس
+
+برای هر اینترفیس، فایل `/sys/class/net/<name>/type` خوانده می‌شود. مقدار `65534` (`ARPHRD_TUNTAP`) در یک اینترفیس فعالی که نامش با الگوهای شناخته‌شده VPN **تطبیق ندارد**، نشانه TUN/TAP در حال جعل هویت اینترفیس معمولی است. نتیجه: `detected = true` (`EvidenceSource.NATIVE_INTERFACE`).
+
+#### 12.2 هیوریستیک host-route /32
+
+در جدول مسیریابی (`NETLINK`) به دنبال مسیر non-default با پیشوند `/32` (IPv4) یا `/128` (IPv6) به یک آدرس قابل مسیریابی عمومی از طریق اینترفیس فیزیکی (`wlan0`، `rmnet`، `eth0`) می‌گردد. این الگوی کلاسیک host-route کلاینت VPN به IP سرور خود در دور زدن تانل است — نشت IP واقعی سرور VPN. نتیجه: `detected = true` (`EvidenceSource.NATIVE_ROUTE`).
+
+#### 12.3 تشخیصگر شبیه‌ساز
+
+بررسی‌های JNI (`nativeDetectEmulator`): ویژگی‌های سیستم QEMU (`ro.kernel.qemu*`، `ro.boot.qemu`)، سخت‌افزار goldfish/ranchu، دستگاه‌های pipe (برای Genymotion: `/dev/qemu_pipe`، `/dev/socket/genyd`)، درایور goldfish در `/proc/tty/drivers`، آثار BlueStacks. به علاوه — هیوریستیک Build (`FINGERPRINT`، `MODEL`، `HARDWARE`، `PRODUCT`، `MANUFACTURER == "Genymotion"`).
+
+در شبیه‌ساز، آزمون‌های شبکه قابل اعتماد نیستند؛ بنابراین نتیجه `needsReview = true` است (`EvidenceSource.NATIVE_EMULATOR`)، **هرگز** `detected`.
+
+#### 12.4 تشخیصگر ایزولاسیون
+
+زمینه‌هایی تعیین می‌شوند که در آن‌ها VPN کاربر/پروفایل دیگر برای تشخیص‌دهنده‌های شبکه نامرئی است:
+
+- کاربر ثانویه Android (`userId > 0`، از مسیر `dataDir` استخراج می‌شود)؛
+- کلون برنامه / dual-app (`userId == 999` یا بازه `950..959` در MIUI)؛
+- پروفایل کاری (`DevicePolicyManager.isProfileOwnerApp`).
+
+هر کدام از این سیگنال‌ها `needsReview = true` می‌دهند (`EvidenceSource.SANDBOX_ISOLATION`)، **هرگز** `detected`.
 
 ---
 

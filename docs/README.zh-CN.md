@@ -62,11 +62,11 @@ VpnCheckRunner
 ├── CallTransportChecker     — STUN/MTProto 探测（泄漏与连通性）
 ├── CdnPullingChecker        — 对 CDN/redirector 的 HTTPS 请求
 ├── LocationSignalsChecker   — MCC/SIM/cell/Wi-Fi/BeaconDB
-├── BypassChecker            — localhost 代理、Xray gRPC API、underlying-network leak
+├── BypassChecker            — localhost 代理、Xray gRPC API、Clash/sing-box REST API、SOCKS5 认证探测、underlying-network leak
 ├── RttTriangulationChecker  — SNITCH（β）：针对 RU/境外主机的 RTT 三角测量
 ├── IcmpSpoofingChecker      — 运营商 ICMP 欺骗检测（被封锁主机回复 ping）
 ├── DomainReachabilityChecker — DNS→TCP→TLS 流水线，用于检测 DPI 封锁
-├── NativeSignsChecker       — JNI 检查（路由、接口、钩子、root 等）
+├── NativeSignsChecker       — JNI 检查（路由、接口、host-route /32、按类型检测 TUN/TAP、钩子、root、模拟器、隔离）
 └── IpConsensusBuilder       — 跨模块 IP 共识
         └── VerdictEngine    — 最终结论逻辑
 ```
@@ -136,6 +136,8 @@ API：`ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 `IS_VPN` 和 `VpnTransportInfo` 都是通过 `NetworkCapabilities` 的字符串表示来检查的。
 
+若存在 `VpnTransportInfo`（API 29+，通过 reflection `getType()` 获取），则会在 findings 中附加传输类型：`SERVICE`（VpnService 应用）、`PLATFORM`（always-on / IKEv2）、`LEGACY`（旧版 VPN 框架）或 `OEM`。这是仅供参考的信息字段，不影响 `detected`/`needsReview`。
+
 #### 3.2 系统代理 (`checkSystemProxy`)
 
 使用：
@@ -193,7 +195,14 @@ API：`NetworkInterface.getNetworkInterfaces()`。仅检查活动接口（`isUp`
 - `tap\d+`
 - `wg\d+`
 - `ppp\d+`
-- `ipsec.*`
+- `utun\d*` — macOS/iOS 风格 TUN
+- `zt.*` — ZeroTier
+- `tailscale\d*` — Tailscale
+- `svpn\d*` — Pulse Secure / Ivanti
+- `gre\d+` — GRE 隧道
+- `l2tp\d+` — L2TP
+- `he-ipv6.*` — Hurricane Electric IPv6 隧道
+- `(ipsec|xfrm).*` — IPsec / 内核 XFRM
 
 任何匹配这些模式的活动接口都会产生 `detected = true`。
 
@@ -308,10 +317,11 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
 ### 6. Bypass 检查 (`BypassChecker`)
 
-以下三项检查并行执行：
+以下检查并行执行：
 
 - `ProxyScanner`
 - `XrayApiScanner`
+- `ClashApiScanner`
 - `UnderlyingNetworkProber`
 
 #### 6.1 代理扫描器 (`ProxyScanner` + `ProxyProber`)
@@ -341,12 +351,19 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 | `SOCKS5` | greeting `0x05 0x01 0x00` 与响应 `0x05 0x00` |
 | `HTTP CONNECT` | `CONNECT ifconfig.me:443 HTTP/1.1` 与响应 `HTTP/1.x 200` |
 
-开放的 localhost 代理本身并不会被视为“确认存在绕过”：它只会被记录为 `needsReview`。只有在能够同时拿到直连 IP 与代理 IP，且二者不同的情况下，才会确认绕过。
+开放的 localhost 代理本身并不会被视为”确认存在绕过”：它只会被记录为 `needsReview`。只有在能够同时拿到直连 IP 与代理 IP，且二者不同的情况下，才会确认绕过。
 
 此外：
 
 - 如果找到了 `SOCKS5`，但无法通过它获取 HTTP IP，且该端口又不像 Xray，则会启动 `MtProtoProber`；
 - MTProto probe 成功只会增加一条说明性 finding，不影响最终 verdict。
+
+**认证探测（`ProxyProber`，可选）。** 通过”代理本地认证探测”设置启用（`pref_proxy_auth_probe_enabled`，默认关闭）。仅适用于 loopback 地址上的 `SOCKS5` 端点：
+
+- 对需要认证的代理，使用弱凭据字典进行枚举（RFC 1929）：空用户名/密码对、`admin/admin`、`user/password`、`proxy/proxy`、`test/test` 等；
+- 对无需认证的代理，发起 `UDP ASSOCIATE` 探测。
+
+成功猜解凭据或发现开放的 `UDP ASSOCIATE` 均会产生 `detected = true`（`EvidenceSource.PROXY_AUTH_BYPASS`，属于 `HARD_DETECT_BYPASS`）。
 
 #### 6.2 Xray gRPC API 扫描器 (`XrayApiScanner` + `XrayApiClient`)
 
@@ -377,9 +394,26 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
 如果在 VPN 激活时 underlying 网络仍可访问，则会被视为 `VPN gateway leak`，并产生 `detected = true`。
 
+#### 6.4 Clash/sing-box REST API 扫描器 (`ClashApiScanner` + `ClashApiClient`)
+
+可选检查，通过”Clash/sing-box REST API 扫描”设置启用（`pref_clash_api_scan_enabled`，默认开启）。扫描 loopback（`127.0.0.1`、`::1`）上 Clash、mihomo 和 sing-box 管理器的 REST API。
+
+参数：
+
+- 端口 `9090`、`19090`、`9091`、`9097`
+- TCP 连接探测超时 `200 ms`，连接/读取超时 `600 ms`
+
+逻辑：
+
+- `GET /configs` — 若返回合法 JSON，则认为 API 存活；
+- `GET /connections` — 从 `metadata.destinationIP` 中提取 VPN 服务器 IP（最多 10 个唯一地址）；
+- `GET /proxies` — 收集代理节点名称。
+
+API 存活或目标 IP 列表非空均会产生 `detected = true`（`EvidenceSource.CLASH_API`，属于 `HARD_DETECT_BYPASS`）。
+
 类别最终结果：
 
-- `detected = confirmed split tunnel || xrayApiFound || vpnGatewayLeak || vpnNetworkBinding`
+- `detected = confirmed split tunnel || xrayApiFound || clashApiFound || proxyAuthBypass || vpnGatewayLeak || vpnNetworkBinding`
 - 如果发现开放代理但无法确认绕过，则 `needsReview = true`
 
 ---
@@ -461,6 +495,30 @@ TLS 步骤使用信任所有证书的 X.509 manager，因为目标是检测 DPI 
 - 检查 Root（su 二进制文件、magisk 属性、selinux 状态、/system rw 挂载等）
 
 原生发现可被解释为 `needsReview` 或一般的间接路由迹象。
+
+#### 12.1 按接口类型检测 TUN/TAP
+
+对每个接口读取 `/sys/class/net/<name>/type`。若活动接口的值为 `65534`（`ARPHRD_TUNTAP`），且接口名称与已知 VPN 模式**不**匹配，则说明该 TUN/TAP 接口正在伪装成普通接口。结果：`detected = true`（`EvidenceSource.NATIVE_INTERFACE`）。
+
+#### 12.2 host-route /32 启发式
+
+在路由表（NETLINK）中查找非默认路由，其目标为公开可路由地址，前缀长度为 `/32`（IPv4）或 `/128`（IPv6），且经由物理接口（`wlan0`、`rmnet`、`eth0`）。这是 VPN 客户端绕过隧道直连 VPN 服务器 IP 的经典主机路由，会泄露真实 VPN 服务器地址。结果：`detected = true`（`EvidenceSource.NATIVE_ROUTE`）。
+
+#### 12.3 模拟器检测器
+
+JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`、`ro.boot.qemu`）、goldfish/ranchu 硬件、管道设备（`/dev/qemu_pipe`、`/dev/socket/genyd` 用于 Genymotion）、`/proc/tty/drivers` 中的 goldfish 驱动、BlueStacks 特征。另外还有 Build 启发式（`FINGERPRINT`、`MODEL`、`HARDWARE`、`PRODUCT`、`MANUFACTURER == "Genymotion"`）。
+
+在模拟器环境中，网络测试结果不可靠，因此结果为 `needsReview = true`（`EvidenceSource.NATIVE_EMULATOR`），**不会**产生 `detected`。
+
+#### 12.4 隔离检测器
+
+检测 VPN 对网络检测模块不可见的用户/配置文件隔离环境：
+
+- Android 次要用户（`userId > 0`，从 `dataDir` 路径中提取）；
+- 应用克隆 / 双开（`userId == 999` 或 MIUI 的 `950..959` 范围）；
+- 工作资料（`DevicePolicyManager.isProfileOwnerApp`）。
+
+满足其中任一条件均会产生 `needsReview = true`（`EvidenceSource.SANDBOX_ISOLATION`），**不会**产生 `detected`。
 
 ---
 
