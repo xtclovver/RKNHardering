@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.probe.NativeRouteEntry
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -184,6 +185,42 @@ class NativeSignsCheckerTest {
         assertTrue(
             result.evidence.any { it.source == EvidenceSource.NATIVE_ROOT_DETECTION && it.detected },
         )
+    }
+
+    @Test
+    fun `host route to public ip via physical interface emits NATIVE_ROUTE evidence`() {
+        val routes = listOf(
+            NativeRouteEntry(
+                interfaceName = "wlan0",
+                destinationHex = "CB007107",
+                gatewayHex = "C0A80101",
+                flags = 0,
+                isDefault = false,
+                source = NativeRouteEntry.RouteSource.NETLINK,
+                family = 2,
+                destination = "203.0.113.7",
+                prefixLen = 32,
+            ),
+        )
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, routes)
+        assertTrue(outcome.detected)
+        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_ROUTE && it.detected })
+    }
+
+    @Test
+    fun `host route to private ip or via tun does not emit evidence`() {
+        val privateViaWlan = NativeRouteEntry(
+            interfaceName = "wlan0", destinationHex = "0A080001", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "10.8.0.1", prefixLen = 32,
+        )
+        val publicViaTun = NativeRouteEntry(
+            interfaceName = "tun0", destinationHex = "CB007107", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "203.0.113.7", prefixLen = 32,
+        )
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(privateViaWlan, publicViaTun))
+        assertFalse(outcome.detected)
     }
 
     @Suppress("unused")

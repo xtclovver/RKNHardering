@@ -645,6 +645,7 @@
     <string name="checker_native_root_selinux_absent">SELinux enforcement status is not accessible</string>
     <string name="checker_native_root_uid">Process is running with root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Magisk property detected: %1$s</string>
+    <string name="checker_native_host_route_leak">Host route to %1$s via physical interface %2$s (VPN server IP leak)</string>
 
     <!-- App update checker -->
     <string name="update_dialog_title">Update available</string>

@@ -640,6 +640,7 @@
     <string name="checker_native_root_selinux_absent">Статус SELinux enforcement недоступен</string>
     <string name="checker_native_root_uid">Процесс выполняется с root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Обнаружено свойство Magisk: %1$s</string>
+    <string name="checker_native_host_route_leak">Хост-маршрут к %1$s через физический интерфейс %2$s (утечка IP VPN-сервера)</string>
 
     <!-- App update checker -->
     <string name="update_dialog_title">Доступно обновление</string>

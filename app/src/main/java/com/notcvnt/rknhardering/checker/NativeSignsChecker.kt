@@ -95,10 +95,16 @@ object NativeSignsChecker {
         detected = detected || mismatchOutcome.detected
         needsReview = needsReview || mismatchOutcome.needsReview
 
-        val routeOutcome = evaluateRoutes(context)
+        val nativeRoutes = runCatching { NativeInterfaceProbe.collectRoutes() }.getOrDefault(emptyList())
+        val routeOutcome = evaluateRoutes(context, nativeRoutes)
         findings += routeOutcome.findings
         evidence += routeOutcome.evidence
         detected = detected || routeOutcome.detected
+
+        val hostRouteOutcome = evaluateHostRoutes(context, nativeRoutes)
+        findings += hostRouteOutcome.findings
+        evidence += hostRouteOutcome.evidence
+        detected = detected || hostRouteOutcome.detected
 
         val hookOutcome = evaluateHookMarkers(context)
         findings += hookOutcome.findings
@@ -332,8 +338,7 @@ object NativeSignsChecker {
         return PartialOutcome(findings, evidence, detected = detected, needsReview = needsReview)
     }
 
-    internal fun evaluateRoutes(context: Context): PartialOutcome {
-        val routes = runCatching { NativeInterfaceProbe.collectRoutes() }.getOrDefault(emptyList())
+    internal fun evaluateRoutes(context: Context, routes: List<NativeRouteEntry>): PartialOutcome {
         if (routes.isEmpty()) {
             return PartialOutcome(
                 findings = listOf(
@@ -419,6 +424,72 @@ object NativeSignsChecker {
         }
 
         return PartialOutcome(findings, evidence, detected = detected)
+    }
+
+    internal fun evaluateHostRoutes(
+        context: Context,
+        routes: List<NativeRouteEntry>,
+    ): PartialOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var detected = false
+
+        val hostRoutes = routes.filter { route ->
+            route.source == NativeRouteEntry.RouteSource.NETLINK &&
+                !route.isDefault &&
+                (route.prefixLen == 32 || route.prefixLen == 128) &&
+                route.destination != null &&
+                isPublicRoutableAddress(route.destination) &&
+                NetworkInterfacePatterns.isStandardInterface(route.interfaceName)
+        }
+
+        for (route in hostRoutes) {
+            val dst = route.destination ?: continue
+            findings += Finding(
+                description = context.getString(
+                    R.string.checker_native_host_route_leak,
+                    dst,
+                    route.interfaceName,
+                ),
+                detected = true,
+                source = EvidenceSource.NATIVE_ROUTE,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+            evidence += EvidenceItem(
+                source = EvidenceSource.NATIVE_ROUTE,
+                detected = true,
+                confidence = EvidenceConfidence.MEDIUM,
+                description = "Host route to $dst via physical interface ${route.interfaceName}",
+            )
+            detected = true
+        }
+
+        return PartialOutcome(findings, evidence, detected = detected)
+    }
+
+    internal fun isPublicRoutableAddress(addr: String): Boolean {
+        return runCatching {
+            val inet = java.net.InetAddress.getByName(addr)
+            !inet.isLoopbackAddress &&
+                !inet.isLinkLocalAddress &&
+                !inet.isSiteLocalAddress &&
+                !inet.isAnyLocalAddress &&
+                !inet.isMulticastAddress &&
+                !isCgnatOrUla(inet)
+        }.getOrDefault(false)
+    }
+
+    private fun isCgnatOrUla(inet: java.net.InetAddress): Boolean {
+        val bytes = inet.address ?: return false
+        if (bytes.size == 4) {
+            val b0 = bytes[0].toInt() and 0xFF
+            val b1 = bytes[1].toInt() and 0xFF
+            return b0 == 100 && b1 in 64..127
+        }
+        if (bytes.size == 16) {
+            return (bytes[0].toInt() and 0xFE) == 0xFC
+        }
+        return false
     }
 
     internal fun evaluateHookMarkers(context: Context): PartialOutcome {

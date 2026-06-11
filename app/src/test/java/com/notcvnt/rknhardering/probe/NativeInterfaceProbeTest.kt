@@ -127,4 +127,17 @@ class NativeInterfaceProbeTest {
         assertFalse(hooked.missing)
         assertEquals("/data/local/tmp/hook.so", hooked.library)
     }
+
+    @Test
+    fun `parseNetlinkRoutes preserves prefix length for host routes`() {
+        val rows = arrayOf(
+            "route|family=2|dst=203.0.113.7/32|via=192.168.1.1|dev=wlan0|oif=5",
+            "route|family=2|dst=10.8.0.0/24|dev=tun0|oif=7",
+        )
+        val parsed = NativeInterfaceProbe.parseNetlinkRoutes(rows)
+        val hostRoute = parsed.first { it.destination == "203.0.113.7" }
+        assertEquals(32, hostRoute.prefixLen)
+        val subnet = parsed.first { it.destination == "10.8.0.0" }
+        assertEquals(24, subnet.prefixLen)
+    }
 }

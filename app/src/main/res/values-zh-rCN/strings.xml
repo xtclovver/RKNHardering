@@ -617,6 +617,7 @@
     <string name="checker_native_root_selinux_absent">SELinux 强制执行状态不可访问</string>
     <string name="checker_native_root_uid">进程以 root UID 运行：%1$s</string>
     <string name="checker_native_root_magisk_prop">检测到 Magisk 属性：%1$s</string>
+    <string name="checker_native_host_route_leak">通过物理接口 %2$s 到 %1$s 的主机路由（VPN 服务器 IP 泄露）</string>
 
     <!-- App update checker -->
     <string name="update_dialog_title">有更新可用</string>

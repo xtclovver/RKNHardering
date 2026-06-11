@@ -40,6 +40,7 @@ data class NativeRouteEntry(
     val scope: String? = null,
     val type: String? = null,
     val table: Int? = null,
+    val prefixLen: Int? = null,
 ) {
     enum class RouteSource { PROC, NETLINK }
 }
@@ -219,6 +220,7 @@ object NativeInterfaceProbe {
                     scope = scope,
                     type = type,
                     table = table,
+                    prefixLen = prefixLen,
                 ),
             )
         }
