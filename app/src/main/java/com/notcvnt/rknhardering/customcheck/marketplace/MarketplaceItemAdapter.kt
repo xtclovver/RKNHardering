@@ -70,24 +70,18 @@ internal class MarketplaceItemAdapter(
             holder.textDescription.visibility = View.GONE
         }
 
-        if (item.installed) {
-            holder.badgeOfficial.visibility = View.GONE
-            holder.badgeVerified.visibility = View.GONE
-            when {
-                entry.official -> {
-                    holder.installedMarker.visibility = View.VISIBLE
-                    holder.installedMarker.setImageResource(R.drawable.ic_verified_blue)
-                }
-                entry.verified -> {
-                    holder.installedMarker.visibility = View.VISIBLE
-                    holder.installedMarker.setImageResource(R.drawable.ic_verified_grey)
-                }
-                else -> holder.installedMarker.visibility = View.GONE
+        holder.badgeOfficial.visibility = View.GONE
+        holder.badgeVerified.visibility = View.GONE
+        when {
+            entry.official -> {
+                holder.installedMarker.visibility = View.VISIBLE
+                holder.installedMarker.setImageResource(R.drawable.ic_verified_blue)
             }
-        } else {
-            holder.installedMarker.visibility = View.GONE
-            holder.badgeOfficial.visibility = if (entry.official) View.VISIBLE else View.GONE
-            holder.badgeVerified.visibility = if (entry.verified && !entry.official) View.VISIBLE else View.GONE
+            entry.verified -> {
+                holder.installedMarker.visibility = View.VISIBLE
+                holder.installedMarker.setImageResource(R.drawable.ic_verified_grey)
+            }
+            else -> holder.installedMarker.visibility = View.GONE
         }
 
         when {
