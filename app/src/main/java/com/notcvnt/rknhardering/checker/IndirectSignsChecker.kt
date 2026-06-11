@@ -40,11 +40,6 @@ data class TunInterfaceInfo(
 
 object IndirectSignsChecker {
 
-    internal data class SignalOutcome(
-        val detected: Boolean = false,
-        val needsReview: Boolean = false,
-    )
-
     internal enum class DnsClassification {
         LOOPBACK,
         PRIVATE_NETWORK,

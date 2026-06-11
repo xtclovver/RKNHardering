@@ -834,8 +834,9 @@
     <string name="marketplace_empty">No profiles found</string>
     <string name="marketplace_error_unknown">Unknown error</string>
     <string name="marketplace_meta_format">by %1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d installs</string>
     <string name="marketplace_action_install">Install</string>
+    <string name="install_file_subtitle">Local file</string>
+    <string name="install_dns_override_warning">This profile overrides your DNS settings. All DNS lookups during the scan will go through the server above instead of your configured DNS.</string>
     <string name="marketplace_action_update">Update</string>
     <string name="marketplace_action_clone_edit">Clone &amp; edit</string>
     <string name="marketplace_preview_author">Author: %1$s</string>
@@ -929,4 +930,19 @@
     <string name="domain_reachability_expected_prefix">Expected:</string>
     <string name="domain_reachability_test_running">Testing DNS → TCP → TLS…</string>
     <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
+
+    <!-- Markdown export -->
+    <string name="export_ip_channels_col_channel">Channel</string>
+    <string name="export_ip_channels_col_country">Country</string>
+    <string name="export_ip_channels_col_sources">Sources</string>
+    <string name="export_flags_label">Flags</string>
+    <string name="export_operator_whitelist_title">Operator whitelists</string>
+    <string name="export_detected_label">Detected</string>
+    <string name="export_detected_yes">yes</string>
+    <string name="export_detected_no">no</string>
+    <string name="export_control_suffix">control</string>
+    <string name="export_duration_label">Duration</string>
+    <string name="export_duration_unit_ms">ms</string>
+    <string name="export_available">available</string>
+    <string name="export_unavailable">unavailable</string>
 </resources>

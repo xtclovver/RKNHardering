@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "default-quick-scan",
   "name": "Quick Scan",
-  "description": "Fast subset — only direct/indirect signs and GeoIP. Official profile.",
+  "description": "Fast subset \u00e2\u20ac\u201d only direct/indirect signs and GeoIP. Official profile.",
   "author": "xtclovver",
   "version": "1.0.0",
   "created_at": 1747699200000,
@@ -107,7 +107,6 @@
     "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/quick-scan.rkncheck",
     "official": true,
     "verified": true,
-    "install_count": 0,
     "marketplace_id": "default-quick-scan"
   }
 }

@@ -23,6 +23,7 @@ internal class SettingsMarketplaceFragment : Fragment(R.layout.fragment_settings
 
     private lateinit var adapter: MarketplaceItemAdapter
     private var fullList: List<MarketplaceEntry> = emptyList()
+    private var catalogSignatureValid: Boolean = false
     private var installedIds: Set<String> = emptySet()
     private var installedProfiles: Map<String, com.notcvnt.rknhardering.customcheck.CustomCheckProfile> = emptyMap()
     private var currentQuery: String = ""
@@ -35,7 +36,7 @@ internal class SettingsMarketplaceFragment : Fragment(R.layout.fragment_settings
 
         adapter = MarketplaceItemAdapter(
             onInstall = { entry ->
-                SettingsMarketplaceInstallDialogFragment.newInstance(entry)
+                SettingsMarketplaceInstallDialogFragment.newInstance(entry, catalogSignatureValid)
                     .show(childFragmentManager, "install_dialog")
             },
             onOpenInstalled = { entry ->
@@ -46,7 +47,7 @@ internal class SettingsMarketplaceFragment : Fragment(R.layout.fragment_settings
                 activity.navigateTo(fragment, R.string.settings_custom_check_editor_title)
             },
             onUpdate = { entry ->
-                SettingsMarketplaceInstallDialogFragment.newInstance(entry)
+                SettingsMarketplaceInstallDialogFragment.newInstance(entry, catalogSignatureValid)
                     .show(childFragmentManager, "install_dialog")
             },
         )
@@ -139,6 +140,7 @@ internal class SettingsMarketplaceFragment : Fragment(R.layout.fragment_settings
                 .onSuccess { catalog ->
                     progress.visibility = View.GONE
                     fullList = catalog.entries
+                    catalogSignatureValid = catalog.signatureValid
                     refreshInstalledIds()
                     if (fullList.isEmpty()) {
                         textEmpty.visibility = View.VISIBLE

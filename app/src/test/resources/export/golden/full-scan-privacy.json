@@ -1,0 +1,658 @@
+{
+  "meta": {
+    "formatVersion": 1,
+    "timestamp": "2023-11-14T22:13:20Z",
+    "appVersion": "0.0-golden",
+    "buildType": "golden",
+    "privacyMode": true
+  },
+  "verdict": {
+    "value": "DETECTED",
+    "status": "[DETECTED]",
+    "explanation": "The automated check considers the bypass confirmed. The local Xray API exposed a remote endpoint address.",
+    "exposureStatus": "REMOTE_ENDPOINT_DISCOVERED",
+    "meaning": [
+      "A red verdict means the automated check collected enough signs of a bypass.",
+      "An actual remote endpoint address was obtained, not just a public IP."
+    ],
+    "discovered": [
+      {
+        "label": "Exposure level",
+        "value": "Remote endpoint discovered"
+      },
+      {
+        "label": "Local Xray API",
+        "value": "127.0.*.*:8080"
+      },
+      {
+        "label": "Remote endpoint",
+        "value": "198.51.*.*:443"
+      },
+      {
+        "label": "Local proxy",
+        "value": "SOCKS5 127.0.*.*:1080"
+      },
+      {
+        "label": "Owner app",
+        "value": "Example VPN (com.example.vpn, uid 10123)"
+      },
+      {
+        "label": "IP via VPN Network",
+        "value": "198.51.*.*"
+      },
+      {
+        "label": "IP outside VPN",
+        "value": "192.168.*.*"
+      },
+      {
+        "label": "Direct public IP",
+        "value": "198.51.*.*"
+      },
+      {
+        "label": "Public IP via proxy",
+        "value": "203.0.*.*"
+      },
+      {
+        "label": "IP from RU checkers",
+        "value": "198.51.*.*"
+      },
+      {
+        "label": "IP from non-RU checkers",
+        "value": "203.0.*.*"
+      }
+    ],
+    "reasons": [
+      "A local Xray API was found on the device.",
+      "The direct IP and the IP via the local proxy differ.",
+      "A local proxy was found, but the bypass was not automatically confirmed.",
+      "RU and non-RU IP checkers returned different public IPs.",
+      "GeoIP indicates an external or suspicious address."
+    ]
+  },
+  "results": {
+    "geoIp": {
+      "name": "GeoIP",
+      "detected": true,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "findings": [
+        {
+          "description": "GeoIP says 203.0.*.*",
+          "detected": false,
+          "needsReview": false,
+          "isInformational": true,
+          "isError": false,
+          "source": "GEO_IP"
+        }
+      ],
+      "evidence": [
+        {
+          "source": "GEO_IP",
+          "detected": true,
+          "confidence": "HIGH",
+          "description": "Hosting signal for 203.0.*.*"
+        }
+      ],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": [],
+      "geoFacts": {
+        "ip": "203.0.*.*",
+        "countryCode": "FI",
+        "asn": "AS64502 Example VPN",
+        "outsideRu": true,
+        "hosting": true,
+        "proxyDb": true,
+        "fetchError": false,
+        "expectedRoamingExit": false
+      }
+    },
+    "ipComparison": {
+      "detected": true,
+      "needsReview": true,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "summary": "Mismatch between 198.51.*.* and 203.0.*.*",
+      "ruGroup": {
+        "title": "RU",
+        "detected": true,
+        "needsReview": true,
+        "status": "[DETECTED]",
+        "statusLabel": "mismatch",
+        "summary": "RU checker returned 198.51.*.*",
+        "canonicalIp": "198.51.*.*",
+        "ignoredIpv6ErrorCount": 1,
+        "responses": [
+          {
+            "label": "ru-main",
+            "url": "https:\/\/ru.example\/check",
+            "scope": "RU",
+            "ip": "198.51.*.*",
+            "ipv4Records": [],
+            "ipv6Records": [],
+            "ignoredIpv6Error": false
+          }
+        ]
+      },
+      "nonRuGroup": {
+        "title": "NON_RU",
+        "detected": true,
+        "needsReview": false,
+        "status": "[DETECTED]",
+        "statusLabel": "ok",
+        "summary": "NON_RU checker returned 203.0.*.*",
+        "canonicalIp": "203.0.*.*",
+        "ignoredIpv6ErrorCount": 0,
+        "responses": [
+          {
+            "label": "non-ru-main",
+            "url": "https:\/\/non-ru.example\/check",
+            "scope": "NON_RU",
+            "ip": "203.0.*.*",
+            "ipv4Records": [],
+            "ipv6Records": [],
+            "ignoredIpv6Error": false
+          }
+        ]
+      }
+    },
+    "cdnPulling": {
+      "detected": true,
+      "needsReview": true,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "summary": "rutracker.org exposed 203.0.*.*",
+      "findings": [
+        {
+          "description": "CDN trace matched 203.0.*.*",
+          "detected": true,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": false,
+          "source": "SPLIT_TUNNEL_BYPASS"
+        }
+      ],
+      "responses": [
+        {
+          "targetLabel": "rutracker.org",
+          "url": "https:\/\/rutracker.org\/cdn-cgi\/trace",
+          "ip": "203.0.*.*",
+          "ipv4": "203.0.*.*",
+          "ipv6": "2001:db8:0:0:*:*:*:*",
+          "ipv4Unavailable": false,
+          "ipv4Error": "IPv4 retry saw 198.51.*.*",
+          "ipv6Error": "IPv6 timeout 2001:db8:0:0:*:*:*:*",
+          "importantFields": {
+            "ip": "203.0.*.*",
+            "loc": "FI"
+          },
+          "rawBody": "ip=203.0.*.*\nloc=FI"
+        }
+      ]
+    },
+    "directSigns": {
+      "name": "Direct",
+      "detected": true,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "findings": [
+        {
+          "description": "Installed app com.example.vpn at 198.51.*.*",
+          "detected": true,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": false,
+          "source": "INSTALLED_APP",
+          "confidence": "HIGH",
+          "family": "v2ray",
+          "packageName": "com.example.vpn"
+        }
+      ],
+      "evidence": [
+        {
+          "source": "ACTIVE_VPN",
+          "detected": true,
+          "confidence": "HIGH",
+          "description": "VPN service active",
+          "family": "v2ray",
+          "packageName": "com.example.vpn",
+          "kind": "TARGETED_BYPASS"
+        }
+      ],
+      "matchedApps": [
+        {
+          "packageName": "com.example.vpn",
+          "appName": "Example VPN",
+          "family": "v2ray",
+          "kind": "TARGETED_BYPASS",
+          "source": "INSTALLED_APP",
+          "active": true,
+          "confidence": "HIGH",
+          "technicalMetadata": {
+            "versionName": "1.2.3",
+            "serviceNames": [
+              "ExampleService"
+            ],
+            "appType": "V2RayNG",
+            "coreType": "Xray\/V2Ray",
+            "corePath": "lib\/arm64-v8a\/libxray.so",
+            "goVersion": "go1.24.1",
+            "systemApp": false,
+            "matchedByNameHeuristic": false
+          }
+        }
+      ],
+      "activeApps": [
+        {
+          "packageName": "com.example.vpn",
+          "serviceName": "ExampleService",
+          "family": "v2ray",
+          "kind": "TARGETED_BYPASS",
+          "source": "ACTIVE_VPN",
+          "confidence": "HIGH",
+          "technicalMetadata": {
+            "versionName": "1.2.3",
+            "serviceNames": [
+              "ExampleService"
+            ],
+            "appType": "V2RayNG",
+            "coreType": "Xray\/V2Ray",
+            "corePath": "lib\/arm64-v8a\/libxray.so",
+            "goVersion": "go1.24.1",
+            "systemApp": false,
+            "matchedByNameHeuristic": false
+          }
+        }
+      ],
+      "callTransportLeaks": [],
+      "stunProbeGroups": []
+    },
+    "indirectSigns": {
+      "name": "Indirect",
+      "detected": true,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "findings": [
+        {
+          "description": "Indirect route mismatch 198.51.*.*",
+          "detected": true,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": false,
+          "source": "ROUTING"
+        }
+      ],
+      "evidence": [],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [
+        {
+          "service": "TELEGRAM",
+          "probeKind": "DIRECT_UDP_STUN",
+          "networkPath": "UNDERLYING",
+          "status": "ERROR",
+          "targetHost": "198.51.*.*",
+          "targetPort": 3478,
+          "resolvedIps": [
+            "198.51.*.*"
+          ],
+          "mappedIp": "198.51.*.*",
+          "observedPublicIp": "203.0.*.*",
+          "summary": "STUN error from 198.51.*.*",
+          "confidence": "MEDIUM",
+          "experimental": true
+        }
+      ],
+      "stunProbeGroups": [
+        {
+          "scope": "GLOBAL",
+          "respondedCount": 1,
+          "totalCount": 2,
+          "results": [
+            {
+              "host": "stun.example.org",
+              "port": 3478,
+              "scope": "GLOBAL",
+              "mappedIpv4": "203.0.*.*",
+              "mappedIpv6": "2001:db8:0:0:*:*:*:*",
+              "mappedIpDisplay": "203.0.*.* \/ 2001:db8:0:0:*:*:*:*",
+              "hasResponse": true
+            },
+            {
+              "host": "198.51.*.*",
+              "port": 3478,
+              "scope": "GLOBAL",
+              "error": "timeout from 198.51.*.*",
+              "hasResponse": false
+            }
+          ]
+        }
+      ]
+    },
+    "nativeSigns": {
+      "name": "Native signs",
+      "detected": true,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "findings": [
+        {
+          "description": "Native getifaddrs() reports tun0",
+          "detected": true,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": false,
+          "source": "NATIVE_INTERFACE",
+          "confidence": "HIGH"
+        }
+      ],
+      "evidence": [
+        {
+          "source": "NATIVE_INTERFACE",
+          "detected": true,
+          "confidence": "HIGH",
+          "description": "native interface tun0 is visible"
+        }
+      ],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": []
+    },
+    "icmpSpoofing": {
+      "name": "ICMP spoofing",
+      "detected": false,
+      "needsReview": true,
+      "hasError": false,
+      "status": "[REVIEW]",
+      "findings": [
+        {
+          "description": "instagram.com replied and google.com was too fast",
+          "detected": false,
+          "needsReview": true,
+          "isInformational": false,
+          "isError": false,
+          "source": "ICMP_SPOOFING"
+        },
+        {
+          "description": "Blocked target instagram.com (157.240.*.*): 3\/3 replies",
+          "detected": false,
+          "needsReview": false,
+          "isInformational": true,
+          "isError": false
+        }
+      ],
+      "evidence": [
+        {
+          "source": "ICMP_SPOOFING",
+          "detected": true,
+          "confidence": "MEDIUM",
+          "description": "ICMP route behavior looked inconsistent"
+        }
+      ],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": []
+    },
+    "rttTriangulation": {
+      "name": "RTT triangulation",
+      "detected": false,
+      "needsReview": true,
+      "hasError": false,
+      "status": "[REVIEW]",
+      "findings": [
+        {
+          "description": "RTT target mix needs review",
+          "detected": false,
+          "needsReview": true,
+          "isInformational": false,
+          "isError": false,
+          "source": "RTT_TRIANGULATION"
+        }
+      ],
+      "evidence": [],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": []
+    },
+    "locationSignals": {
+      "name": "Location",
+      "detected": false,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[OK]",
+      "findings": [],
+      "evidence": [],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": []
+    },
+    "bypass": {
+      "detected": true,
+      "needsReview": true,
+      "hasError": false,
+      "status": "[DETECTED]",
+      "proxyEndpoint": {
+        "host": "127.0.0.1",
+        "port": 1080,
+        "type": "SOCKS5",
+        "authRequired": true
+      },
+      "proxyOwner": {
+        "uid": 10123,
+        "packageNames": [
+          "com.example.vpn"
+        ],
+        "appLabels": [
+          "Example VPN"
+        ],
+        "confidence": "HIGH"
+      },
+      "proxyOwnerText": "Example VPN (com.example.vpn, uid 10123)",
+      "directIp": "198.51.*.*",
+      "proxyIp": "203.0.*.*",
+      "vpnNetworkIp": "198.51.*.*",
+      "underlyingIp": "192.168.1.55",
+      "xrayApiScanResult": {
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080
+        },
+        "outbounds": [
+          {
+            "tag": "proxy",
+            "protocolName": "vless",
+            "address": "198.51.*.*",
+            "port": 443,
+            "sni": "example.org",
+            "senderSettingsType": "tcp",
+            "proxySettingsType": "none",
+            "uuidPresent": true,
+            "publicKeyPresent": true
+          }
+        ],
+        "handlerAvailable": true,
+        "stats": {
+          "statCount": 2,
+          "sampleNames": [
+            "outbound>>>proxy>>>traffic>>>uplink"
+          ]
+        }
+      },
+      "proxyChecks": [
+        {
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 1080,
+            "type": "SOCKS5",
+            "authRequired": true
+          },
+          "owner": {
+            "uid": 10123,
+            "packageNames": [
+              "com.example.vpn"
+            ],
+            "appLabels": [
+              "Example VPN"
+            ],
+            "confidence": "HIGH"
+          },
+          "ownerStatus": "RESOLVED",
+          "proxyIp": "203.0.*.*",
+          "status": "CONFIRMED_BYPASS",
+          "mtProtoReachable": true,
+          "mtProtoTarget": "149.154.*.*:443",
+          "summaryReason": "CONFIRMED_BYPASS"
+        }
+      ],
+      "findings": [
+        {
+          "description": "Bypass via 198.51.*.*",
+          "detected": true,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": false,
+          "source": "SPLIT_TUNNEL_BYPASS",
+          "confidence": "HIGH"
+        }
+      ],
+      "evidence": [
+        {
+          "source": "XRAY_API",
+          "detected": true,
+          "confidence": "HIGH",
+          "description": "Xray exposed 198.51.*.*"
+        }
+      ]
+    }
+  },
+  "ipConsensus": {
+    "observedIps": [
+      {
+        "value": "198.51.*.*",
+        "family": "V4",
+        "channel": "DIRECT",
+        "sources": [
+          "geoip",
+          "ipcomp:ru:ru-main"
+        ],
+        "countryCode": "RU",
+        "asn": "AS64501 Example Direct",
+        "targetGroup": "RU"
+      },
+      {
+        "value": "203.0.*.*",
+        "family": "V4",
+        "channel": "VPN",
+        "sources": [
+          "underlying-prober.non-ru.vpn",
+          "bypass.vpn"
+        ],
+        "countryCode": "FI",
+        "asn": "AS64502 Example VPN",
+        "targetGroup": "NON_RU"
+      }
+    ],
+    "unparsedIps": [
+      {
+        "raw": "bad field 203.0.*.*",
+        "source": "fixture.raw"
+      }
+    ],
+    "channelIps": {
+      "DIRECT": [
+        "198.51.*.*"
+      ],
+      "VPN": [
+        "203.0.*.*"
+      ]
+    },
+    "crossChannelMismatch": true,
+    "dualStackObserved": true,
+    "warpLikeIndicator": false,
+    "probeTargetDivergence": true,
+    "probeTargetDirectDivergence": true,
+    "geoCountryMismatch": true,
+    "sameAsnAcrossChannels": true,
+    "channelConflict": [
+      "DIRECT",
+      "VPN"
+    ],
+    "foreignIps": [
+      "203.0.*.*"
+    ],
+    "needsReview": true
+  },
+  "tunProbeDiagnostics": {
+    "enabled": true,
+    "modeOverride": "CURL_COMPATIBLE",
+    "activeNetworkIsVpn": true,
+    "vpnNetworkPresent": true,
+    "underlyingNetworkPresent": true,
+    "vpnPath": {
+      "interfaceName": "tun0",
+      "selectedMode": "CURL_COMPATIBLE",
+      "selectedIp": "203.0.*.*",
+      "dnsPathMismatch": true,
+      "strict": {
+        "mode": "STRICT_SAME_PATH",
+        "status": "FAILED",
+        "error": "timeout from 198.51.*.*",
+        "endpointAttempts": [
+          {
+            "endpoint": "https:\/\/198.51.*.*\/ip",
+            "familyHint": "ipv4",
+            "status": "FAILED",
+            "error": "timeout from 198.51.*.*"
+          }
+        ],
+        "transportDiagnostics": {
+          "engine": "NATIVE_LIBCURL",
+          "engineDebugName": "native-libcurl",
+          "resolveStrategy": "NATIVE_DEFAULT",
+          "resolveStrategyDebugName": "native-default",
+          "curlCode": 0,
+          "httpCode": 200,
+          "nativeLibraryLoaded": true,
+          "caBundleVersion": "test-ca",
+          "resolvedAddressesUsed": [
+            "203.0.*.*"
+          ]
+        }
+      },
+      "curlCompatible": {
+        "mode": "CURL_COMPATIBLE",
+        "status": "SUCCEEDED",
+        "ip": "203.0.*.*",
+        "endpointAttempts": [
+          {
+            "endpoint": "https:\/\/203.0.*.*\/ip",
+            "familyHint": "ipv4",
+            "status": "SUCCEEDED",
+            "ip": "203.0.*.*"
+          }
+        ],
+        "transportDiagnostics": {
+          "engine": "NATIVE_LIBCURL",
+          "engineDebugName": "native-libcurl",
+          "resolveStrategy": "NATIVE_DEFAULT",
+          "resolveStrategyDebugName": "native-default",
+          "curlCode": 0,
+          "httpCode": 200,
+          "nativeLibraryLoaded": true,
+          "caBundleVersion": "test-ca",
+          "resolvedAddressesUsed": [
+            "203.0.*.*"
+          ]
+        }
+      }
+    }
+  }
+}

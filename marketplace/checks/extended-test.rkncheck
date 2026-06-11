@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "id": "extended-test",
+  "name": "Extended Test",
+  "description": "Maximum sensitivity profile with all checks enabled, increased ping counts, lowered listener thresholds, full port range scan, and Domain Reachability testing. Includes domains expected to work without VPN and domains expected to be blocked without VPN in Russia.",
+  "author": "xtclovver",
+  "version": "1.0.0",
+  "created_at": 1748296800000,
+  "updated_at": 1748296800000,
+  "checks": {
+    "geo_ip": {
+      "enabled": true,
+      "timeout_ms": 12000,
+      "builtin_providers": {},
+      "custom_providers": []
+    },
+    "ip_comparison": {
+      "enabled": true,
+      "timeout_ms": 10000,
+      "builtin_ru_checkers_enabled": true,
+      "builtin_non_ru_checkers_enabled": true,
+      "custom_endpoints": []
+    },
+    "cdn_pulling": {
+      "enabled": true,
+      "timeout_ms": 12000,
+      "meduza_enabled": true,
+      "rutracker_enabled": true,
+      "builtin_targets_enabled": true,
+      "custom_targets": []
+    },
+    "direct_signs": {
+      "enabled": true,
+      "check_transport_vpn": true,
+      "check_http_proxy": true,
+      "check_socks_proxy": true,
+      "check_proxy_info": true,
+      "check_vpn_service": true
+    },
+    "indirect_signs": {
+      "enabled": true,
+      "check_not_vpn_cap": true,
+      "check_vpn_interfaces": true,
+      "check_mtu_anomaly": true,
+      "check_ipsec": true,
+      "check_routing": true,
+      "check_dns": true,
+      "check_proxy_tools": true,
+      "check_local_listeners": true,
+      "check_dumpsys": true,
+      "listener_port_threshold": 2
+    },
+    "native_signs": {
+      "enabled": true
+    },
+    "location_signals": {
+      "enabled": true,
+      "check_beacondb": true,
+      "check_cell_towers": true,
+      "check_wifi_signals": true
+    },
+    "icmp_spoofing": {
+      "enabled": true,
+      "timeout_ms": 8000,
+      "ping_count": 5,
+      "builtin_targets_enabled": true,
+      "custom_targets": []
+    },
+    "rtt_triangulation": {
+      "enabled": true,
+      "timeout_ms": 8000,
+      "ping_count": 10,
+      "builtin_targets_enabled": true,
+      "custom_targets": []
+    },
+    "call_transport": {
+      "enabled": true,
+      "timeout_ms": 8000,
+      "builtin_global_stun_enabled": true,
+      "builtin_ru_stun_enabled": true,
+      "check_mtproto": true,
+      "custom_stun_servers": []
+    },
+    "split_tunnel": {
+      "enabled": true,
+      "proxy_scan": true,
+      "xray_api_scan": true,
+      "port_range": "full",
+      "port_range_start": 1024,
+      "port_range_end": 65535,
+      "connect_timeout_ms": 500,
+      "check_underlying_network": true,
+      "check_vpn_network_binding": true,
+      "check_mtproto_via_proxy": true
+    },
+    "domain_reachability_enabled": true
+  },
+  "custom_domains": [
+    {
+      "domain": "yandex.ru",
+      "check_type": "reachable-without-vpn",
+      "description": "Yandex \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "vk.com",
+      "check_type": "reachable-without-vpn",
+      "description": "VK \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "mail.ru",
+      "check_type": "reachable-without-vpn",
+      "description": "Mail.ru \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "gosuslugi.ru",
+      "check_type": "reachable-without-vpn",
+      "description": "Gosuslugi \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "sberbank.ru",
+      "check_type": "reachable-without-vpn",
+      "description": "Sberbank \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "mos.ru",
+      "check_type": "reachable-without-vpn",
+      "description": "Mos.ru \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "habr.com",
+      "check_type": "reachable-without-vpn",
+      "description": "Habr \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "google.com",
+      "check_type": "reachable-without-vpn",
+      "description": "Google \u00e2\u20ac\u201d should be reachable without VPN",
+      "expected_dns_available": true,
+      "expected_tcp_available": true,
+      "expected_tls_available": true
+    },
+    {
+      "domain": "discord.com",
+      "check_type": "blocked-without-vpn",
+      "description": "Discord \u00e2\u20ac\u201d blocked in Russia since 2024",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "twitter.com",
+      "check_type": "blocked-without-vpn",
+      "description": "Twitter/X \u00e2\u20ac\u201d throttled/blocked in Russia",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "instagram.com",
+      "check_type": "blocked-without-vpn",
+      "description": "Instagram \u00e2\u20ac\u201d blocked in Russia since 2022",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "facebook.com",
+      "check_type": "blocked-without-vpn",
+      "description": "Facebook \u00e2\u20ac\u201d blocked in Russia since 2022",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "linkedin.com",
+      "check_type": "blocked-without-vpn",
+      "description": "LinkedIn \u00e2\u20ac\u201d blocked in Russia since 2016",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "rutracker.org",
+      "check_type": "blocked-without-vpn",
+      "description": "RuTracker \u00e2\u20ac\u201d blocked in Russia",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "meduza.io",
+      "check_type": "blocked-without-vpn",
+      "description": "Meduza \u00e2\u20ac\u201d blocked in Russia",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    },
+    {
+      "domain": "protonvpn.com",
+      "check_type": "blocked-without-vpn",
+      "description": "ProtonVPN \u00e2\u20ac\u201d blocked in Russia",
+      "expected_dns_available": true,
+      "expected_tcp_available": false,
+      "expected_tls_available": false
+    }
+  ],
+  "network": {
+    "network_requests_enabled": true,
+    "dns_mode": "system",
+    "dns_preset": "custom",
+    "dns_servers": "",
+    "doh_url": "",
+    "doh_bootstrap": ""
+  },
+  "marketplace": {
+    "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/extended-test.rkncheck",
+    "official": true,
+    "verified": true,
+    "marketplace_id": "extended-test"
+  }
+}

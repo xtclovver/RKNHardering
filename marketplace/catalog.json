@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-05-20T00:00:00Z",
+  "updated_at": "2026-05-28T00:00:00Z",
   "entries": [
     {
       "id": "default-full-scan",
@@ -12,7 +12,6 @@
       "verified": true,
       "profile_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/full-scan.rkncheck",
       "expected_hash": "9c52db2e71cd34b693d1a216ea07456aedd6dec56deb7152f4d5d56ba426b78f",
-      "install_count": 0,
       "tags": ["official", "complete"],
       "created_at": "2026-05-20T00:00:00Z",
       "updated_at": "2026-05-20T00:00:00Z"
@@ -26,11 +25,52 @@
       "official": true,
       "verified": true,
       "profile_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/quick-scan.rkncheck",
-      "expected_hash": "c3e74f7507b4d22d960467f5d4603808c93609bbcd318f844ea151a5affab19b",
-      "install_count": 0,
+      "expected_hash": "4805913b72eefdb2b4fe3fa34dd6cf8e0a556c0b89154c1a4c421bfa51797591",
       "tags": ["official", "quick"],
       "created_at": "2026-05-20T00:00:00Z",
       "updated_at": "2026-05-20T00:00:00Z"
+    },
+    {
+      "id": "stealth-check",
+      "name": "Stealth Check",
+      "description": "Local-only checks without any network requests — direct/indirect signs, native JNI, and localhost proxy scanning",
+      "author": "xtclovver",
+      "version": "1.0.0",
+      "official": true,
+      "verified": true,
+      "profile_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/stealth-check.rkncheck",
+      "expected_hash": "bd22df1c205fd992f51d6924a2cd24262d61c9b4a7d720b070cb9d36b1c53918",
+      "tags": ["official", "stealth", "offline", "no-network"],
+      "created_at": "2026-05-27T00:00:00Z",
+      "updated_at": "2026-05-27T00:00:00Z"
+    },
+    {
+      "id": "mtproxy-tg-stun-check",
+      "name": "MTProxy/TG STUN Check",
+      "description": "Telegram traffic analysis — STUN reflexive IP, MTProto probing via localhost proxies, underlying network leak checks",
+      "author": "xtclovver",
+      "version": "1.0.0",
+      "official": true,
+      "verified": true,
+      "profile_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/mtproxy-tg-stun-check.rkncheck",
+      "expected_hash": "52b54892378044a9238c2824fdc32870fd2923bb1f5bac784fd51740f91718d5",
+      "tags": ["official", "telegram", "mtproto", "stun"],
+      "created_at": "2026-05-27T00:00:00Z",
+      "updated_at": "2026-05-27T00:00:00Z"
+    },
+    {
+      "id": "extended-test",
+      "name": "Extended Test",
+      "description": "Maximum sensitivity — all checks enabled, increased ping counts, lowered thresholds, full port scan, domain reachability with blocked/reachable domains",
+      "author": "xtclovver",
+      "version": "1.0.0",
+      "official": true,
+      "verified": true,
+      "profile_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/extended-test.rkncheck",
+      "expected_hash": "f9fddd357e1ad2ca6a674fd4d41a471bb881894f7a7716627eee58e964383f3b",
+      "tags": ["official", "extended", "hardening", "maximum-sensitivity", "domain-reachability"],
+      "created_at": "2026-05-27T00:00:00Z",
+      "updated_at": "2026-05-27T00:00:00Z"
     }
   ]
 }

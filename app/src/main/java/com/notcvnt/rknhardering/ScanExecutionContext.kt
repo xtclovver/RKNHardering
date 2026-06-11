@@ -60,9 +60,15 @@ class ScanCancellationSignal {
 
     fun cancel() {
         if (!cancelled.compareAndSet(false, true)) return
-        val pending = callbacks.entries.toList()
+        // Snapshot via the map's weakly-consistent iterator. Collection.toList()
+        // takes a size==1 fast path through first(), which races with concurrent
+        // unregister() and can throw NoSuchElementException.
+        val pending = ArrayList<() -> Unit>(callbacks.size)
+        for (callback in callbacks.values) {
+            pending.add(callback)
+        }
         callbacks.clear()
-        pending.forEach { (_, callback) ->
+        pending.forEach { callback ->
             runCatching(callback)
         }
     }

@@ -23,6 +23,10 @@ data class UrlInfo(
 object CustomCheckSerializer {
 
     private const val SCHEMA_VERSION = 1
+    // Caps on imported payload size to keep memory predictable and to make
+    // attacker-controlled payloads less interesting (no point ferrying 10k URLs).
+    private const val MAX_CUSTOM_ENTRIES = 32
+    private const val MAX_LABEL_LEN = 128
 
     // ── serialize ────────────────────────────────────────────────────────────
 
@@ -41,7 +45,7 @@ object CustomCheckSerializer {
         root.put("custom_domains", serializeCustomDomains(profile.customDomains))
         root.put("network", serializeNetworkConfig(profile.networkConfig))
 
-        profile.marketplaceInfo?.let { root.put("marketplace", serializeMarketplaceInfo(it)) }
+        profile.marketplaceInfo?.let { root.put("marketplace", serializeMarketplaceInfo(it, includeSignatureVerified = true)) }
         profile.sourceProfileId?.let { root.put("source_profile_id", it) }
 
         return root.toString(2)
@@ -270,12 +274,15 @@ object CustomCheckSerializer {
         return obj
     }
 
-    private fun serializeMarketplaceInfo(m: MarketplaceInfo): JSONObject {
+    private fun serializeMarketplaceInfo(m: MarketplaceInfo, includeSignatureVerified: Boolean): JSONObject {
         val obj = JSONObject()
         if (m.sourceUrl != null) obj.put("source_url", m.sourceUrl) else obj.put("source_url", JSONObject.NULL)
         obj.put("official", m.official)
         obj.put("verified", m.verified)
-        obj.put("install_count", m.installCount)
+        // signature_verified is a device-local trust signal — only serialized when
+        // writing to local storage, never included in the canonical hash and never
+        // honored when an imported file claims it.
+        if (includeSignatureVerified) obj.put("signature_verified", m.signatureVerified)
         if (m.marketplaceId != null) obj.put("marketplace_id", m.marketplaceId) else obj.put("marketplace_id", JSONObject.NULL)
         if (m.originalHash != null) obj.put("original_hash", m.originalHash) else obj.put("original_hash", JSONObject.NULL)
         return obj
@@ -283,7 +290,17 @@ object CustomCheckSerializer {
 
     // ── deserialize ──────────────────────────────────────────────────────────
 
-    fun deserialize(json: String): CustomCheckProfile {
+    // Deserialize a profile from an UNTRUSTED source (file/clipboard/network).
+    // marketplace.signature_verified, official, verified are forced to false here —
+    // those bits can only be set later by code that actually verified the catalog
+    // signature for this profile. URLs and hosts are scrubbed via UrlSanitizer.
+    fun deserialize(json: String): CustomCheckProfile = deserializeInternal(json, trustSignatureField = false)
+
+    // Deserialize from device-local storage where we trust the signature_verified
+    // bit because the app itself wrote it after a successful catalog check.
+    fun deserializeFromStorage(json: String): CustomCheckProfile = deserializeInternal(json, trustSignatureField = true)
+
+    private fun deserializeInternal(json: String, trustSignatureField: Boolean): CustomCheckProfile {
         val root = JSONObject(json)
 
         val id = root.optString("id", java.util.UUID.randomUUID().toString())
@@ -303,8 +320,13 @@ object CustomCheckSerializer {
         val networkConfig = if (root.has("network")) deserializeNetworkConfig(root.getJSONObject("network"))
         else NetworkConfig()
 
-        val marketplaceInfo = if (root.has("marketplace")) deserializeMarketplaceInfo(root.getJSONObject("marketplace"))
+        val rawMarketplaceInfo = if (root.has("marketplace")) deserializeMarketplaceInfo(root.getJSONObject("marketplace"), trustSignatureField)
         else null
+        // Force official/verified to false when the trust signal is missing. The
+        // catalog-verification path will re-mint these flags after Ed25519 succeeds.
+        val marketplaceInfo = rawMarketplaceInfo?.let {
+            if (it.signatureVerified) it else it.copy(official = false, verified = false)
+        }
 
         val sourceProfileId = if (root.has("source_profile_id") && !root.isNull("source_profile_id"))
             root.getString("source_profile_id") else null
@@ -370,12 +392,14 @@ object CustomCheckSerializer {
         val customProviders = mutableListOf<CustomGeoIpProvider>()
         if (obj.has("custom_providers")) {
             val arr = obj.getJSONArray("custom_providers")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val sanitizedUrl = UrlSanitizer.sanitizeGeoIpProviderUrl(e.optString("url", ""))
+                if (sanitizedUrl.isEmpty()) continue
                 customProviders.add(
                     CustomGeoIpProvider(
-                        name = e.optString("name", ""),
-                        url = e.optString("url", ""),
+                        name = e.optString("name", "").take(MAX_LABEL_LEN),
+                        url = sanitizedUrl,
                         enabled = e.optBoolean("enabled", true),
                         responseMapping = if (e.has("response_mapping")) deserializeResponseMapping(e.getJSONObject("response_mapping")) else ResponseMapping(),
                     )
@@ -394,13 +418,15 @@ object CustomCheckSerializer {
         val endpoints = mutableListOf<CustomIpEndpoint>()
         if (obj.has("custom_endpoints")) {
             val arr = obj.getJSONArray("custom_endpoints")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val sanitizedUrl = UrlSanitizer.sanitizeHttpsUrl(e.optString("url", ""))
+                if (sanitizedUrl.isEmpty()) continue
                 val scope = runCatching { EndpointScope.valueOf(e.optString("scope", "RU")) }.getOrDefault(EndpointScope.RU)
                 endpoints.add(
                     CustomIpEndpoint(
-                        label = e.optString("label", ""),
-                        url = e.optString("url", ""),
+                        label = e.optString("label", "").take(MAX_LABEL_LEN),
+                        url = sanitizedUrl,
                         scope = scope,
                         enabled = e.optBoolean("enabled", true),
                         responseMapping = if (e.has("response_mapping")) deserializeResponseMapping(e.getJSONObject("response_mapping"))
@@ -422,12 +448,14 @@ object CustomCheckSerializer {
         val targets = mutableListOf<CustomCdnTarget>()
         if (obj.has("custom_targets")) {
             val arr = obj.getJSONArray("custom_targets")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val sanitizedUrl = UrlSanitizer.sanitizeHttpsUrl(e.optString("url", ""))
+                if (sanitizedUrl.isEmpty()) continue
                 targets.add(
                     CustomCdnTarget(
-                        label = e.optString("label", ""),
-                        url = e.optString("url", ""),
+                        label = e.optString("label", "").take(MAX_LABEL_LEN),
+                        url = sanitizedUrl,
                         enabled = e.optBoolean("enabled", true),
                         responseMapping = if (e.has("response_mapping")) deserializeResponseMapping(e.getJSONObject("response_mapping"))
                         else ResponseMapping(responseType = ResponseType.KEY_VALUE),
@@ -479,11 +507,13 @@ object CustomCheckSerializer {
         val targets = mutableListOf<IcmpTarget>()
         if (obj.has("custom_targets")) {
             val arr = obj.getJSONArray("custom_targets")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val host = UrlSanitizer.sanitizeHost(e.optString("host", ""))
+                if (host.isEmpty()) continue
                 targets.add(IcmpTarget(
-                    host = e.optString("host", ""),
-                    label = e.optString("label", ""),
+                    host = host,
+                    label = e.optString("label", "").take(MAX_LABEL_LEN),
                     isControl = e.optBoolean("is_control", false),
                 ))
             }
@@ -501,12 +531,14 @@ object CustomCheckSerializer {
         val targets = mutableListOf<RttTarget>()
         if (obj.has("custom_targets")) {
             val arr = obj.getJSONArray("custom_targets")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val host = UrlSanitizer.sanitizeHost(e.optString("host", ""))
+                if (host.isEmpty()) continue
                 targets.add(RttTarget(
-                    host = e.optString("host", ""),
-                    label = e.optString("label", ""),
-                    expectedLocation = e.optString("expected_location", ""),
+                    host = host,
+                    label = e.optString("label", "").take(MAX_LABEL_LEN),
+                    expectedLocation = e.optString("expected_location", "").take(MAX_LABEL_LEN),
                 ))
             }
         }
@@ -523,12 +555,15 @@ object CustomCheckSerializer {
         val servers = mutableListOf<StunServer>()
         if (obj.has("custom_stun_servers")) {
             val arr = obj.getJSONArray("custom_stun_servers")
-            for (i in 0 until arr.length()) {
+            for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
                 val e = arr.getJSONObject(i)
+                val host = UrlSanitizer.sanitizeHost(e.optString("host", ""))
+                if (host.isEmpty()) continue
+                val port = e.optInt("port", 3478).coerceIn(1, 65535)
                 servers.add(StunServer(
-                    host = e.optString("host", ""),
-                    port = e.optInt("port", 3478),
-                    label = e.optString("label", ""),
+                    host = host,
+                    port = port,
+                    label = e.optString("label", "").take(MAX_LABEL_LEN),
                 ))
             }
         }
@@ -557,12 +592,14 @@ object CustomCheckSerializer {
 
     private fun deserializeCustomDomains(arr: JSONArray): List<CustomDomain> {
         val list = mutableListOf<CustomDomain>()
-        for (i in 0 until arr.length()) {
+        for (i in 0 until arr.length().coerceAtMost(MAX_CUSTOM_ENTRIES)) {
             val e = arr.getJSONObject(i)
+            val domain = UrlSanitizer.sanitizeHost(e.optString("domain", ""))
+            if (domain.isEmpty()) continue
             list.add(CustomDomain(
-                domain = e.optString("domain", ""),
-                checkType = e.optString("check_type", ""),
-                description = e.optString("description", ""),
+                domain = domain,
+                checkType = e.optString("check_type", "").take(MAX_LABEL_LEN),
+                description = e.optString("description", "").take(MAX_LABEL_LEN),
                 expectedDnsAvailable = e.optBoolean("expected_dns_available", true),
                 expectedTcpAvailable = e.optBoolean("expected_tcp_available", true),
                 expectedTlsAvailable = e.optBoolean("expected_tls_available", true),
@@ -575,16 +612,19 @@ object CustomCheckSerializer {
         networkRequestsEnabled = obj.optBoolean("network_requests_enabled", true),
         dnsMode = obj.optString("dns_mode", "system"),
         dnsPreset = obj.optString("dns_preset", "custom"),
-        dnsServers = obj.optString("dns_servers", ""),
-        dohUrl = obj.optString("doh_url", ""),
-        dohBootstrap = obj.optString("doh_bootstrap", ""),
+        dnsServers = UrlSanitizer.sanitizeAddressList(obj.optString("dns_servers", "")),
+        dohUrl = UrlSanitizer.sanitizeHttpsUrl(obj.optString("doh_url", "")),
+        dohBootstrap = UrlSanitizer.sanitizeAddressList(obj.optString("doh_bootstrap", "")),
     )
 
-    private fun deserializeMarketplaceInfo(obj: JSONObject): MarketplaceInfo = MarketplaceInfo(
+    private fun deserializeMarketplaceInfo(obj: JSONObject, trustSignatureVerifiedField: Boolean): MarketplaceInfo = MarketplaceInfo(
         sourceUrl = if (obj.has("source_url") && !obj.isNull("source_url")) obj.getString("source_url") else null,
         official = obj.optBoolean("official", false),
         verified = obj.optBoolean("verified", false),
-        installCount = obj.optInt("install_count", 0),
+        // signature_verified inside a file is only honored when reading from
+        // local storage (where the app itself wrote it). For imports we ignore
+        // the field entirely so attackers cannot forge it.
+        signatureVerified = trustSignatureVerifiedField && obj.optBoolean("signature_verified", false),
         marketplaceId = if (obj.has("marketplace_id") && !obj.isNull("marketplace_id")) obj.getString("marketplace_id") else null,
         originalHash = if (obj.has("original_hash") && !obj.isNull("original_hash")) obj.getString("original_hash") else null,
     )
@@ -625,13 +665,23 @@ object CustomCheckSerializer {
         return sha256Hex(root.toString())
     }
 
-    fun verifyIntegrity(profile: CustomCheckProfile): CustomCheckProfile {
+    // Re-validates a profile loaded from local storage.
+    //   * If trustedHash is null (never installed from signed catalog), strip any
+    //     official/verified the file might claim.
+    //   * If trustedHash is provided, recompute canonicalHash and require match.
+    //     The trustedHash comes from outside the file (SharedPrefs) so an attacker
+    //     who can rewrite the .rkncheck cannot also rewrite this anchor.
+    fun verifyIntegrity(profile: CustomCheckProfile, trustedHash: String? = null): CustomCheckProfile {
         val info = profile.marketplaceInfo ?: return profile
-        val storedHash = info.originalHash ?: return profile
+        if (trustedHash == null) {
+            return if (info.official || info.verified || info.signatureVerified) {
+                profile.copy(marketplaceInfo = info.copy(official = false, verified = false, signatureVerified = false))
+            } else profile
+        }
         val recomputed = canonicalHash(profile)
-        if (recomputed == storedHash) return profile
+        if (recomputed.equals(trustedHash, ignoreCase = true)) return profile
         return profile.copy(
-            marketplaceInfo = info.copy(official = false, verified = false),
+            marketplaceInfo = info.copy(official = false, verified = false, signatureVerified = false),
         )
     }
 
@@ -653,6 +703,17 @@ object CustomCheckSerializer {
 
     fun extractAllUrls(profile: CustomCheckProfile): List<UrlInfo> {
         val result = mutableListOf<UrlInfo>()
+
+        val net = profile.networkConfig
+        if (net.dohUrl.isNotBlank()) {
+            result.add(UrlInfo(url = net.dohUrl, purpose = "DoH endpoint", checkName = "DNS"))
+        }
+        if (net.dnsServers.isNotBlank()) {
+            result.add(UrlInfo(url = net.dnsServers, purpose = "DNS servers", checkName = "DNS"))
+        }
+        if (net.dohBootstrap.isNotBlank()) {
+            result.add(UrlInfo(url = net.dohBootstrap, purpose = "DoH bootstrap", checkName = "DNS"))
+        }
 
         profile.checksConfig.geoIp.customProviders.forEach { p ->
             if (p.url.isNotBlank()) {

@@ -38,7 +38,6 @@ internal class MarketplaceItemAdapter(
         val textName: TextView = view.findViewById(R.id.textItemName)
         val textAuthor: TextView = view.findViewById(R.id.textItemAuthor)
         val textDescription: TextView = view.findViewById(R.id.textItemDescription)
-        val textInstallCount: TextView = view.findViewById(R.id.textItemInstallCount)
         val badgeOfficial: TextView = view.findViewById(R.id.badgeOfficial)
         val badgeVerified: TextView = view.findViewById(R.id.badgeVerified)
         val installedMarker: ImageView = view.findViewById(R.id.installedMarker)
@@ -70,8 +69,6 @@ internal class MarketplaceItemAdapter(
         } else {
             holder.textDescription.visibility = View.GONE
         }
-
-        holder.textInstallCount.text = ctx.getString(R.string.marketplace_install_count, entry.installCount)
 
         if (item.installed) {
             holder.badgeOfficial.visibility = View.GONE

@@ -414,10 +414,10 @@ data class DomainReachabilityResponse(
     val matchesExpectation: Boolean
         get() {
             val dnsOk = (dnsStatus == DomainReachabilityStepStatus.OK) == expectedDnsAvailable
-            val tcpOk = if (dnsStatus == DomainReachabilityStepStatus.FAILED) true
-                else (tcpStatus == DomainReachabilityStepStatus.OK) == expectedTcpAvailable
-            val tlsOk = if (tcpStatus != DomainReachabilityStepStatus.OK) true
-                else (tlsStatus == DomainReachabilityStepStatus.OK) == expectedTlsAvailable
+            val tcpOk = dnsStatus == DomainReachabilityStepStatus.FAILED ||
+                (tcpStatus == DomainReachabilityStepStatus.OK) == expectedTcpAvailable
+            val tlsOk = tcpStatus != DomainReachabilityStepStatus.OK ||
+                (tlsStatus == DomainReachabilityStepStatus.OK) == expectedTlsAvailable
             return dnsOk && tcpOk && tlsOk
         }
 }

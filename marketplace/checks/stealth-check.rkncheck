@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "stealth-check",
+  "name": "Stealth Check",
+  "description": "Local-only checks without any network requests. Detects VPN/proxy using on-device signals: NetworkCapabilities, interfaces, routing, DNS config, dumpsys, native JNI, and localhost proxy scanning.",
+  "author": "xtclovver",
+  "version": "1.0.0",
+  "created_at": 1748296800000,
+  "updated_at": 1748296800000,
+  "checks": {
+    "geo_ip": {
+      "enabled": false,
+      "timeout_ms": 10000,
+      "builtin_providers": {},
+      "custom_providers": []
+    },
+    "ip_comparison": {
+      "enabled": false,
+      "timeout_ms": 8000,
+      "builtin_ru_checkers_enabled": false,
+      "builtin_non_ru_checkers_enabled": false,
+      "custom_endpoints": []
+    },
+    "cdn_pulling": {
+      "enabled": false,
+      "timeout_ms": 10000,
+      "meduza_enabled": false,
+      "rutracker_enabled": false,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "direct_signs": {
+      "enabled": true,
+      "check_transport_vpn": true,
+      "check_http_proxy": true,
+      "check_socks_proxy": true,
+      "check_proxy_info": true,
+      "check_vpn_service": true
+    },
+    "indirect_signs": {
+      "enabled": true,
+      "check_not_vpn_cap": true,
+      "check_vpn_interfaces": true,
+      "check_mtu_anomaly": true,
+      "check_ipsec": true,
+      "check_routing": true,
+      "check_dns": true,
+      "check_proxy_tools": true,
+      "check_local_listeners": true,
+      "check_dumpsys": true,
+      "listener_port_threshold": 5
+    },
+    "native_signs": {
+      "enabled": true
+    },
+    "location_signals": {
+      "enabled": true,
+      "check_beacondb": false,
+      "check_cell_towers": true,
+      "check_wifi_signals": true
+    },
+    "icmp_spoofing": {
+      "enabled": false,
+      "timeout_ms": 5000,
+      "ping_count": 3,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "rtt_triangulation": {
+      "enabled": false,
+      "timeout_ms": 5000,
+      "ping_count": 5,
+      "builtin_targets_enabled": false,
+      "custom_targets": []
+    },
+    "call_transport": {
+      "enabled": false,
+      "timeout_ms": 5000,
+      "builtin_global_stun_enabled": false,
+      "builtin_ru_stun_enabled": false,
+      "check_mtproto": false,
+      "custom_stun_servers": []
+    },
+    "split_tunnel": {
+      "enabled": true,
+      "proxy_scan": true,
+      "xray_api_scan": true,
+      "port_range": "popular",
+      "port_range_start": 1024,
+      "port_range_end": 65535,
+      "connect_timeout_ms": 300,
+      "check_underlying_network": false,
+      "check_vpn_network_binding": false,
+      "check_mtproto_via_proxy": false
+    },
+    "domain_reachability_enabled": false
+  },
+  "custom_domains": [],
+  "network": {
+    "network_requests_enabled": false,
+    "dns_mode": "system",
+    "dns_preset": "custom",
+    "dns_servers": "",
+    "doh_url": "",
+    "doh_bootstrap": ""
+  },
+  "marketplace": {
+    "source_url": "https://raw.githubusercontent.com/xtclovver/RKNHardering/main/marketplace/checks/stealth-check.rkncheck",
+    "official": true,
+    "verified": true,
+    "marketplace_id": "stealth-check"
+  }
+}

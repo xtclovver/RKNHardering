@@ -1,0 +1,281 @@
+timestamp: 2023-11-14T22:13:20Z
+app: 0.0-golden (golden)
+debugDiagnosticsEnabled: false
+privacyMode: true
+splitTunnelEnabled: true
+proxyScanEnabled: true
+xrayApiScanEnabled: true
+networkRequestsEnabled: true
+cdnPullingEnabled: false
+callTransportProbeEnabled: false
+tunProbeModeOverride: AUTO
+resolverMode: SYSTEM
+resolverPreset: CUSTOM
+resolverDirectServers: <none>
+resolverDohUrl: <none>
+resolverDohBootstrap: <none>
+verdict: DETECTED
+
+[geoIp]
+name: GeoIP
+detected: true
+needsReview: false
+hasError: false
+status: [DETECTED]
+findingsCount: 1
+evidenceCount: 1
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 0
+findings:
+- description=GeoIP says 203.0.*.* detected=false needsReview=false error=false informational=true source=GEO_IP
+evidence:
+- source=GEO_IP detected=true confidence=HIGH description=Hosting signal for 203.0.*.*
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- <none>
+responses:
+- <none>
+
+[ipComparison]
+detected: true
+needsReview: true
+hasError: false
+status: [DETECTED]
+summary: Mismatch between 198.51.*.* and 203.0.*.*
+ru.title: RU
+ru.detected: true
+ru.needsReview: true
+ru.statusLabel: mismatch
+ru.summary: RU checker returned 198.51.*.*
+ru.canonicalIp: 198.51.*.*
+ru.ignoredIpv6ErrorCount: 1
+ru.responses:
+- label=ru-main scope=RU url=https://ru.example/check ip=198.51.*.* error=<none> ipv4Records=<none> ipv6Records=<none> ignoredIpv6Error=false
+nonRu.title: NON_RU
+nonRu.detected: true
+nonRu.needsReview: false
+nonRu.statusLabel: ok
+nonRu.summary: NON_RU checker returned 203.0.*.*
+nonRu.canonicalIp: 203.0.*.*
+nonRu.ignoredIpv6ErrorCount: 0
+nonRu.responses:
+- label=non-ru-main scope=NON_RU url=https://non-ru.example/check ip=203.0.*.* error=<none> ipv4Records=<none> ipv6Records=<none> ignoredIpv6Error=false
+
+[cdnPulling]
+detected: true
+needsReview: true
+hasError: false
+status: [DETECTED]
+summary: rutracker.org exposed 203.0.*.*
+findings:
+- description=CDN trace matched 203.0.*.* detected=true needsReview=false error=false informational=false source=SPLIT_TUNNEL_BYPASS
+responses:
+- target=rutracker.org url=https://rutracker.org/cdn-cgi/trace ip=203.0.*.* error=<none> importantFields=ip=203.0.*.*, loc=FI rawBody=ip=203.0.*.*\nloc=FI
+
+[directSigns]
+name: Direct
+detected: true
+needsReview: false
+hasError: false
+status: [DETECTED]
+findingsCount: 1
+evidenceCount: 1
+matchedAppsCount: 1
+activeAppsCount: 1
+callTransportCount: 0
+findings:
+- description=Installed app com.example.vpn at 198.51.*.* detected=true needsReview=false error=false informational=false source=INSTALLED_APP confidence=HIGH family=v2ray package=com.example.vpn
+evidence:
+- source=ACTIVE_VPN detected=true confidence=HIGH kind=TARGETED_BYPASS family=v2ray package=com.example.vpn description=VPN service active
+matchedApps:
+- appName=Example VPN package=com.example.vpn family=v2ray kind=TARGETED_BYPASS source=INSTALLED_APP active=true confidence=HIGH version=1.2.3 services=ExampleService appType=V2RayNG coreType=Xray/V2Ray corePath=lib/arm64-v8a/libxray.so goVersion=go1.24.1 systemApp=false matchedByNameHeuristic=false
+activeApps:
+- package=com.example.vpn serviceName=ExampleService family=v2ray kind=TARGETED_BYPASS source=ACTIVE_VPN confidence=HIGH version=1.2.3 services=ExampleService appType=V2RayNG coreType=Xray/V2Ray corePath=lib/arm64-v8a/libxray.so goVersion=go1.24.1 systemApp=false matchedByNameHeuristic=false
+callTransport:
+- <none>
+
+[indirectSigns]
+name: Indirect
+detected: true
+needsReview: false
+hasError: false
+status: [DETECTED]
+findingsCount: 1
+evidenceCount: 0
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 1
+findings:
+- description=Indirect route mismatch 198.51.*.* detected=true needsReview=false error=false informational=false source=ROUTING
+evidence:
+- <none>
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- service=TELEGRAM probeKind=DIRECT_UDP_STUN networkPath=UNDERLYING status=ERROR targetHost=198.51.*.* targetPort=3478 resolvedIps=198.51.*.* mappedIp=198.51.*.* observedPublicIp=203.0.*.* confidence=MEDIUM experimental=true summary=STUN error from 198.51.*.*
+
+[icmpSpoofing]
+name: ICMP spoofing
+detected: false
+needsReview: true
+hasError: false
+status: [REVIEW]
+findingsCount: 2
+evidenceCount: 1
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 0
+findings:
+- description=instagram.com replied and google.com was too fast detected=false needsReview=true error=false informational=false source=ICMP_SPOOFING
+- description=Blocked target instagram.com (157.240.*.*): 3/3 replies detected=false needsReview=false error=false informational=true
+evidence:
+- source=ICMP_SPOOFING detected=true confidence=MEDIUM description=ICMP route behavior looked inconsistent
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- <none>
+
+[rttTriangulation]
+name: RTT triangulation
+detected: false
+needsReview: true
+hasError: false
+status: [REVIEW]
+findingsCount: 1
+evidenceCount: 0
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 0
+findings:
+- description=RTT target mix needs review detected=false needsReview=true error=false informational=false source=RTT_TRIANGULATION
+evidence:
+- <none>
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- <none>
+
+[locationSignals]
+name: Location
+detected: false
+needsReview: false
+hasError: false
+status: [OK]
+findingsCount: 0
+evidenceCount: 0
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 0
+findings:
+- <none>
+evidence:
+- <none>
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- <none>
+
+[bypass]
+detected: true
+needsReview: true
+hasError: false
+status: [DETECTED]
+directIp: 198.51.*.*
+proxyIp: 203.0.*.*
+vpnNetworkIp: 198.51.*.*
+underlyingIp: 192.168.1.55
+proxyEndpoint: 127.0.0.1:1080 (SOCKS5)
+proxyOwner: uid=10123 confidence=HIGH apps=Example VPN packages=com.example.vpn
+xrayApi: endpoint=127.0.0.1:8080 outboundCount=1
+findings:
+- description=Bypass via 198.51.*.* detected=true needsReview=false error=false informational=false source=SPLIT_TUNNEL_BYPASS confidence=HIGH
+evidence:
+- source=XRAY_API detected=true confidence=HIGH description=Xray exposed 198.51.*.*
+proxyChecks:
+- endpoint=127.0.0.1:1080 type=SOCKS5 ownerStatus=RESOLVED owner=uid=10123 confidence=HIGH apps=Example VPN packages=com.example.vpn proxyIp=203.0.*.* status=CONFIRMED_BYPASS mtProtoReachable=true mtProtoTarget=149.154.*.*:443 summaryReason=CONFIRMED_BYPASS
+xrayOutbounds:
+- tag=proxy protocol=vless address=198.51.*.* port=443 sni=example.org senderSettingsType=tcp proxySettingsType=none uuidPresent=true publicKeyPresent=true
+
+[nativeSigns]
+name: Native signs
+detected: true
+needsReview: false
+hasError: false
+status: [DETECTED]
+findingsCount: 1
+evidenceCount: 1
+matchedAppsCount: 0
+activeAppsCount: 0
+callTransportCount: 0
+findings:
+- description=Native getifaddrs() reports tun0 detected=true needsReview=false error=false informational=false source=NATIVE_INTERFACE confidence=HIGH
+evidence:
+- source=NATIVE_INTERFACE detected=true confidence=HIGH description=native interface tun0 is visible
+matchedApps:
+- <none>
+activeApps:
+- <none>
+callTransport:
+- <none>
+
+[nativeSigns.raw]
+libraryLoaded: false
+
+[operatorWhitelist]
+collected: false
+
+[tunProbe]
+collected: true
+debugDiagnosticsEnabled: true
+tunProbeModeOverride: CURL_COMPATIBLE
+resolver: SYSTEM
+activeNetworkIsVpn: true
+vpnNetworkPresent: true
+underlyingNetworkPresent: true
+
+[vpn path]
+available: true
+interfaceName: tun0
+selectedMode: CURL_COMPATIBLE
+selectedIp: 203.0.*.*
+selectedError: <none>
+dnsPathMismatch: true
+strict.status: FAILED
+strict.ip: <none>
+strict.error: timeout from 198.51.*.*
+strict.engine: native-libcurl
+strict.resolveStrategy: native-default
+strict.curlCode: 0
+strict.httpCode: 200
+strict.nativeLibraryLoaded: true
+strict.caBundleVersion: test-ca
+strict.resolvedAddresses: 203.0.*.*
+strict.endpoints:
+- https://198.51.100.7/ip [ipv4] -> FAILED (error=timeout from 198.51.*.*)
+curl-compatible.status: SUCCEEDED
+curl-compatible.ip: 203.0.*.*
+curl-compatible.error: <none>
+curl-compatible.engine: native-libcurl
+curl-compatible.resolveStrategy: native-default
+curl-compatible.curlCode: 0
+curl-compatible.httpCode: 200
+curl-compatible.nativeLibraryLoaded: true
+curl-compatible.caBundleVersion: test-ca
+curl-compatible.resolvedAddresses: 203.0.*.*
+curl-compatible.endpoints:
+- https://203.0.113.64/ip [ipv4] -> SUCCEEDED (ip=203.0.*.*)
+
+[underlying path]
+available: false

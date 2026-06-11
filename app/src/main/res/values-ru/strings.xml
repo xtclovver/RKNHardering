@@ -817,8 +817,9 @@
     <string name="marketplace_empty">Профили не найдены</string>
     <string name="marketplace_error_unknown">Неизвестная ошибка</string>
     <string name="marketplace_meta_format">от %1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d установок</string>
     <string name="marketplace_action_install">Установить</string>
+    <string name="install_file_subtitle">Локальный файл</string>
+    <string name="install_dns_override_warning">Этот профиль переопределяет настройки DNS. Все DNS-запросы во время сканирования пойдут через указанный выше сервер, а не через выбранный в настройках.</string>
     <string name="marketplace_action_update">Обновить</string>
     <string name="marketplace_action_clone_edit">Клонировать и редактировать</string>
     <string name="marketplace_preview_author">Автор: %1$s</string>
@@ -917,4 +918,19 @@
     <string name="domain_reachability_expected_prefix">Ожидается:</string>
     <string name="domain_reachability_test_running">Тестирование DNS → TCP → TLS…</string>
     <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
+
+    <!-- Markdown export -->
+    <string name="export_ip_channels_col_channel">Канал</string>
+    <string name="export_ip_channels_col_country">Страна</string>
+    <string name="export_ip_channels_col_sources">Источники</string>
+    <string name="export_flags_label">Флаги</string>
+    <string name="export_operator_whitelist_title">Белые списки оператора</string>
+    <string name="export_detected_label">Детектировано</string>
+    <string name="export_detected_yes">да</string>
+    <string name="export_detected_no">нет</string>
+    <string name="export_control_suffix">контроль</string>
+    <string name="export_duration_label">Длительность</string>
+    <string name="export_duration_unit_ms">мс</string>
+    <string name="export_available">доступен</string>
+    <string name="export_unavailable">недоступен</string>
 </resources>

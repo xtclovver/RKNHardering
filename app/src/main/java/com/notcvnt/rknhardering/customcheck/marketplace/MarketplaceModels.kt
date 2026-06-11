@@ -4,6 +4,10 @@ data class MarketplaceCatalog(
     val schemaVersion: Int,
     val updatedAt: String,
     val entries: List<MarketplaceEntry>,
+    // True only if catalog.json was downloaded together with a catalog.sig that
+    // validated against the bundled marketplace public key. Drives whether the
+    // catalog can confer official/verified status on entries.
+    val signatureValid: Boolean = false,
 )
 
 data class MarketplaceEntry(
@@ -15,7 +19,6 @@ data class MarketplaceEntry(
     val official: Boolean,
     val verified: Boolean,
     val profileUrl: String,
-    val installCount: Int,
     val tags: List<String>,
     val createdAt: String,
     val updatedAt: String,

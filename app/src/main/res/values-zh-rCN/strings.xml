@@ -794,8 +794,9 @@
     <string name="marketplace_empty">未找到配置文件</string>
     <string name="marketplace_error_unknown">未知错误</string>
     <string name="marketplace_meta_format">作者：%1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d 次安装</string>
     <string name="marketplace_action_install">安装</string>
+    <string name="install_file_subtitle">本地文件</string>
+    <string name="install_dns_override_warning">此配置文件将覆盖您的 DNS 设置。扫描期间的所有 DNS 查询将通过上面的服务器,而不是您配置的 DNS。</string>
     <string name="marketplace_action_update">更新</string>
     <string name="marketplace_action_clone_edit">克隆并编辑</string>
     <string name="marketplace_preview_author">作者：%1$s</string>
@@ -894,4 +895,19 @@
     <string name="domain_reachability_expected_prefix">预期：</string>
     <string name="domain_reachability_test_running">正在测试 DNS → TCP → TLS…</string>
     <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
+
+    <!-- Markdown export -->
+    <string name="export_ip_channels_col_channel">通道</string>
+    <string name="export_ip_channels_col_country">国家/地区</string>
+    <string name="export_ip_channels_col_sources">来源</string>
+    <string name="export_flags_label">标志</string>
+    <string name="export_operator_whitelist_title">运营商白名单</string>
+    <string name="export_detected_label">已检测</string>
+    <string name="export_detected_yes">是</string>
+    <string name="export_detected_no">否</string>
+    <string name="export_control_suffix">对照</string>
+    <string name="export_duration_label">时长</string>
+    <string name="export_duration_unit_ms">毫秒</string>
+    <string name="export_available">可用</string>
+    <string name="export_unavailable">不可用</string>
 </resources>

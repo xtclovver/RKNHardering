@@ -17,6 +17,8 @@ object IfconfigClient {
     private const val CURL_COMPATIBLE_UNAVAILABLE_MESSAGE =
         "OS device bind fallback is unavailable because interfaceName is missing"
     private const val DISABLED_BY_OVERRIDE_MESSAGE = "Disabled by override"
+    private const val PUBLIC_IP_PROBE_FAILED = "Public IP probe failed"
+    private const val UNKNOWN_ERROR = "unknown error"
     private const val DEFAULT_HTTP_TIMEOUT_MS = 5_000
 
     private val ENDPOINTS = listOf(
@@ -186,7 +188,7 @@ object IfconfigClient {
                     curlCompatible = curlCompatible,
                     fallbackBinding = fallbackBinding,
                 )
-                TunProbeModeOverride.STRICT_SAME_PATH -> strict.error ?: "Public IP probe failed"
+                TunProbeModeOverride.STRICT_SAME_PATH -> strict.error ?: PUBLIC_IP_PROBE_FAILED
                 TunProbeModeOverride.CURL_COMPATIBLE -> curlCompatible.error ?: CURL_COMPATIBLE_UNAVAILABLE_MESSAGE
             }
         }
@@ -435,12 +437,12 @@ object IfconfigClient {
                 primaryError = strict.error,
                 fallbackError = curlCompatible.error,
                 fallbackBinding = fallbackBinding,
-            ).message ?: "Public IP probe failed"
+            ).message ?: PUBLIC_IP_PROBE_FAILED
             PublicIpProbeStatus.SKIPPED -> {
-                val strictMessage = strict.error ?: "unknown error"
+                val strictMessage = strict.error ?: UNKNOWN_ERROR
                 "$strictMessage; ${curlCompatible.error ?: CURL_COMPATIBLE_UNAVAILABLE_MESSAGE}"
             }
-            PublicIpProbeStatus.SUCCEEDED -> strict.error ?: "Public IP probe failed"
+            PublicIpProbeStatus.SUCCEEDED -> strict.error ?: PUBLIC_IP_PROBE_FAILED
         }
     }
 
@@ -451,14 +453,14 @@ object IfconfigClient {
     ): IOException {
         val interfaceName = fallbackBinding?.interfaceName ?: "unknown"
         return IOException(
-            "Android Network binding failed: ${primaryError ?: "unknown error"}; " +
-                "SO_BINDTODEVICE($interfaceName) failed: ${fallbackError ?: "unknown error"}",
+            "Android Network binding failed: ${primaryError ?: UNKNOWN_ERROR}; " +
+                "SO_BINDTODEVICE($interfaceName) failed: ${fallbackError ?: UNKNOWN_ERROR}",
         )
     }
 
     private fun Throwable?.renderMessage(): String {
         return this?.message
             ?: this?.javaClass?.simpleName
-            ?: "unknown error"
+            ?: UNKNOWN_ERROR
     }
 }

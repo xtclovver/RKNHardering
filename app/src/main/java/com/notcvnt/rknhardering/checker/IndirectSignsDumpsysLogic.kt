@@ -1,4 +1,4 @@
-﻿package com.notcvnt.rknhardering.checker
+package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import android.os.Build
@@ -17,8 +17,8 @@ internal fun checkDumpsysVpn(
     findings: MutableList<Finding>,
     evidence: MutableList<EvidenceItem>,
     activeApps: MutableList<ActiveVpnApp>,
-): IndirectSignsChecker.SignalOutcome {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return IndirectSignsChecker.SignalOutcome()
+): SignalOutcome {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return SignalOutcome()
     return try {
         val process = Runtime.getRuntime().exec(arrayOf("dumpsys", "vpn_management"))
         val output = process.inputStream.bufferedReader().readText()
@@ -26,14 +26,14 @@ internal fun checkDumpsysVpn(
 
         if (VpnDumpsysParser.isUnavailable(output)) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_vpn_unavailable)))
-            return IndirectSignsChecker.SignalOutcome()
+            return SignalOutcome()
         }
 
         val records = VpnDumpsysParser.parseVpnManagement(output)
             .filter { it.packageName != null || it.serviceName != null }
         if (records.isEmpty()) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_vpn_none)))
-            return IndirectSignsChecker.SignalOutcome()
+            return SignalOutcome()
         }
 
         var detected = false
@@ -94,10 +94,10 @@ internal fun checkDumpsysVpn(
             needsReview = needsReview || signature == null
         }
 
-        IndirectSignsChecker.SignalOutcome(detected = detected, needsReview = needsReview)
+        SignalOutcome(detected = detected, needsReview = needsReview)
     } catch (e: Exception) {
         findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_vpn_error, e.message)))
-        IndirectSignsChecker.SignalOutcome()
+        SignalOutcome()
     }
 }
 
@@ -106,7 +106,7 @@ internal fun checkDumpsysVpnService(
     findings: MutableList<Finding>,
     evidence: MutableList<EvidenceItem>,
     activeApps: MutableList<ActiveVpnApp>,
-): IndirectSignsChecker.SignalOutcome {
+): SignalOutcome {
     return try {
         val process = Runtime.getRuntime().exec(arrayOf("dumpsys", "activity", "services", "android.net.VpnService"))
         val output = process.inputStream.bufferedReader().readText()
@@ -114,13 +114,13 @@ internal fun checkDumpsysVpnService(
 
         if (VpnDumpsysParser.isUnavailable(output)) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_service_unavailable)))
-            return IndirectSignsChecker.SignalOutcome()
+            return SignalOutcome()
         }
 
         val records = VpnDumpsysParser.parseVpnServices(output)
         if (records.isEmpty()) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_service_none)))
-            return IndirectSignsChecker.SignalOutcome()
+            return SignalOutcome()
         }
 
         var detected = false
@@ -186,9 +186,9 @@ internal fun checkDumpsysVpnService(
             needsReview = needsReview || signature == null
         }
 
-        IndirectSignsChecker.SignalOutcome(detected = detected, needsReview = needsReview)
+        SignalOutcome(detected = detected, needsReview = needsReview)
     } catch (e: Exception) {
         findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_service_error, e.message)))
-        IndirectSignsChecker.SignalOutcome()
+        SignalOutcome()
     }
 }

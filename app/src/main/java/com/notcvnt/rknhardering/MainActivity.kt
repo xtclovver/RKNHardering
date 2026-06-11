@@ -6,30 +6,24 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Gravity
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.AttrRes
-import androidx.annotation.ColorRes
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.core.content.ContextCompat
-import androidx.core.text.BidiFormatter
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isNotEmpty
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -47,48 +41,39 @@ import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
-import com.notcvnt.rknhardering.model.CallTransportNetworkPath
-import com.notcvnt.rknhardering.model.CallTransportService
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
-import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.DomainReachabilityResult
-import com.notcvnt.rknhardering.model.DomainReachabilityStepStatus
 import com.notcvnt.rknhardering.model.Finding
-import com.notcvnt.rknhardering.model.IpFamily
-import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
-import com.notcvnt.rknhardering.model.StunScope
-import com.notcvnt.rknhardering.model.TargetGroup
-import com.notcvnt.rknhardering.export.CheckResultJsonExportFormatter
-import com.notcvnt.rknhardering.export.CheckResultMarkdownExportFormatter
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
-import com.notcvnt.rknhardering.export.ExportFormat
-import com.notcvnt.rknhardering.export.buildDefaultExportFileName
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
-import com.notcvnt.rknhardering.model.ExposureStatus
-import com.notcvnt.rknhardering.model.NarrativeRow
-import com.notcvnt.rknhardering.model.Verdict
-import com.notcvnt.rknhardering.model.VerdictNarrative
-import com.notcvnt.rknhardering.model.VerdictNarrativeBuilder
-import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.network.DnsResolverConfig
-import com.notcvnt.rknhardering.util.formatCallTransportReason
-import com.notcvnt.rknhardering.util.maskInfoValue
-import com.notcvnt.rknhardering.util.maskIp
-import com.notcvnt.rknhardering.util.maskIpsInText
+import com.notcvnt.rknhardering.ui.main.CategoryTiles
+import com.notcvnt.rknhardering.ui.main.MainExportController
+import com.notcvnt.rknhardering.ui.main.TileSpec
+import com.notcvnt.rknhardering.ui.main.render.BypassRenderer
+import com.notcvnt.rknhardering.ui.main.render.CallTransportRenderer
+import com.notcvnt.rknhardering.ui.main.render.CategoryCardRenderer
+import com.notcvnt.rknhardering.ui.main.render.CdnPullingRenderer
+import com.notcvnt.rknhardering.ui.main.render.DomainReachabilityRenderer
+import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
+import com.notcvnt.rknhardering.ui.main.render.IpChannelsRenderer
+import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
+import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
+import com.notcvnt.rknhardering.ui.main.render.VerdictRenderer
+import com.notcvnt.rknhardering.ui.main.render.VerdictViews
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 internal fun retainCompletedDiagnosticsSnapshot(
     result: CheckResult,
@@ -216,7 +201,6 @@ class MainActivity : AppCompatActivity() {
     private var activeCheckSettings: CheckSettings? = null
     private var retainedDiagnosticsSnapshot: RetainedDiagnosticsSnapshot? = null
     private var completedExportSnapshot: CompletedExportSnapshot? = null
-    private var isVerdictDetailsExpanded = false
 
     // Redesign
     private lateinit var mainContentRoot: LinearLayout
@@ -255,17 +239,33 @@ class MainActivity : AppCompatActivity() {
         prefs.edit { putBoolean(PREF_RATIONALE_SHOWN, true) }
     }
 
-    private val exportMarkdownLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument(ExportFormat.MARKDOWN.mimeType),
-    ) { uri ->
-        writeExportDocument(uri, ExportFormat.MARKDOWN)
-    }
+    // Field initializer: the controller registers its CreateDocument launchers
+    // here, preserving the pre-STARTED registration timing.
+    private val exportController = MainExportController(
+        activity = this,
+        snapshot = { completedExportSnapshot },
+        debugClipboardEnabled = { isDebugClipboardExportEnabled() },
+    )
 
-    private val exportJsonLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
-    ) { uri ->
-        writeExportDocument(uri, ExportFormat.JSON)
+    // Lazy: the render environment anchors on resultsScrollView, which is
+    // bound in bindViews() before the first render call.
+    private val renderEnv by lazy {
+        MainRenderEnvironment(
+            context = this,
+            anchorView = resultsScrollView,
+            statusVisual = ::statusVisual,
+            colorVisionMode = ::colorVisionMode,
+        )
     }
+    private val findingViews by lazy { FindingViewFactory(renderEnv) }
+    private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
+    private val ipComparisonRenderer by lazy { IpComparisonRenderer(renderEnv) }
+    private val cdnPullingRenderer by lazy { CdnPullingRenderer(renderEnv, findingViews) }
+    private val callTransportRenderer by lazy { CallTransportRenderer(renderEnv, findingViews) }
+    private val bypassRenderer by lazy { BypassRenderer(renderEnv, findingViews) }
+    private val ipChannelsRenderer by lazy { IpChannelsRenderer(renderEnv) }
+    private val domainReachabilityRenderer by lazy { DomainReachabilityRenderer(renderEnv) }
+    private val verdictRenderer by lazy { VerdictRenderer(renderEnv, findingViews) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -295,7 +295,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         btnCopyDiagnostics.setOnClickListener { copyTunProbeDiagnostics() }
-        btnExport.setOnClickListener { showExportFormatDialog() }
+        btnExport.setOnClickListener { exportController.showFormatDialog() }
         observeScanEvents()
 
         handleRkncheckImportIntent()
@@ -494,24 +494,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupCategoryAccordion() {
         tiles.clear()
         expandedCategoryIds.clear()
-        val specs = listOf(
-            Triple(CATEGORY_GEO, getString(R.string.main_card_geo_ip), R.drawable.ic_public),
-            Triple(CATEGORY_IPC, getString(R.string.main_card_ip_comparison), R.drawable.ic_compare_arrows),
-            Triple(CATEGORY_CDN, getString(R.string.main_card_cdn_pulling), R.drawable.ic_cloud),
-            Triple(CATEGORY_DIR, getString(R.string.main_card_direct_signs), R.drawable.ic_security),
-            Triple(CATEGORY_IND, getString(R.string.main_card_indirect_signs), R.drawable.ic_lan),
-            Triple(CATEGORY_NAT, getString(R.string.main_card_native_signs), R.drawable.ic_lock),
-            Triple(CATEGORY_STN, getString(R.string.main_card_call_transport), R.drawable.ic_call),
-            Triple(CATEGORY_ICM, getString(R.string.main_card_icmp_spoofing), R.drawable.ic_network),
-            Triple(CATEGORY_RTT, getString(R.string.main_card_rtt_triangulation), R.drawable.ic_pin),
-            Triple(CATEGORY_LOC, getString(R.string.main_card_location_signals), R.drawable.ic_location_on),
-            Triple(CATEGORY_BYP, getString(R.string.settings_split_tunnel), R.drawable.ic_call_split),
-            Triple(CATEGORY_REA, getString(R.string.main_card_domain_reachability), R.drawable.ic_globe),
-        )
-        specs.forEach { (id, title, iconRes) ->
-            val holder = createTileHolder(id)
-            holder.title.text = title
-            findViewById<ImageView>(headerIconId(id)).setImageResource(iconRes)
+        CategoryTiles.ALL.forEach { spec ->
+            val id = spec.id
+            val holder = createTileHolder(spec)
+            holder.title.text = getString(spec.titleRes)
+            findViewById<ImageView>(spec.views.icon).setImageResource(spec.iconRes)
             holder.hint.text = getString(R.string.tile_hint_placeholder)
             holder.body.visibility = View.GONE
             holder.chevron.rotation = 0f
@@ -522,145 +509,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createTileHolder(id: String): TileHolder {
+    private fun createTileHolder(spec: TileSpec): TileHolder {
         return TileHolder(
-            id = id,
-            card = findViewById(cardId(id)),
-            header = findViewById(headerId(id)),
-            statusDot = findViewById(headerDotId(id)),
-            title = findViewById(headerTitleId(id)),
-            hint = findViewById(headerHintId(id)),
-            chevron = findViewById(chevronId(id)),
-            body = findViewById(bodyId(id)),
+            id = spec.id,
+            card = findViewById(spec.views.card),
+            header = findViewById(spec.views.header),
+            statusDot = findViewById(spec.views.dot),
+            title = findViewById(spec.views.title),
+            hint = findViewById(spec.views.hint),
+            chevron = findViewById(spec.views.chevron),
+            body = findViewById(spec.views.body),
         )
-    }
-
-    private fun cardId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.cardGeoIp
-        CATEGORY_IPC -> R.id.cardIpComparison
-        CATEGORY_CDN -> R.id.cardCdnPulling
-        CATEGORY_DIR -> R.id.cardDirect
-        CATEGORY_IND -> R.id.cardIndirect
-        CATEGORY_NAT -> R.id.cardNativeSigns
-        CATEGORY_STN -> R.id.cardCallTransport
-        CATEGORY_ICM -> R.id.cardIcmpSpoofing
-        CATEGORY_RTT -> R.id.cardRttTriangulation
-        CATEGORY_LOC -> R.id.cardLocation
-        CATEGORY_BYP -> R.id.cardBypass
-        CATEGORY_REA -> R.id.cardDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerGeoIp
-        CATEGORY_IPC -> R.id.headerIpComparison
-        CATEGORY_CDN -> R.id.headerCdnPulling
-        CATEGORY_DIR -> R.id.headerDirect
-        CATEGORY_IND -> R.id.headerIndirect
-        CATEGORY_NAT -> R.id.headerNativeSigns
-        CATEGORY_STN -> R.id.headerCallTransport
-        CATEGORY_ICM -> R.id.headerIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerRttTriangulation
-        CATEGORY_LOC -> R.id.headerLocation
-        CATEGORY_BYP -> R.id.headerBypass
-        CATEGORY_REA -> R.id.headerDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerDotId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerDotGeoIp
-        CATEGORY_IPC -> R.id.headerDotIpComparison
-        CATEGORY_CDN -> R.id.headerDotCdnPulling
-        CATEGORY_DIR -> R.id.headerDotDirect
-        CATEGORY_IND -> R.id.headerDotIndirect
-        CATEGORY_NAT -> R.id.headerDotNativeSigns
-        CATEGORY_STN -> R.id.headerDotCallTransport
-        CATEGORY_ICM -> R.id.headerDotIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerDotRttTriangulation
-        CATEGORY_LOC -> R.id.headerDotLocation
-        CATEGORY_BYP -> R.id.headerDotBypass
-        CATEGORY_REA -> R.id.headerDotDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerIconId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerIconGeoIp
-        CATEGORY_IPC -> R.id.headerIconIpComparison
-        CATEGORY_CDN -> R.id.headerIconCdnPulling
-        CATEGORY_DIR -> R.id.headerIconDirect
-        CATEGORY_IND -> R.id.headerIconIndirect
-        CATEGORY_NAT -> R.id.headerIconNativeSigns
-        CATEGORY_STN -> R.id.headerIconCallTransport
-        CATEGORY_ICM -> R.id.headerIconIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerIconRttTriangulation
-        CATEGORY_LOC -> R.id.headerIconLocation
-        CATEGORY_BYP -> R.id.headerIconBypass
-        CATEGORY_REA -> R.id.headerIconDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerTitleId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerTitleGeoIp
-        CATEGORY_IPC -> R.id.headerTitleIpComparison
-        CATEGORY_CDN -> R.id.headerTitleCdnPulling
-        CATEGORY_DIR -> R.id.headerTitleDirect
-        CATEGORY_IND -> R.id.headerTitleIndirect
-        CATEGORY_NAT -> R.id.headerTitleNativeSigns
-        CATEGORY_STN -> R.id.headerTitleCallTransport
-        CATEGORY_ICM -> R.id.headerTitleIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerTitleRttTriangulation
-        CATEGORY_LOC -> R.id.headerTitleLocation
-        CATEGORY_BYP -> R.id.headerTitleBypass
-        CATEGORY_REA -> R.id.headerTitleDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun headerHintId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.headerHintGeoIp
-        CATEGORY_IPC -> R.id.headerHintIpComparison
-        CATEGORY_CDN -> R.id.headerHintCdnPulling
-        CATEGORY_DIR -> R.id.headerHintDirect
-        CATEGORY_IND -> R.id.headerHintIndirect
-        CATEGORY_NAT -> R.id.headerHintNativeSigns
-        CATEGORY_STN -> R.id.headerHintCallTransport
-        CATEGORY_ICM -> R.id.headerHintIcmpSpoofing
-        CATEGORY_RTT -> R.id.headerHintRttTriangulation
-        CATEGORY_LOC -> R.id.headerHintLocation
-        CATEGORY_BYP -> R.id.headerHintBypass
-        CATEGORY_REA -> R.id.headerHintDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun chevronId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.chevronGeoIp
-        CATEGORY_IPC -> R.id.chevronIpComparison
-        CATEGORY_CDN -> R.id.chevronCdnPulling
-        CATEGORY_DIR -> R.id.chevronDirect
-        CATEGORY_IND -> R.id.chevronIndirect
-        CATEGORY_NAT -> R.id.chevronNativeSigns
-        CATEGORY_STN -> R.id.chevronCallTransport
-        CATEGORY_ICM -> R.id.chevronIcmpSpoofing
-        CATEGORY_RTT -> R.id.chevronRttTriangulation
-        CATEGORY_LOC -> R.id.chevronLocation
-        CATEGORY_BYP -> R.id.chevronBypass
-        CATEGORY_REA -> R.id.chevronDomainReachability
-        else -> error("Unknown category id: $id")
-    }
-
-    private fun bodyId(id: String): Int = when (id) {
-        CATEGORY_GEO -> R.id.bodyGeoIp
-        CATEGORY_IPC -> R.id.bodyIpComparison
-        CATEGORY_CDN -> R.id.bodyCdnPulling
-        CATEGORY_DIR -> R.id.bodyDirect
-        CATEGORY_IND -> R.id.bodyIndirect
-        CATEGORY_NAT -> R.id.bodyNativeSigns
-        CATEGORY_STN -> R.id.bodyCallTransport
-        CATEGORY_ICM -> R.id.bodyIcmpSpoofing
-        CATEGORY_RTT -> R.id.bodyRttTriangulation
-        CATEGORY_LOC -> R.id.bodyLocation
-        CATEGORY_BYP -> R.id.bodyBypass
-        CATEGORY_REA -> R.id.bodyDomainReachability
-        else -> error("Unknown category id: $id")
     }
 
     private fun showPrivacyFooterDialog() {
@@ -795,99 +654,6 @@ class MainActivity : AppCompatActivity() {
         runCheck()
     }
 
-    private fun showExportFormatDialog() {
-        if (completedExportSnapshot == null) return
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.main_export_title)
-            .setPositiveButton(R.string.main_export_markdown) { _, _ ->
-                onExportFormatSelected(ExportFormat.MARKDOWN)
-            }
-            .setNegativeButton(R.string.main_export_json) { _, _ ->
-                onExportFormatSelected(ExportFormat.JSON)
-            }
-            .setNeutralButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun onExportFormatSelected(format: ExportFormat) {
-        if (isDebugClipboardExportEnabled()) {
-            showExportActionDialog(format)
-        } else {
-            launchExport(format)
-        }
-    }
-
-    private fun showExportActionDialog(format: ExportFormat) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(
-                when (format) {
-                    ExportFormat.MARKDOWN -> R.string.main_export_markdown
-                    ExportFormat.JSON -> R.string.main_export_json
-                },
-            )
-            .setPositiveButton(R.string.main_export_save_file) { _, _ ->
-                launchExport(format)
-            }
-            .setNegativeButton(R.string.main_export_copy_to_clipboard) { _, _ ->
-                copyExportToClipboard(format)
-            }
-            .setNeutralButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun launchExport(format: ExportFormat) {
-        val snapshot = completedExportSnapshot ?: return
-        val defaultFileName = buildDefaultExportFileName(format, snapshot.finishedAtMillis)
-        when (format) {
-            ExportFormat.MARKDOWN -> exportMarkdownLauncher.launch(defaultFileName)
-            ExportFormat.JSON -> exportJsonLauncher.launch(defaultFileName)
-        }
-    }
-
-    private fun copyExportToClipboard(format: ExportFormat) {
-        val snapshot = completedExportSnapshot ?: return
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val labelResId = when (format) {
-            ExportFormat.MARKDOWN -> R.string.main_export_markdown
-            ExportFormat.JSON -> R.string.main_export_json
-        }
-        clipboard.setPrimaryClip(
-            ClipData.newPlainText(
-                getString(labelResId),
-                buildExportContent(snapshot, format),
-            ),
-        )
-        Toast.makeText(this, R.string.main_export_copied, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun writeExportDocument(uri: Uri?, format: ExportFormat) {
-        val targetUri = uri ?: return
-        val snapshot = completedExportSnapshot ?: return
-        val content = buildExportContent(snapshot, format)
-        val exportResult = runCatching {
-            contentResolver.openOutputStream(targetUri)?.use { outputStream ->
-                outputStream.writer(Charsets.UTF_8).use { writer ->
-                    writer.write(content)
-                }
-            } ?: throw IOException("Unable to open export destination")
-        }
-        if (exportResult.isSuccess) {
-            Toast.makeText(this, R.string.main_export_saved, Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, R.string.main_export_failed, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun buildExportContent(
-        snapshot: CompletedExportSnapshot,
-        format: ExportFormat,
-    ): String {
-        return when (format) {
-            ExportFormat.MARKDOWN -> CheckResultMarkdownExportFormatter.format(this, snapshot)
-            ExportFormat.JSON -> CheckResultJsonExportFormatter.format(this, snapshot)
-        }
-    }
-
     private fun isDebugClipboardExportEnabled(): Boolean {
         return prefs.getBoolean(SettingsActivity.PREF_TUN_PROBE_DEBUG_ENABLED, false)
     }
@@ -937,31 +703,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkStatusStopped(): String = getString(R.string.main_check_stopped)
-
-    private fun themedContext(): android.content.Context = resultsScrollView.context
-
-    private fun themeColor(@AttrRes attrRes: Int, @ColorRes fallbackColorRes: Int): Int {
-        return MaterialColors.getColor(
-            resultsScrollView,
-            attrRes,
-            ContextCompat.getColor(themedContext(), fallbackColorRes),
-        )
-    }
-
-    private fun surfaceColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorSurface, R.color.md_surface)
-
-    private fun onSurfaceColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorOnSurface, R.color.md_on_surface)
-
-    private fun onSurfaceVariantColor(): Int =
-        themeColor(
-            com.google.android.material.R.attr.colorOnSurfaceVariant,
-            R.color.md_on_surface_variant,
-        )
-
-    private fun outlineVariantColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorOutlineVariant, R.color.md_outline_variant)
 
     private fun updateCheckStatus(message: String?) {
         textCheckStatus.text = message.orEmpty()
@@ -1224,93 +965,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayDomainReachability(result: DomainReachabilityResult) {
-        findingsDomainReachability.removeAllViews()
-        if (result.isEmpty) return
-
-        result.responses.forEach { response ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 8.dp, 0, 8.dp)
-            }
-
-            // Header with match/mismatch indicator
-            val matchIcon = if (response.matchesExpectation) "✅" else "⚠\uFE0F"
-            val header = TextView(this).apply {
-                text = "$matchIcon ${response.label}"
-                setTextColor(resolveTextColorPrimary())
-                textSize = 13f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-            }
-            row.addView(header)
-
-            val stepsLine = TextView(this).apply {
-                val dns = stepIcon(response.dnsStatus)
-                val tcp = stepIcon(response.tcpStatus)
-                val tls = stepIcon(response.tlsStatus)
-                text = buildString {
-                    append("DNS $dns")
-                    append("  \u2192  ")
-                    append("TCP $tcp")
-                    append("  \u2192  ")
-                    append("TLS $tls")
-                }
-                textSize = 12f
-                setTextColor(resolveTextColorSecondary())
-            }
-            row.addView(stepsLine)
-
-            // Show expected line when not all expected=true (custom expectations)
-            val hasCustomExpectations = !response.expectedDnsAvailable || !response.expectedTcpAvailable || !response.expectedTlsAvailable
-            if (hasCustomExpectations) {
-                val expectedLine = TextView(this).apply {
-                    val dn = if (response.expectedDnsAvailable) "\u2705" else "\u274C"
-                    val tc = if (response.expectedTcpAvailable) "\u2705" else "\u274C"
-                    val tl = if (response.expectedTlsAvailable) "\u2705" else "\u274C"
-                    text = getString(R.string.domain_reachability_expected_prefix) + " DNS $dn  TCP $tc  TLS $tl"
-                    textSize = 11f
-                    setTextColor(resolveTextColorSecondary())
-                    setPadding(0, 2.dp, 0, 0)
-                }
-                row.addView(expectedLine)
-            }
-
-            // Show error detail if any step failed
-            val errorDetail = when {
-                response.dnsStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.dnsError?.let { "DNS: $it" }
-                response.tcpStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.tcpError?.let { "TCP: $it" }
-                response.tlsStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.tlsError?.let { "TLS: $it" }
-                else -> null
-            }
-            if (errorDetail != null) {
-                val errorView = TextView(this).apply {
-                    text = errorDetail
-                    textSize = 11f
-                    setTextColor(statusColor(StatusSemantic.DETECTED))
-                    setPadding(0, 2.dp, 0, 0)
-                }
-                row.addView(errorView)
-            }
-
-            findingsDomainReachability.addView(row)
-        }
-        findingsDomainReachability.visibility = View.VISIBLE
-    }
-
-    private fun stepIcon(status: DomainReachabilityStepStatus): String = when (status) {
-        DomainReachabilityStepStatus.OK -> "✅"
-        DomainReachabilityStepStatus.FAILED -> "❌"
-        DomainReachabilityStepStatus.SKIPPED -> "⏭"
-    }
-
-    private fun resolveTextColorPrimary(): Int {
-        return MaterialColors.getColor(this, android.R.attr.textColorPrimary, 0xFFFFFFFF.toInt())
-    }
-
-    private fun resolveTextColorSecondary(): Int {
-        return MaterialColors.getColor(this, android.R.attr.textColorSecondary, 0x99FFFFFF.toInt())
+        domainReachabilityRenderer.render(result, findingsDomainReachability)
     }
 
     private fun updateTileFromDomainReachability(result: DomainReachabilityResult) {
@@ -1330,7 +985,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showDomainReachabilityLoading(stage: RunningStage) {
         findingsDomainReachability.removeAllViews()
-        findingsDomainReachability.addView(createLoadingHintView(stageLoadingMessage(stage)))
+        findingsDomainReachability.addView(findingViews.createLoadingHintView(stageLoadingMessage(stage)))
         findingsDomainReachability.visibility = View.VISIBLE
         ensureCardVisible(cardDomainReachability)
     }
@@ -1578,6 +1233,30 @@ class MainActivity : AppCompatActivity() {
         RunningStage.DOMAIN_REACHABILITY -> CATEGORY_REA
     }
 
+    // View bundle for the "plain category card" stages handled by
+    // showCategoryLoading/showCategoryStopped. Stages with specialized
+    // loading/stopped handlers (IP comparison, CDN, bypass, reachability,
+    // consensus) return null.
+    private data class StageCategoryViews(
+        val card: MaterialCardView,
+        val icon: ImageView,
+        val status: TextView,
+        val findingsContainer: LinearLayout,
+        val infoSection: LinearLayout? = null,
+        val infoDivider: View? = null,
+    )
+
+    private fun categoryViewsForStage(stage: RunningStage): StageCategoryViews? = when (stage) {
+        RunningStage.GEO_IP -> StageCategoryViews(cardGeoIp, iconGeoIp, statusGeoIp, findingsGeoIp, geoIpInfoSection, geoIpDivider)
+        RunningStage.ICMP -> StageCategoryViews(cardIcmpSpoofing, iconIcmpSpoofing, statusIcmpSpoofing, findingsIcmpSpoofing)
+        RunningStage.RTT_TRIANGULATION -> StageCategoryViews(cardRttTriangulation, iconRttTriangulation, statusRttTriangulation, findingsRttTriangulation)
+        RunningStage.DIRECT -> StageCategoryViews(cardDirect, iconDirect, statusDirect, findingsDirect, directInfoSection, directDivider)
+        RunningStage.INDIRECT -> StageCategoryViews(cardIndirect, iconIndirect, statusIndirect, findingsIndirect)
+        RunningStage.NATIVE_SIGNS -> StageCategoryViews(cardNativeSigns, iconNativeSigns, statusNativeSigns, findingsNativeSigns)
+        RunningStage.LOCATION -> StageCategoryViews(cardLocation, iconLocation, statusLocation, findingsLocation, locationInfoSection, locationDivider)
+        else -> null
+    }
+
     private fun showLoadingCardForStage(stage: RunningStage) {
         if (stage == RunningStage.IP_CONSENSUS) return
         if (stage in completedStages) return
@@ -1586,73 +1265,23 @@ class MainActivity : AppCompatActivity() {
         setTileStatus(tileIdForStage(stage), TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
         loadingStages += stage
         when (stage) {
-            RunningStage.GEO_IP -> showCategoryLoading(
-                stage = stage,
-                card = cardGeoIp,
-                icon = iconGeoIp,
-                status = statusGeoIp,
-                findingsContainer = findingsGeoIp,
-                hint = stageLoadingMessage(stage),
-                infoSection = geoIpInfoSection,
-                infoDivider = geoIpDivider,
-            )
             RunningStage.IP_COMPARISON -> showIpComparisonLoading(stage)
             RunningStage.CDN_PULLING -> showCdnPullingLoading(stage)
-            RunningStage.ICMP -> showCategoryLoading(
-                stage = stage,
-                card = cardIcmpSpoofing,
-                icon = iconIcmpSpoofing,
-                status = statusIcmpSpoofing,
-                findingsContainer = findingsIcmpSpoofing,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.RTT_TRIANGULATION -> showCategoryLoading(
-                stage = stage,
-                card = cardRttTriangulation,
-                icon = iconRttTriangulation,
-                status = statusRttTriangulation,
-                findingsContainer = findingsRttTriangulation,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.DIRECT -> showCategoryLoading(
-                stage = stage,
-                card = cardDirect,
-                icon = iconDirect,
-                status = statusDirect,
-                findingsContainer = findingsDirect,
-                hint = stageLoadingMessage(stage),
-                infoSection = directInfoSection,
-                infoDivider = directDivider,
-            )
-            RunningStage.INDIRECT -> showCategoryLoading(
-                stage = stage,
-                card = cardIndirect,
-                icon = iconIndirect,
-                status = statusIndirect,
-                findingsContainer = findingsIndirect,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.NATIVE_SIGNS -> showCategoryLoading(
-                stage = stage,
-                card = cardNativeSigns,
-                icon = iconNativeSigns,
-                status = statusNativeSigns,
-                findingsContainer = findingsNativeSigns,
-                hint = stageLoadingMessage(stage),
-            )
-            RunningStage.LOCATION -> showCategoryLoading(
-                stage = stage,
-                card = cardLocation,
-                icon = iconLocation,
-                status = statusLocation,
-                findingsContainer = findingsLocation,
-                hint = stageLoadingMessage(stage),
-                infoSection = locationInfoSection,
-                infoDivider = locationDivider,
-            )
-            RunningStage.IP_CONSENSUS -> Unit
             RunningStage.BYPASS -> showBypassLoading(stage)
             RunningStage.DOMAIN_REACHABILITY -> showDomainReachabilityLoading(stage)
+            RunningStage.IP_CONSENSUS -> Unit
+            else -> categoryViewsForStage(stage)?.let { v ->
+                showCategoryLoading(
+                    stage = stage,
+                    card = v.card,
+                    icon = v.icon,
+                    status = v.status,
+                    findingsContainer = v.findingsContainer,
+                    hint = stageLoadingMessage(stage),
+                    infoSection = v.infoSection,
+                    infoDivider = v.infoDivider,
+                )
+            }
         }
         syncLoadingStatusAnimation()
     }
@@ -1674,7 +1303,7 @@ class MainActivity : AppCompatActivity() {
         }
         infoDivider?.visibility = View.GONE
         findingsContainer.removeAllViews()
-        findingsContainer.addView(createLoadingHintView(hint))
+        findingsContainer.addView(findingViews.createLoadingHintView(hint))
         findingsContainer.visibility = View.VISIBLE
         ensureCardVisible(card)
     }
@@ -1719,73 +1348,37 @@ class MainActivity : AppCompatActivity() {
     private fun markLoadingStagesCancelled() {
         loadingStages.toList().forEach { stage ->
             when (stage) {
-                RunningStage.GEO_IP -> showCategoryStopped(
-                    card = cardGeoIp,
-                    icon = iconGeoIp,
-                    status = statusGeoIp,
-                    findingsContainer = findingsGeoIp,
-                    message = stageStoppedMessage(stage),
-                    infoSection = geoIpInfoSection,
-                    infoDivider = geoIpDivider,
-                )
                 RunningStage.IP_COMPARISON -> showIpComparisonStopped(stage)
                 RunningStage.CDN_PULLING -> showCdnPullingStopped(stage)
-                RunningStage.ICMP -> showCategoryStopped(
-                    card = cardIcmpSpoofing,
-                    icon = iconIcmpSpoofing,
-                    status = statusIcmpSpoofing,
-                    findingsContainer = findingsIcmpSpoofing,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.RTT_TRIANGULATION -> showCategoryStopped(
-                    card = cardRttTriangulation,
-                    icon = iconRttTriangulation,
-                    status = statusRttTriangulation,
-                    findingsContainer = findingsRttTriangulation,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.DIRECT -> showCategoryStopped(
-                    card = cardDirect,
-                    icon = iconDirect,
-                    status = statusDirect,
-                    findingsContainer = findingsDirect,
-                    message = stageStoppedMessage(stage),
-                    infoSection = directInfoSection,
-                    infoDivider = directDivider,
-                )
-                RunningStage.INDIRECT -> showCategoryStopped(
-                    card = cardIndirect,
-                    icon = iconIndirect,
-                    status = statusIndirect,
-                    findingsContainer = findingsIndirect,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.NATIVE_SIGNS -> showCategoryStopped(
-                    card = cardNativeSigns,
-                    icon = iconNativeSigns,
-                    status = statusNativeSigns,
-                    findingsContainer = findingsNativeSigns,
-                    message = stageStoppedMessage(stage),
-                )
-                RunningStage.LOCATION -> showCategoryStopped(
-                    card = cardLocation,
-                    icon = iconLocation,
-                    status = statusLocation,
-                    findingsContainer = findingsLocation,
-                    message = stageStoppedMessage(stage),
-                    infoSection = locationInfoSection,
-                    infoDivider = locationDivider,
-                )
-                RunningStage.IP_CONSENSUS -> Unit
                 RunningStage.BYPASS -> showBypassStopped(stage)
                 RunningStage.DOMAIN_REACHABILITY -> {
                     findingsDomainReachability.removeAllViews()
-                    findingsDomainReachability.addView(createLoadingHintView(stageStoppedMessage(stage)))
+                    findingsDomainReachability.addView(findingViews.createLoadingHintView(stageStoppedMessage(stage)))
                     findingsDomainReachability.visibility = View.VISIBLE
+                }
+                RunningStage.IP_CONSENSUS -> Unit
+                else -> categoryViewsForStage(stage)?.let { v ->
+                    showCategoryStopped(
+                        card = v.card,
+                        icon = v.icon,
+                        status = v.status,
+                        findingsContainer = v.findingsContainer,
+                        message = stageStoppedMessage(stage),
+                        infoSection = v.infoSection,
+                        infoDivider = v.infoDivider,
+                    )
                 }
             }
         }
         loadingStages.clear()
+    }
+
+    private fun bindCardStoppedState(icon: ImageView, status: TextView) {
+        val visual = statusVisual(StatusSemantic.REVIEW)
+        icon.setImageResource(visual.iconRes)
+        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
+        status.text = getString(R.string.main_status_stopped)
+        status.setTextColor(visual.accentColor)
     }
 
     private fun showCategoryStopped(
@@ -1797,28 +1390,20 @@ class MainActivity : AppCompatActivity() {
         infoSection: LinearLayout? = null,
         infoDivider: View? = null,
     ) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        icon.setImageResource(visual.iconRes)
-        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        status.text = getString(R.string.main_status_stopped)
-        status.setTextColor(visual.accentColor)
+        bindCardStoppedState(icon, status)
         infoSection?.apply {
             removeAllViews()
             visibility = View.GONE
         }
         infoDivider?.visibility = View.GONE
         findingsContainer.removeAllViews()
-        findingsContainer.addView(createLoadingHintView(message))
+        findingsContainer.addView(findingViews.createLoadingHintView(message))
         findingsContainer.visibility = View.VISIBLE
         ensureCardVisible(card)
     }
 
     private fun showIpComparisonStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconIpComparison.setImageResource(visual.iconRes)
-        iconIpComparison.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusIpComparison.text = getString(R.string.main_status_stopped)
-        statusIpComparison.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconIpComparison, statusIpComparison)
         textIpComparisonSummary.text = stageStoppedMessage(stage)
         ipComparisonGroups.removeAllViews()
         ipComparisonGroups.visibility = View.GONE
@@ -1826,11 +1411,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCdnPullingStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconCdnPulling.setImageResource(visual.iconRes)
-        iconCdnPulling.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusCdnPulling.text = getString(R.string.main_status_stopped)
-        statusCdnPulling.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconCdnPulling, statusCdnPulling)
         textCdnPullingSummary.text = stageStoppedMessage(stage)
         cdnPullingResponses.removeAllViews()
         cdnPullingResponses.visibility = View.GONE
@@ -1838,11 +1419,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showBypassStopped(stage: RunningStage) {
-        val visual = statusVisual(StatusSemantic.REVIEW)
-        iconBypass.setImageResource(visual.iconRes)
-        iconBypass.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        statusBypass.text = getString(R.string.main_status_stopped)
-        statusBypass.setTextColor(visual.accentColor)
+        bindCardStoppedState(iconBypass, statusBypass)
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
         textBypassProgress.text = stageStoppedMessage(stage)
@@ -2005,22 +1582,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createLoadingHintView(message: String): View {
-        return TextView(themedContext()).apply {
-            text = message
-            textSize = 13f
-            setLineSpacing(2.dp.toFloat(), 1f)
-            setPadding(0, 8.dp, 0, 2.dp)
-            setTextColor(onSurfaceVariantColor())
-        }
-    }
-
     private fun hideCards() {
         collapseExpanded()
         cardIpChannels.visibility = View.GONE
         cardVerdict.visibility = View.GONE
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity). Resolves the
+    // optional info-section views for the card before delegating.
     private fun displayCategory(
         category: CategoryResult,
         card: MaterialCardView,
@@ -2029,11 +1598,6 @@ class MainActivity : AppCompatActivity() {
         findingsContainer: LinearLayout,
         privacyMode: Boolean = false,
     ) {
-        card.visibility = View.VISIBLE
-        findingsContainer.visibility = View.VISIBLE
-
-        bindCardStatus(category.detected, category.needsReview, icon, status, hasError = category.hasError)
-
         val infoSection = when (card.id) {
             R.id.cardGeoIp -> geoIpInfoSection
             R.id.cardLocation -> locationInfoSection
@@ -2046,995 +1610,94 @@ class MainActivity : AppCompatActivity() {
             R.id.cardDirect -> directDivider
             else -> null
         }
-
-        if (infoSection != null && infoDivider != null) {
-            val infoFindings = category.findings.filter { it.isInformational }
-            val husiModelFindings = buildHusiModelFindings(category)
-            val checkFindings = category.findings.filterNot { it.isInformational || it.isError }
-
-            bindInfoSection(infoFindings + husiModelFindings, infoSection, infoDivider, checkFindings.isNotEmpty(), privacyMode)
-            findingsContainer.removeAllViews()
-            for (finding in checkFindings) {
-                if (finding.description.startsWith("network_mcc_ru:")) continue
-                findingsContainer.addView(createFindingView(finding, privacyMode))
-            }
-            return
-        }
-
-        findingsContainer.removeAllViews()
-        for (finding in category.findings + buildHusiModelFindings(category)) {
-            if (finding.isError) continue
-            if (finding.description.startsWith("network_mcc_ru:")) continue
-            findingsContainer.addView(createFindingView(finding, privacyMode))
-        }
+        categoryCards.render(category, card, icon, status, findingsContainer, infoSection, infoDivider, privacyMode)
     }
 
-    private fun buildHusiModelFindings(category: CategoryResult): List<Finding> {
-        val findings = buildList {
-            category.matchedApps.forEach { app ->
-                husiModelFinding(
-                    label = app.appName,
-                    packageName = app.packageName,
-                    serviceName = app.technicalMetadata?.serviceNames?.firstOrNull(),
-                    metadata = app.technicalMetadata,
-                    source = app.source,
-                )?.let(::add)
-            }
-            category.activeApps.forEach { app ->
-                husiModelFinding(
-                    label = app.packageName ?: app.serviceName ?: "active VPN",
-                    packageName = app.packageName,
-                    serviceName = app.serviceName,
-                    metadata = app.technicalMetadata,
-                    source = app.source,
-                )?.let(::add)
-            }
-        }
-        return findings.distinctBy { it.packageName.orEmpty() to it.description }
-    }
-
-    private fun husiModelFinding(
-        label: String,
-        packageName: String?,
-        serviceName: String?,
-        metadata: VpnAppTechnicalMetadata?,
-        source: com.notcvnt.rknhardering.model.EvidenceSource?,
-    ): Finding? {
-        val hasMeaningfulMetadata = metadata != null || !serviceName.isNullOrBlank() || !packageName.isNullOrBlank()
-        if (!hasMeaningfulMetadata) return null
-
-        val description = buildString {
-            append("HUSI model: ")
-            append(label)
-            packageName?.takeIf { it.isNotBlank() }?.let {
-                append(" · package: ")
-                append(it)
-            }
-            metadata?.versionName?.takeIf { it.isNotBlank() }?.let {
-                append(" · app version: ")
-                append(it)
-            }
-            append(" · app type: ")
-            append(metadata?.appType ?: "Other")
-            append(" · core type: ")
-            append(metadata?.coreType ?: "Unknown")
-            metadata?.corePath?.takeIf { it.isNotBlank() }?.let {
-                append(" · core path: ")
-                append(it)
-            }
-            metadata?.goVersion?.takeIf { it.isNotBlank() }?.let {
-                append(" · Go: ")
-                append(it)
-            }
-            serviceName?.takeIf { it.isNotBlank() }?.let {
-                append(" · service: ")
-                append(it)
-            }
-        }
-        return Finding(
-            description = description,
-            isInformational = true,
-            source = source,
-            packageName = packageName,
-        )
-    }
-
-    private fun bindInfoSection(
-        infoFindings: List<Finding>,
-        infoSection: LinearLayout,
-        infoDivider: View,
-        hasCheckFindings: Boolean,
-        privacyMode: Boolean,
-    ) {
-        infoSection.removeAllViews()
-        infoSection.visibility = if (infoFindings.isNotEmpty()) View.VISIBLE else View.GONE
-        for (finding in infoFindings) {
-            val parts = splitInfoFinding(finding.description)
-            if (parts != null) {
-                val value = maskInfoValue(parts.second, privacyMode)
-                infoSection.addView(createInfoView(parts.first, value))
-            } else {
-                infoSection.addView(createFindingView(finding, privacyMode))
-            }
-        }
-        infoDivider.visibility = if (infoFindings.isNotEmpty() && hasCheckFindings) View.VISIBLE else View.GONE
-    }
-
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
-        cardIpComparison.visibility = View.VISIBLE
-        bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison, hasError = result.hasError)
-        textIpComparisonSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
-
-        ipComparisonGroups.removeAllViews()
-        ipComparisonGroups.visibility = View.VISIBLE
-        ipComparisonGroups.addView(
-            createIpCheckerGroupView(
-                group = result.ruGroup,
-                expanded = result.detected || result.needsReview || result.hasError || result.ruGroup.needsReview,
-                privacyMode = privacyMode,
-            ),
-        )
-        ipComparisonGroups.addView(
-            createIpCheckerGroupView(
-                group = result.nonRuGroup,
-                expanded = result.detected || result.needsReview || result.hasError || result.nonRuGroup.detected,
-                privacyMode = privacyMode,
-            ),
+        ipComparisonRenderer.render(
+            result,
+            cardIpComparison,
+            iconIpComparison,
+            statusIpComparison,
+            textIpComparisonSummary,
+            ipComparisonGroups,
+            privacyMode,
         )
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayCdnPulling(result: CdnPullingResult, privacyMode: Boolean = false) {
-        cardCdnPulling.visibility = View.VISIBLE
-        bindCardStatus(result.detected, result.needsReview, iconCdnPulling, statusCdnPulling, hasError = result.hasError)
-        textCdnPullingSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
-
-        cdnPullingResponses.removeAllViews()
-        cdnPullingResponses.visibility = if (result.responses.isEmpty()) View.GONE else View.VISIBLE
-        result.responses.forEach { response ->
-            cdnPullingResponses.addView(createCdnPullingResponseView(response, privacyMode))
-        }
+        cdnPullingRenderer.render(
+            result,
+            cardCdnPulling,
+            iconCdnPulling,
+            statusCdnPulling,
+            textCdnPullingSummary,
+            cdnPullingResponses,
+            privacyMode,
+        )
     }
 
-    private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
-        val semantic = statusSemantic(finding.detected, finding.needsReview, finding.isError)
-        val visual = statusVisual(semantic)
-        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            setPadding(0, 3.dp, 0, 3.dp)
-            contentDescription = "${getString(visual.labelRes)}. $descriptionText"
-        }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View =
+        findingViews.createFindingView(finding, privacyMode)
 
-        val indicator = View(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(8.dp, 8.dp).apply {
-                topMargin = 6.dp
-                marginEnd = 8.dp
-            }
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            background = StatusVisualResolver.indicatorDrawable(themedContext(), semantic, colorVisionMode())
-        }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View =
+        ipComparisonRenderer.createIpCheckerResponseView(response, privacyMode)
 
-        val description = TextView(themedContext()).apply {
-            text = wrapForDisplay(descriptionText)
-            textSize = 13f
-            setLineSpacing(0f, 1.45f)
-            setTextColor(onSurfaceVariantColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-        }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View =
+        cdnPullingRenderer.createCdnPullingResponseView(response, privacyMode)
 
-        row.addView(indicator)
-        row.addView(description)
-        finding.packageName
-            ?.takeIf { it.isNotBlank() }
-            ?.let { packageName ->
-                row.isClickable = true
-                row.isFocusable = true
-                row.setOnClickListener {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", packageName, null)
-                    }
-                    startActivity(intent)
-                }
-            }
-        return row
-    }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites (the IP-channels card is
+    // currently not rendered from MainActivity; see IpChannelsRenderer).
+    private fun createIpChannelRow(ip: ObservedIp, privacyMode: Boolean): View =
+        ipChannelsRenderer.createIpChannelRow(ip, privacyMode)
 
-    private fun createInfoView(label: String, value: String): View {
-        val rtl = isRtlLayout()
-        val row = LinearLayout(themedContext()).apply {
-            orientation = if (rtl) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-            gravity = if (rtl) Gravity.END else Gravity.CENTER_VERTICAL
-            setPadding(0, 2.dp, 0, if (rtl) 6.dp else 2.dp)
-        }
-
-        val labelView = TextView(themedContext()).apply {
-            text = wrapForDisplay(label)
-            textSize = 13f
-            setTextColor(onSurfaceVariantColor())
-            layoutParams = if (rtl) {
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
-            } else {
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.32f)
-            }
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = if (rtl) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        val valueView = TextView(themedContext()).apply {
-            text = wrapForDisplay(value)
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = if (rtl) {
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    topMargin = 2.dp
-                }
-            } else {
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.68f)
-            }
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = if (rtl) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        row.addView(labelView)
-        row.addView(valueView)
-        return row
-    }
-
-    private fun splitInfoFinding(description: String): Pair<String, String>? {
-        val separatorIndex = sequenceOf(
-            description.indexOf(": "),
-            description.indexOf('：'),
-            description.indexOf(':'),
-        ).filter { it >= 0 }.minOrNull() ?: return null
-        val separatorLength = when {
-            description.startsWith(": ", separatorIndex) -> 2
-            else -> 1
-        }
-        val label = description.substring(0, separatorIndex).trim()
-        val value = description.substring(separatorIndex + separatorLength).trim()
-        if (label.isBlank() || value.isBlank()) return null
-        return label to value
-    }
-
-    private fun wrapForDisplay(text: String): String {
-        return if (isRtlLayout()) {
-            BidiFormatter.getInstance(true).unicodeWrap(text)
-        } else {
-            text
-        }
-    }
-
-    private fun isRtlLayout(): Boolean = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
-
-    private fun createIpCheckerGroupView(
-        group: IpCheckerGroupResult,
-        expanded: Boolean,
-        privacyMode: Boolean = false,
-    ): View {
-        val card = MaterialCardView(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = 8.dp
-            }
-            radius = 14.dp.toFloat()
-            strokeWidth = 1.dp
-            strokeColor = outlineVariantColor()
-            setCardBackgroundColor(surfaceColor())
-        }
-
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12.dp, 12.dp, 12.dp, 12.dp)
-        }
-
-        val header = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val title = TextView(themedContext()).apply {
-            text = group.title
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val status = TextView(themedContext()).apply {
-            text = group.statusLabel
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(statusColor(statusSemantic(group.detected, group.needsReview)))
-        }
-
-        val toggle = TextView(themedContext()).apply {
-            text = if (expanded) "▼" else "▶"
-            textSize = 12f
-            setPadding(8.dp, 0, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val summary = TextView(themedContext()).apply {
-            text = if (privacyMode) maskIpsInText(group.summary) else group.summary
-            textSize = 13f
-            setPadding(0, 6.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val details = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = if (expanded) View.VISIBLE else View.GONE
-            setPadding(0, 8.dp, 0, 0)
-        }
-        group.responses.forEach { response ->
-            details.addView(createIpCheckerResponseView(response, privacyMode))
-        }
-
-        header.addView(title)
-        header.addView(status)
-        header.addView(toggle)
-
-        val toggleDetails = {
-            val nextExpanded = details.visibility != View.VISIBLE
-            details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
-            toggle.text = if (nextExpanded) "▼" else "▶"
-        }
-        header.setOnClickListener { toggleDetails() }
-        summary.setOnClickListener { toggleDetails() }
-
-        container.addView(header)
-        container.addView(summary)
-        container.addView(details)
-        card.addView(container)
-        return card
-    }
-
-    private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 8.dp, 0, 8.dp)
-        }
-
-        val topRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val label = TextView(themedContext()).apply {
-            text = response.label
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val displayIp = if (privacyMode && response.ip != null) maskIp(response.ip) else response.ip
-        val value = TextView(themedContext()).apply {
-            text = displayIp ?: getString(R.string.main_card_status_error)
-            textSize = 13f
-            typeface = Typeface.MONOSPACE
-            setTextColor(statusColor(if (response.ip != null) StatusSemantic.CLEAN else StatusSemantic.ERROR))
-        }
-
-        val url = TextView(themedContext()).apply {
-            text = response.url
-            textSize = 12f
-            setPadding(0, 4.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        topRow.addView(label)
-        topRow.addView(value)
-        container.addView(topRow)
-        container.addView(url)
-
-        return container
-    }
-
-    private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 8.dp, 0, 8.dp)
-        }
-
-        val topRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val label = TextView(themedContext()).apply {
-            text = response.targetLabel
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val hasDualStack = response.ipv4 != null && response.ipv6 != null
-        val hasIpv6Only = response.ipv6 != null && response.ipv4 == null
-        val primaryDisplayIp = response.ip
-
-        val valueText = when {
-            hasDualStack -> if (privacyMode) maskIp(response.ipv4!!) else response.ipv4!!
-            hasIpv6Only && response.ipv4Unavailable -> if (privacyMode) maskIp(response.ipv6!!) else response.ipv6!!
-            primaryDisplayIp != null -> if (privacyMode) maskIp(primaryDisplayIp) else primaryDisplayIp
-            response.importantFields.isNotEmpty() -> getString(R.string.main_card_status_detected)
-            response.error != null -> getString(R.string.main_card_status_error)
-            else -> getString(R.string.main_card_status_clean)
-        }
-        val value = TextView(themedContext()).apply {
-            text = valueText
-            textSize = 13f
-            typeface = Typeface.MONOSPACE
-            setTextColor(
-                statusColor(
-                    when {
-                        primaryDisplayIp != null -> StatusSemantic.DETECTED
-                        response.error != null -> StatusSemantic.ERROR
-                        else -> StatusSemantic.CLEAN
-                    },
-                ),
-            )
-        }
-
-        val url = TextView(themedContext()).apply {
-            text = response.url
-            textSize = 12f
-            setPadding(0, 4.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        topRow.addView(label)
-        topRow.addView(value)
-        container.addView(topRow)
-
-        if (hasDualStack) {
-            container.addView(
-                TextView(themedContext()).apply {
-                    text = if (privacyMode) maskIp(response.ipv6!!) else response.ipv6!!
-                    textSize = 13f
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, 2.dp, 0, 0)
-                    setTextColor(statusColor(StatusSemantic.DETECTED))
-                },
-            )
-        } else if (response.ipv4Unavailable && response.ipv6 != null) {
-            container.addView(
-                TextView(themedContext()).apply {
-                    text = getString(R.string.main_ip_comparison_ipv4_unavailable)
-                    textSize = 12f
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, 2.dp, 0, 0)
-                    setTextColor(onSurfaceVariantColor())
-                },
-            )
-            response.ipv4Error?.takeIf { it.isNotBlank() }?.let { reason ->
-                container.addView(
-                    TextView(themedContext()).apply {
-                        text = reason
-                        textSize = 11f
-                        typeface = Typeface.MONOSPACE
-                        setPadding(0, 0, 0, 0)
-                        setTextColor(onSurfaceVariantColor())
-                    },
-                )
-            }
-        }
-
-        container.addView(url)
-
-        response.importantFields.forEach { (fieldLabel, fieldValue) ->
-            if (response.ip != null && fieldLabel.equals("IP", ignoreCase = true)) return@forEach
-            container.addView(
-                createInfoView(
-                    fieldLabel,
-                    maskInfoValue(fieldValue, privacyMode),
-                ),
-            )
-        }
-
-        return container
-    }
-
-    private fun displayIpChannels(consensus: IpConsensusResult, privacyMode: Boolean = false) {
-        if (consensus.observedIps.isEmpty()) {
-            cardIpChannels.visibility = View.GONE
-            return
-        }
-        cardIpChannels.visibility = View.VISIBLE
-        ipChannelsContainer.removeAllViews()
-
-        consensus.observedIps.forEach { ip ->
-            ipChannelsContainer.addView(createIpChannelRow(ip, privacyMode))
-        }
-
-        val hasWarning = consensus.crossChannelMismatch || consensus.warpLikeIndicator ||
-                consensus.geoCountryMismatch || consensus.probeTargetDivergence ||
-                consensus.probeTargetDirectDivergence || consensus.channelConflict.isNotEmpty() ||
-                consensus.needsReview
-
-        if (hasWarning) {
-            val flagsContainer = LinearLayout(themedContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = 8.dp }
-            }
-
-            val warningColor = statusColor(StatusSemantic.DETECTED)
-            val warningBackground = TextView(themedContext()).apply {
-                text = buildIpConsensusWarningText(consensus)
-                textSize = 12f
-                setTextColor(warningColor)
-                setPadding(8.dp, 8.dp, 8.dp, 8.dp)
-            }
-
-            flagsContainer.addView(warningBackground)
-            ipChannelsContainer.addView(flagsContainer)
-        }
-    }
-
-    private fun createIpChannelRow(ip: ObservedIp, privacyMode: Boolean): View {
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val channelChip = TextView(themedContext()).apply {
-            text = ipChannelLabel(ip.channel)
-            textSize = 11f
-            setTextColor(onSurfaceColor())
-            typeface = Typeface.DEFAULT_BOLD
-            val padding = 6.dp
-            setPadding(padding, padding / 2, padding, padding / 2)
-            setBackgroundColor(MaterialColors.getColor(themedContext(), com.google.android.material.R.attr.colorSurfaceVariant, 0))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                .apply { marginEnd = 8.dp }
-        }
-
-        val targetChip = if (ip.targetGroup != null) {
-            TextView(themedContext()).apply {
-                text = ipTargetGroupLabel(ip.targetGroup)
-                textSize = 11f
-                setTextColor(onSurfaceColor())
-                typeface = Typeface.DEFAULT_BOLD
-                val padding = 6.dp
-                setPadding(padding, padding / 2, padding, padding / 2)
-                setBackgroundColor(statusContainerColor(StatusSemantic.REVIEW))
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .apply { marginEnd = 8.dp }
-            }
-        } else null
-
-        val infoText = buildString {
-            val maskedIp = maskInfoValue(ip.value, privacyMode)
-            append(maskedIp)
-            if (ip.countryCode != null) append(" (${ip.countryCode})")
-            if (ip.asn != null) append(" ${ip.asn}")
-            append(" • ${ipFamilyLabel(ip.family)}")
-        }
-
-        val infoView = TextView(themedContext()).apply {
-            text = infoText
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        row.addView(channelChip)
-        if (targetChip != null) row.addView(targetChip)
-        row.addView(infoView)
-
-        return row
-    }
-
-    private fun buildIpConsensusWarningText(consensus: IpConsensusResult): String {
-        val warnings = buildList {
-            if (consensus.crossChannelMismatch) add(getString(R.string.ip_channels_flag_cross_channel_mismatch))
-            if (consensus.warpLikeIndicator) add(getString(R.string.ip_channels_flag_warp_like_behavior))
-            if (consensus.geoCountryMismatch) add(getString(R.string.ip_channels_flag_geo_country_mismatch))
-            if (consensus.probeTargetDivergence) add(getString(R.string.ip_channels_flag_probe_target_divergence))
-            if (consensus.probeTargetDirectDivergence) {
-                add(getString(R.string.ip_channels_flag_probe_target_direct_divergence))
-            }
-            if (consensus.channelConflict.isNotEmpty()) {
-                val channels = consensus.channelConflict
-                    .sortedBy { it.ordinal }
-                    .joinToString(", ") { ipChannelLabel(it) }
-                add(getString(R.string.ip_channels_flag_channel_conflict, channels))
-            }
-            if (consensus.needsReview) add(getString(R.string.ip_channels_flag_needs_review))
-        }
-        return warnings.joinToString(separator = "\n") { "\u26A0 $it" }
-    }
-
-    private fun ipChannelLabel(channel: Channel): String = when (channel) {
-        Channel.DIRECT -> getString(R.string.ip_channels_channel_direct)
-        Channel.VPN -> getString(R.string.ip_channels_channel_vpn)
-        Channel.PROXY -> getString(R.string.ip_channels_channel_proxy)
-        Channel.CDN -> getString(R.string.ip_channels_channel_cdn)
-    }
-
-    private fun ipTargetGroupLabel(targetGroup: TargetGroup): String = when (targetGroup) {
-        TargetGroup.RU -> getString(R.string.ip_channels_target_ru)
-        TargetGroup.NON_RU -> getString(R.string.ip_channels_target_non_ru)
-    }
-
-    private fun ipFamilyLabel(family: IpFamily): String = when (family) {
-        IpFamily.V4 -> getString(R.string.main_card_call_transport_stun_ipv4)
-        IpFamily.V6 -> getString(R.string.main_card_call_transport_stun_ipv6)
-    }
-
+    // Reflected by MainActivityUiRenderingTest (name + arity). Card
+    // visibility and the progress reset stay here — they touch activity
+    // state shared with the loading flow.
     private fun displayBypass(bypass: BypassResult, privacyMode: Boolean = false) {
         cardBypass.visibility = View.VISIBLE
         resetBypassProgress()
-
-        bindCardStatus(bypass.detected, bypass.needsReview, iconBypass, statusBypass, hasError = bypass.hasError)
-
-        findingsBypass.removeAllViews()
-        findingsBypass.visibility = View.VISIBLE
-        for (finding in bypass.findings) {
-            findingsBypass.addView(createFindingView(finding, privacyMode))
-        }
+        bypassRenderer.render(bypass, iconBypass, statusBypass, findingsBypass, privacyMode)
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayCallTransport(
         leaks: List<CallTransportLeakResult>,
         stunGroups: List<StunProbeGroupResult>,
         privacyMode: Boolean,
     ) {
-        val hasContent = leaks.isNotEmpty() || stunGroups.any { it.results.isNotEmpty() }
-        if (!hasContent) {
-            cardCallTransport.visibility = View.GONE
-            return
-        }
-        cardCallTransport.visibility = View.VISIBLE
-
-        val hasNeedsReview = leaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
-        val hasError = leaks.any { it.status == CallTransportStatus.ERROR }
-        bindCardStatus(
-            detected = false,
-            needsReview = hasNeedsReview,
-            icon = iconCallTransport,
-            status = statusCallTransport,
-            hasError = hasError,
+        callTransportRenderer.render(
+            leaks,
+            stunGroups,
+            cardCallTransport,
+            iconCallTransport,
+            statusCallTransport,
+            textCallTransportSummary,
+            stunGroupsContainer,
+            findingsCallTransport,
+            privacyMode,
         )
-
-        val respondedCount = stunGroups.sumOf { it.respondedCount }
-        val totalCount = stunGroups.sumOf { it.totalCount }
-        if (totalCount > 0) {
-            textCallTransportSummary.text = getString(
-                R.string.main_card_call_transport_stun_responded,
-                respondedCount,
-                totalCount,
-            )
-            textCallTransportSummary.visibility = View.VISIBLE
-        } else {
-            textCallTransportSummary.visibility = View.GONE
-        }
-
-        stunGroupsContainer.removeAllViews()
-        if (stunGroups.isNotEmpty()) {
-            stunGroupsContainer.visibility = View.VISIBLE
-            for (group in stunGroups) {
-                stunGroupsContainer.addView(createStunGroupView(group, privacyMode))
-            }
-        } else {
-            stunGroupsContainer.visibility = View.GONE
-        }
-
-        findingsCallTransport.removeAllViews()
-        if (leaks.isNotEmpty()) {
-            findingsCallTransport.visibility = View.VISIBLE
-            for (leak in leaks) {
-                findingsCallTransport.addView(createCallTransportLeakView(leak, privacyMode))
-            }
-        } else {
-            findingsCallTransport.visibility = View.GONE
-        }
     }
 
     private fun displayNativeSigns(result: CategoryResult, privacyMode: Boolean) {
-        if (result.findings.isEmpty() && result.evidence.isEmpty()) {
-            cardNativeSigns.visibility = View.GONE
-            return
-        }
-        cardNativeSigns.visibility = View.VISIBLE
-
-        bindCardStatus(
-            detected = result.detected,
-            needsReview = result.needsReview,
-            icon = iconNativeSigns,
-            status = statusNativeSigns,
-            hasError = result.hasError,
+        categoryCards.renderNativeSigns(
+            result,
+            cardNativeSigns,
+            iconNativeSigns,
+            statusNativeSigns,
+            textNativeSignsSummary,
+            findingsNativeSigns,
+            privacyMode,
         )
-
-        val summaryFinding = result.findings.firstOrNull { finding ->
-            finding.description.startsWith("getifaddrs():") ||
-                finding.description.startsWith("Native library not loaded")
-        }
-        if (summaryFinding != null) {
-            textNativeSignsSummary.text = summaryFinding.description
-            textNativeSignsSummary.visibility = View.VISIBLE
-        } else {
-            textNativeSignsSummary.visibility = View.GONE
-        }
-
-        findingsNativeSigns.removeAllViews()
-        val rest = result.findings.filter { it !== summaryFinding }
-        if (rest.isNotEmpty()) {
-            findingsNativeSigns.visibility = View.VISIBLE
-            for (finding in rest) {
-                findingsNativeSigns.addView(createFindingView(finding, privacyMode))
-            }
-        } else {
-            findingsNativeSigns.visibility = View.GONE
-        }
-    }
-
-    private fun createStunGroupView(group: StunProbeGroupResult, privacyMode: Boolean): View {
-        val groupTitle = when (group.scope) {
-            StunScope.GLOBAL -> getString(R.string.main_card_call_transport_stun_group_global)
-            StunScope.RU -> getString(R.string.main_card_call_transport_stun_group_ru)
-        }
-        val respondedCount = group.respondedCount
-        val totalCount = group.totalCount
-        val statusLabel = if (respondedCount > 0) {
-            getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
-        } else {
-            getString(R.string.main_card_call_transport_stun_none_responded)
-        }
-
-        val card = com.google.android.material.card.MaterialCardView(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = 8.dp }
-            radius = 14.dp.toFloat()
-            strokeWidth = 1.dp
-            strokeColor = outlineVariantColor()
-            setCardBackgroundColor(surfaceColor())
-        }
-
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12.dp, 12.dp, 12.dp, 12.dp)
-        }
-
-        val header = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val title = TextView(themedContext()).apply {
-            text = groupTitle
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val statusView = TextView(themedContext()).apply {
-            text = statusLabel
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(statusColor(if (respondedCount > 0) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
-        }
-
-        val expanded = respondedCount > 0
-        val toggle = TextView(themedContext()).apply {
-            text = if (expanded) "▼" else "▶"
-            textSize = 12f
-            setPadding(8.dp, 0, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val details = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = if (expanded) View.VISIBLE else View.GONE
-            setPadding(0, 8.dp, 0, 0)
-        }
-
-        for (result in group.results) {
-            details.addView(createStunProbeResultView(result, privacyMode))
-        }
-
-        val toggleDetails = {
-            val nextExpanded = details.visibility != View.VISIBLE
-            details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
-            toggle.text = if (nextExpanded) "▼" else "▶"
-        }
-        header.setOnClickListener { toggleDetails() }
-
-        header.addView(title)
-        header.addView(statusView)
-        header.addView(toggle)
-        container.addView(header)
-        container.addView(details)
-        card.addView(container)
-        return card
-    }
-
-    private fun createStunProbeResultView(result: com.notcvnt.rknhardering.model.StunProbeResult, privacyMode: Boolean): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 6.dp, 0, 6.dp)
-        }
-
-        val hostRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val hostLabel = TextView(themedContext()).apply {
-            text = "${result.host}:${result.port}"
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val hasAnyResponse = result.hasResponse
-        val hasDualStack = result.mappedIpv4 != null && result.mappedIpv6 != null
-        val responseLabel = TextView(themedContext()).apply {
-            text = when {
-                hasAnyResponse && hasDualStack -> "IPv4 + IPv6"
-                hasAnyResponse -> result.mappedIpDisplay?.let { ip ->
-                    if (privacyMode) maskIp(ip) else ip
-                } ?: getString(R.string.main_card_call_transport_stun_no_response)
-                result.error != null -> getString(R.string.main_card_call_transport_stun_error)
-                else -> getString(R.string.main_card_call_transport_stun_no_response)
-            }
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            setTextColor(statusColor(if (hasAnyResponse) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
-        }
-
-        hostRow.addView(hostLabel)
-        hostRow.addView(responseLabel)
-        container.addView(hostRow)
-
-        if (result.mappedIpv4 != null && result.mappedIpv6 != null) {
-            container.addView(createInfoView(
-                getString(R.string.main_card_call_transport_stun_ipv4),
-                if (privacyMode) maskIp(result.mappedIpv4) else result.mappedIpv4,
-            ))
-            container.addView(createInfoView(
-                getString(R.string.main_card_call_transport_stun_ipv6),
-                if (privacyMode) maskIp(result.mappedIpv6) else result.mappedIpv6,
-            ))
-        }
-
-        result.error?.takeIf { it.isNotBlank() && !hasAnyResponse }?.let { err ->
-            container.addView(TextView(themedContext()).apply {
-                text = err
-                textSize = 11f
-                setTextColor(onSurfaceVariantColor())
-                setPadding(0, 2.dp, 0, 0)
-            })
-        }
-
-        return container
-    }
-
-    private fun createCallTransportLeakView(leak: CallTransportLeakResult, privacyMode: Boolean): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val statusLabel = when (leak.status) {
-            CallTransportStatus.BASELINE -> getString(R.string.main_card_call_transport_status_baseline)
-            CallTransportStatus.NO_SIGNAL -> getString(R.string.main_card_call_transport_status_no_signal)
-            CallTransportStatus.NEEDS_REVIEW -> getString(R.string.main_card_call_transport_status_needs_review)
-            CallTransportStatus.UNSUPPORTED -> getString(R.string.main_card_call_transport_status_unsupported)
-            CallTransportStatus.ERROR -> getString(R.string.main_card_call_transport_status_error)
-        }
-        val pathLabel = when (leak.networkPath) {
-            CallTransportNetworkPath.ACTIVE -> getString(R.string.main_card_call_transport_path_active)
-            CallTransportNetworkPath.UNDERLYING -> getString(R.string.main_card_call_transport_path_underlying)
-            CallTransportNetworkPath.LOCAL_PROXY -> getString(R.string.main_card_call_transport_path_proxy)
-        }
-        val serviceLabel = when (leak.service) {
-            CallTransportService.TELEGRAM -> "Telegram"
-            CallTransportService.WHATSAPP -> "WhatsApp"
-        }
-        val statusColor = when (leak.status) {
-            CallTransportStatus.BASELINE -> statusColor(StatusSemantic.CLEAN)
-            CallTransportStatus.NEEDS_REVIEW -> statusColor(StatusSemantic.REVIEW)
-            CallTransportStatus.ERROR -> statusColor(StatusSemantic.ERROR)
-            CallTransportStatus.NO_SIGNAL -> statusColor(StatusSemantic.NEUTRAL)
-            CallTransportStatus.UNSUPPORTED -> statusColor(StatusSemantic.NEUTRAL)
-        }
-
-        val headerRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val indicator = TextView(themedContext()).apply {
-            text = when (leak.status) {
-                CallTransportStatus.BASELINE -> "\u2713"
-                CallTransportStatus.NEEDS_REVIEW -> "?"
-                CallTransportStatus.ERROR -> "\u26A0"
-                CallTransportStatus.NO_SIGNAL -> "\u2014"
-                CallTransportStatus.UNSUPPORTED -> "\u2014"
-            }
-            setTextColor(statusColor)
-            textSize = 14f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 8.dp, 0)
-        }
-        val headerText = TextView(themedContext()).apply {
-            text = getString(
-                R.string.main_card_call_transport_header,
-                serviceLabel,
-                pathLabel,
-                statusLabel,
-            )
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        headerRow.addView(indicator)
-        headerRow.addView(headerText)
-        container.addView(headerRow)
-
-        formatCallTransportReason(this, leak, privacyMode)?.let { reason ->
-            val reasonColor = if (leak.status == CallTransportStatus.ERROR) {
-                statusColor(StatusSemantic.ERROR)
-            } else {
-                onSurfaceVariantColor()
-            }
-            container.addView(TextView(themedContext()).apply {
-                text = reason
-                textSize = 12f
-                setPadding(22.dp, 2.dp, 0, 0)
-                setTextColor(reasonColor)
-            })
-        }
-
-        val target = leak.targetHost
-        if (target != null) {
-            val port = leak.targetPort
-            val targetStr = if (port != null) {
-                if (target.contains(':')) "[$target]:$port" else "$target:$port"
-            } else target
-            container.addView(createInfoView(
-                label = "target",
-                value = if (privacyMode) maskIp(targetStr) else targetStr,
-            ))
-        }
-        val mappedIp = leak.mappedIp
-        if (!mappedIp.isNullOrBlank()) {
-            container.addView(createInfoView(
-                label = "mapped IP",
-                value = if (privacyMode) maskIp(mappedIp) else mappedIp,
-            ))
-        }
-        val publicIp = leak.observedPublicIp
-        if (!publicIp.isNullOrBlank()) {
-            container.addView(createInfoView(
-                label = "public IP",
-                value = if (privacyMode) maskIp(publicIp) else publicIp,
-            ))
-        }
-
-        return container
     }
 
     private fun updateBypassProgress(progress: BypassChecker.Progress) {
@@ -3056,40 +1719,11 @@ class MainActivity : AppCompatActivity() {
         textBypassProgress.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
     }
 
-    private fun bindCardStatus(
-        detected: Boolean,
-        needsReview: Boolean,
-        icon: ImageView,
-        status: TextView,
-        hasError: Boolean = false,
-    ) {
-        val visual = statusVisual(statusSemantic(detected, needsReview, hasError))
-        icon.setImageResource(visual.iconRes)
-        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        status.setText(visual.labelRes)
-        status.setTextColor(visual.accentColor)
-    }
-
-    private fun statusSemantic(
-        detected: Boolean,
-        needsReview: Boolean,
-        hasError: Boolean = false,
-    ): StatusSemantic {
-        return when {
-            hasError -> StatusSemantic.ERROR
-            detected -> StatusSemantic.DETECTED
-            needsReview -> StatusSemantic.REVIEW
-            else -> StatusSemantic.CLEAN
-        }
-    }
-
     private fun statusVisual(status: StatusSemantic): StatusVisual {
         return StatusVisualResolver.resolve(this, status, colorVisionMode())
     }
 
     private fun statusColor(status: StatusSemantic): Int = statusVisual(status).accentColor
-
-    private fun statusContainerColor(status: StatusSemantic): Int = statusVisual(status).containerColor
 
     private fun statusLabel(status: StatusSemantic): String = getString(statusVisual(status).labelRes)
 
@@ -3099,182 +1733,35 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun verdictViews(): VerdictViews = VerdictViews(
+        cardVerdict = cardVerdict,
+        iconVerdict = iconVerdict,
+        textVerdict = textVerdict,
+        textVerdictExplanation = textVerdictExplanation,
+        textVerdictHomeRoutedRoamingNote = textVerdictHomeRoutedRoamingNote,
+        btnVerdictDetails = btnVerdictDetails,
+        verdictDetailsDivider = verdictDetailsDivider,
+        verdictDetailsContent = verdictDetailsContent,
+        verdictHero = verdictHero,
+        verdictAvatar = verdictAvatar,
+        verdictAvatarIcon = verdictAvatarIcon,
+        verdictLabel = verdictLabel,
+        verdictTitle = verdictTitle,
+        verdictSubtitle = verdictSubtitle,
+        verdictHomeRoutedRoamingNote = verdictHomeRoutedRoamingNote,
+        whitelistWarningBanner = whitelistWarningBanner,
+    )
+
     private fun displayVerdict(result: CheckResult, privacyMode: Boolean) {
-        cardVerdict.visibility = View.VISIBLE
-        isVerdictDetailsExpanded = false
-
-        when (result.verdict) {
-            Verdict.NOT_DETECTED -> {
-                val visual = statusVisual(StatusSemantic.CLEAN)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_not_detected)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-            Verdict.NEEDS_REVIEW -> {
-                val visual = statusVisual(StatusSemantic.REVIEW)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_needs_review)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-            Verdict.DETECTED -> {
-                val visual = statusVisual(StatusSemantic.DETECTED)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_detected)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-        }
-
-        bindVerdictNarrative(VerdictNarrativeBuilder.build(this, result, privacyMode))
-        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
-    }
-
-    private fun bindWhitelistWarningBanner(show: Boolean) {
-        whitelistWarningBanner.visibility = if (show) View.VISIBLE else View.GONE
-    }
-
-    private fun bindVerdictNarrative(narrative: VerdictNarrative) {
-        textVerdictExplanation.text = narrative.explanation
-        textVerdictExplanation.visibility = View.VISIBLE
-
-        bindHomeRoutedRoamingNote(narrative.homeRoutedRoamingNote)
-
-        verdictDetailsContent.removeAllViews()
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_meaning),
-            content = narrative.meaningRows.map(::createVerdictBulletView),
-        )
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_discovered),
-            content = narrative.discoveredRows.map(::createVerdictRowView),
-        )
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_reasons),
-            content = narrative.reasonRows.map(::createVerdictBulletView),
-        )
-
-        val hasDetails = verdictDetailsContent.isNotEmpty()
-        verdictDetailsDivider.visibility = if (hasDetails) View.VISIBLE else View.GONE
-        btnVerdictDetails.visibility = if (hasDetails) View.VISIBLE else View.GONE
-        verdictDetailsContent.visibility = if (hasDetails && isVerdictDetailsExpanded) View.VISIBLE else View.GONE
-        updateVerdictDetailsButton()
-    }
-
-    private fun bindHomeRoutedRoamingNote(note: String?) {
-        if (note != null) {
-            textVerdictHomeRoutedRoamingNote.text = note
-            textVerdictHomeRoutedRoamingNote.visibility = View.VISIBLE
-            textVerdictHomeRoutedRoamingNote.setTextColor(onSurfaceColor())
-            textVerdictHomeRoutedRoamingNote.setBackgroundResource(
-                R.drawable.bg_verdict_home_routed_roaming_note,
-            )
-            verdictHomeRoutedRoamingNote.text = note
-            verdictHomeRoutedRoamingNote.visibility = View.VISIBLE
-        } else {
-            textVerdictHomeRoutedRoamingNote.text = ""
-            textVerdictHomeRoutedRoamingNote.visibility = View.GONE
-            verdictHomeRoutedRoamingNote.text = ""
-            verdictHomeRoutedRoamingNote.visibility = View.GONE
-        }
-    }
-
-    private fun addVerdictSection(title: String, content: List<View>) {
-        if (content.isEmpty()) return
-
-        if (verdictDetailsContent.isNotEmpty()) {
-            verdictDetailsContent.addView(
-                View(themedContext()).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1.dp,
-                    ).apply {
-                        topMargin = 12.dp
-                        bottomMargin = 12.dp
-                    }
-                    setBackgroundColor(outlineVariantColor())
-                    alpha = 0.7f
-                },
-            )
-        }
-
-        verdictDetailsContent.addView(createVerdictSectionTitleView(title))
-        content.forEach { verdictDetailsContent.addView(it) }
-    }
-
-    private fun createVerdictSectionTitleView(title: String): View {
-        return TextView(themedContext()).apply {
-            text = title
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            isAllCaps = true
-            letterSpacing = 0.05f
-            setPadding(0, 0, 0, 6.dp)
-            setTextColor(onSurfaceVariantColor())
-        }
-    }
-
-    private fun createVerdictBulletView(text: String): View {
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val bullet = TextView(themedContext()).apply {
-            this.text = "•"
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 8.dp, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val body = TextView(themedContext()).apply {
-            this.text = text
-            textSize = 13f
-            setLineSpacing(2.dp.toFloat(), 1f)
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        row.addView(bullet)
-        row.addView(body)
-        return row
-    }
-
-    private fun createVerdictRowView(row: NarrativeRow): View {
-        return createInfoView(row.label, row.value)
+        verdictRenderer.displayVerdict(result, verdictViews(), privacyMode)
     }
 
     private fun clearVerdictCard() {
-        isVerdictDetailsExpanded = false
-        textVerdict.text = ""
-        textVerdictExplanation.text = ""
-        textVerdictExplanation.visibility = View.GONE
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
-        verdictDetailsDivider.visibility = View.GONE
-        btnVerdictDetails.visibility = View.GONE
-        btnVerdictDetails.text = getString(R.string.main_verdict_details)
-        verdictDetailsContent.removeAllViews()
-        verdictDetailsContent.visibility = View.GONE
+        verdictRenderer.clearVerdictCard(verdictViews())
     }
 
     private fun toggleVerdictDetails() {
-        if (btnVerdictDetails.visibility != View.VISIBLE) return
-        isVerdictDetailsExpanded = !isVerdictDetailsExpanded
-        verdictDetailsContent.visibility = if (isVerdictDetailsExpanded) View.VISIBLE else View.GONE
-        updateVerdictDetailsButton()
-        if (isVerdictDetailsExpanded) {
-            animateContentReveal(verdictDetailsContent)
-        }
-    }
-
-    private fun updateVerdictDetailsButton() {
-        btnVerdictDetails.text = if (isVerdictDetailsExpanded) getString(R.string.main_verdict_hide_details) else getString(R.string.main_verdict_details)
+        verdictRenderer.toggleVerdictDetails(verdictViews()) { view -> animateContentReveal(view) }
     }
 
     private val Int.dp: Int
@@ -3286,19 +1773,19 @@ class MainActivity : AppCompatActivity() {
         private const val LOADING_STATUS_FRAME_MS = 420L
         private const val AUTO_SCROLL_LOCK_MS = 450L
 
-        private const val CATEGORY_GEO = "geo"
-        private const val CATEGORY_IPC = "ipc"
-        private const val CATEGORY_CDN = "cdn"
-        private const val CATEGORY_IPS = "ip_channels"
-        private const val CATEGORY_DIR = "dir"
-        private const val CATEGORY_IND = "ind"
-        private const val CATEGORY_STN = "stn"
-        private const val CATEGORY_ICM = "icmp"
-        private const val CATEGORY_RTT = "rtt"
-        private const val CATEGORY_LOC = "loc"
-        private const val CATEGORY_BYP = "byp"
-        private const val CATEGORY_NAT = "nat"
-        private const val CATEGORY_REA = "rea"
+        private const val CATEGORY_GEO = CategoryTiles.GEO
+        private const val CATEGORY_IPC = CategoryTiles.IPC
+        private const val CATEGORY_CDN = CategoryTiles.CDN
+        private const val CATEGORY_IPS = CategoryTiles.IPS
+        private const val CATEGORY_DIR = CategoryTiles.DIR
+        private const val CATEGORY_IND = CategoryTiles.IND
+        private const val CATEGORY_STN = CategoryTiles.STN
+        private const val CATEGORY_ICM = CategoryTiles.ICM
+        private const val CATEGORY_RTT = CategoryTiles.RTT
+        private const val CATEGORY_LOC = CategoryTiles.LOC
+        private const val CATEGORY_BYP = CategoryTiles.BYP
+        private const val CATEGORY_NAT = CategoryTiles.NAT
+        private const val CATEGORY_REA = CategoryTiles.REA
 
         private const val TILE_STATUS_NEUTRAL = 0
         private const val TILE_STATUS_CLEAN = 1
@@ -3603,7 +2090,7 @@ class MainActivity : AppCompatActivity() {
     private fun syncHintOnlyContainer(container: LinearLayout, message: String) {
         if (container.childCount > 0) return
         container.removeAllViews()
-        container.addView(createLoadingHintView(message))
+        container.addView(findingViews.createLoadingHintView(message))
         container.visibility = View.VISIBLE
     }
 
@@ -3622,50 +2109,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindVerdictHeroIdle() {
-        val visual = statusVisual(StatusSemantic.NEUTRAL)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(R.string.verdict_title_idle)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_idle)
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
+        verdictRenderer.bindVerdictHeroIdle(verdictViews())
     }
 
     private fun bindVerdictHeroRunning() {
-        val visual = statusVisual(StatusSemantic.NEUTRAL)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(R.string.verdict_title_idle)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_running)
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
+        verdictRenderer.bindVerdictHeroRunning(verdictViews())
     }
 
     private fun bindVerdictHero(result: CheckResult) {
-        val (semantic, titleRes) = when (result.verdict) {
-            Verdict.NOT_DETECTED -> StatusSemantic.CLEAN to R.string.verdict_title_clean
-            Verdict.NEEDS_REVIEW -> StatusSemantic.REVIEW to R.string.verdict_title_review
-            Verdict.DETECTED -> StatusSemantic.DETECTED to R.string.verdict_title_detected
-        }
-        val visual = statusVisual(semantic)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(titleRes)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_done, tiles.size)
-        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
-    }
-
-    private fun applyVerdictHeroColors(visual: StatusVisual) {
-        verdictHero.setCardBackgroundColor(visual.containerColor)
-        verdictTitle.setTextColor(visual.accentColor)
-        verdictLabel.setTextColor(visual.accentColor)
-        val avatarBg = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(visual.accentColor)
-        }
-        verdictAvatar.background = avatarBg
+        verdictRenderer.bindVerdictHero(verdictViews(), result, tiles.size)
     }
 }

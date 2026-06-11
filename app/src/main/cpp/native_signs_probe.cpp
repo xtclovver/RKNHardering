@@ -184,7 +184,7 @@ jstring nativeReadProcFile(JNIEnv *env, jclass /*clazz*/, jstring pathStr, jint 
     env->ReleaseStringUTFChars(pathStr, path);
     if (!allowed) return nullptr;
 
-    size_t limit = static_cast<size_t>(maxBytes > 0 ? maxBytes : 0);
+    auto limit = static_cast<size_t>(maxBytes > 0 ? maxBytes : 0);
     if (limit == 0 || limit > kMapsFileMaxBytes) {
         limit = (pathCopy == "/proc/self/maps") ? kMapsFileMaxBytes : kProcFileMaxBytes;
     }
@@ -397,8 +397,7 @@ jobjectArray nativeInterfaceDump(JNIEnv *env, jclass /*clazz*/) {
                 line.peer = ipToString(cur->ifa_ifu.ifu_broadaddr);
             }
         } else {
-            int pref = ipv6PrefixLen(cur->ifa_netmask);
-            if (pref >= 0) line.mask = std::to_string(pref);
+            if (int pref = ipv6PrefixLen(cur->ifa_netmask); pref >= 0) line.mask = std::to_string(pref);
             if (line.p2p && cur->ifa_dstaddr != nullptr) {
                 line.peer = ipToString(cur->ifa_dstaddr);
             }
@@ -518,7 +517,7 @@ std::vector<std::string> netlinkRouteDump(int family) {
         struct pollfd pfd = {fd, POLLIN, 0};
         int pr = poll(&pfd, 1, 2000);
         if (pr <= 0) {
-            if (pr == 0) out.push_back("error|poll|timeout");
+            if (pr == 0) out.emplace_back("error|poll|timeout");
             else out.push_back(std::string("error|poll|errno=") + std::to_string(errno));
             break;
         }
@@ -530,7 +529,7 @@ std::vector<std::string> netlinkRouteDump(int family) {
         if (len == 0) break;
 
         bool done = false;
-        for (struct nlmsghdr *nh = reinterpret_cast<struct nlmsghdr *>(buf);
+        for (auto *nh = reinterpret_cast<struct nlmsghdr *>(buf);
              NLMSG_OK(nh, static_cast<unsigned int>(len));
              nh = NLMSG_NEXT(nh, len)) {
             if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
@@ -544,7 +543,7 @@ std::vector<std::string> netlinkRouteDump(int family) {
 
             auto *rtm = reinterpret_cast<struct rtmsg *>(NLMSG_DATA(nh));
             int rtaLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(*rtm));
-            struct rtattr *attr = RTM_RTA(rtm);
+            auto *attr = RTM_RTA(rtm);
 
             std::string dst, gw, src, prefSrc;
             int oif = 0;
@@ -552,7 +551,7 @@ std::vector<std::string> netlinkRouteDump(int family) {
             char iface[IF_NAMESIZE] = {0};
 
             for (; RTA_OK(attr, rtaLen); attr = RTA_NEXT(attr, rtaLen)) {
-                void *data = RTA_DATA(attr);
+                auto *data = RTA_DATA(attr);
                 int alen = RTA_PAYLOAD(attr);
                 switch (attr->rta_type) {
                     case RTA_DST: {
@@ -850,7 +849,7 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
 
     // 4. Check /system writability
     if (access("/system", W_OK) == 0) {
-        findings.push_back("system_rw|/system is writable");
+        findings.emplace_back("system_rw|/system is writable");
     }
 
     // 5. Check /proc/self/mounts for suspicious mount entries
@@ -886,12 +885,12 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
     if (selinux != nullptr) {
         int enforce = -1;
         if (std::fscanf(selinux, "%d", &enforce) == 1 && enforce == 0) {
-            findings.push_back("selinux|permissive");
+            findings.emplace_back("selinux|permissive");
         }
         std::fclose(selinux);
     } else {
         // SELinux filesystem not accessible — might be disabled entirely
-        findings.push_back("selinux|absent");
+        findings.emplace_back("selinux|absent");
     }
 
     // 7. Check current process UID/GID

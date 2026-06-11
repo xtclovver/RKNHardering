@@ -74,6 +74,123 @@ class VpnAppMetadataScannerTest {
         assertEquals(listOf("com.example.unknownvpn.TunnelService"), matched?.technicalMetadata?.serviceNames)
     }
 
+    @Test
+    fun `scan without package name returns normalized service names only`() {
+        val metadata = VpnAppMetadataScanner.scan(
+            context,
+            packageName = null,
+            serviceNames = listOf(" com.example.Svc ", "com.example.Svc", "", "com.other.Svc"),
+            matchedByNameHeuristic = true,
+        )
+
+        assertEquals(listOf("com.example.Svc", "com.other.Svc"), metadata?.serviceNames)
+        assertTrue(metadata?.matchedByNameHeuristic == true)
+        assertEquals(null, metadata?.versionName)
+    }
+
+    @Test
+    fun `scan without package name and without services returns null`() {
+        assertEquals(null, VpnAppMetadataScanner.scan(context, packageName = null))
+        assertEquals(null, VpnAppMetadataScanner.scan(context, packageName = " "))
+    }
+
+    @Test
+    fun `scan of missing package without other signals returns null`() {
+        assertEquals(null, VpnAppMetadataScanner.scan(context, "com.example.not.installed"))
+    }
+
+    @Test
+    fun `scan of missing package keeps name-heuristic flag`() {
+        val metadata = VpnAppMetadataScanner.scan(
+            context,
+            "com.example.not.installed",
+            matchedByNameHeuristic = true,
+        )
+
+        assertTrue(metadata?.matchedByNameHeuristic == true)
+        assertEquals(null, metadata?.versionName)
+        assertEquals(emptyList<String>(), metadata?.serviceNames)
+    }
+
+    @Test
+    fun `services without vpn permission are not collected from package`() {
+        val apk = createApk("classes.dex" to "irrelevant".encodeToByteArray())
+        val service = installVpnPackage(
+            packageName = "com.example.nopermission",
+            label = "No Permission",
+            versionName = "1.0",
+            apkPath = apk,
+            serviceName = "com.example.nopermission.PlainService",
+        )
+        service.permission = null
+
+        val metadata = VpnAppMetadataScanner.scan(context, "com.example.nopermission")
+
+        assertEquals(emptyList<String>(), metadata?.serviceNames)
+        assertEquals("1.0", metadata?.versionName)
+    }
+
+    @Test
+    fun `resolveAppLabel returns label for installed and null for missing package`() {
+        val apk = createApk("classes.dex" to "irrelevant".encodeToByteArray())
+        installVpnPackage(
+            packageName = "com.example.labeled",
+            label = "Labeled App",
+            versionName = "1.0",
+            apkPath = apk,
+            serviceName = "com.example.labeled.VpnService",
+        )
+
+        assertEquals("Labeled App", VpnAppMetadataScanner.resolveAppLabel(context, "com.example.labeled"))
+        assertEquals(null, VpnAppMetadataScanner.resolveAppLabel(context, "com.example.ghost"))
+        assertEquals(null, VpnAppMetadataScanner.resolveAppLabel(context, null))
+    }
+
+    @Test
+    fun `metadata details preserve field order and truncate services`() {
+        val metadata = com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata(
+            versionName = "2.0",
+            serviceNames = listOf("a.Svc", "b.Svc", "c.Svc", "d.Svc"),
+            appType = "V2RayNG",
+            coreType = "Xray/V2Ray",
+            corePath = "lib/arm64-v8a/libxray.so",
+            goVersion = "go1.24.2",
+            systemApp = true,
+            matchedByNameHeuristic = true,
+        )
+
+        assertEquals(
+            listOf(
+                "version=2.0",
+                "app=V2RayNG",
+                "core=Xray/V2Ray",
+                "path=lib/arm64-v8a/libxray.so",
+                "go=go1.24.2",
+                "services=a.Svc, b.Svc, c.Svc",
+                "nameHeuristic=true",
+                "systemApp=true",
+            ),
+            VpnAppMetadataScanner.metadataDetails(metadata),
+        )
+    }
+
+    @Test
+    fun `metadata suffix is empty for null and bracketed otherwise`() {
+        assertEquals("", VpnAppMetadataScanner.formatMetadataSuffix(null))
+        assertEquals(
+            "",
+            VpnAppMetadataScanner.formatMetadataSuffix(
+                com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata(),
+            ),
+        )
+        assertEquals(
+            " [version=3.1]",
+            VpnAppMetadataScanner.formatMetadataSuffix(
+                com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata(versionName = "3.1"),
+            ),
+        )
+    }
+
     private fun installVpnPackage(
         packageName: String,
         label: String,

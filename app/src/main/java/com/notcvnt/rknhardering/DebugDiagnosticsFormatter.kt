@@ -39,6 +39,11 @@ import java.util.Locale
 
 object DebugDiagnosticsFormatter {
 
+    private const val NONE = "<none>"
+    private const val NONE_DASH = "- <none>"
+    private const val EMPTY = "<empty>"
+    private const val FINDINGS_LABEL = "findings:"
+
     fun format(
         result: CheckResult,
         settings: CheckSettings,
@@ -130,7 +135,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- ifconfig-like dump (getifaddrs + /sys/class/net) --")
         val dump = runCatching { NativeSignsBridge.interfaceDump() }.getOrDefault(emptyArray())
         if (dump.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             dump.forEach { block ->
                 builder.appendLine(maskInterfaceDumpBlock(block.trimEnd()))
@@ -141,7 +146,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- getifaddrs() rows (pipe-delimited) --")
         val rows = runCatching { NativeSignsBridge.getIfAddrs() }.getOrDefault(emptyArray())
         if (rows.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             rows.forEach { row -> builder.appendLine(maskIfAddrsRow(row)) }
         }
@@ -150,7 +155,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- Routes via AF_NETLINK NETLINK_ROUTE RTM_GETROUTE (IPv4+IPv6) --")
         val nlRoutes = runCatching { NativeSignsBridge.netlinkRouteDump(0) }.getOrDefault(emptyArray())
         if (nlRoutes.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             nlRoutes.forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
         }
@@ -159,7 +164,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- TCP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv4) --")
         val nlTcp4 = runCatching { NativeSignsBridge.netlinkSockDiag(2, 6) }.getOrDefault(emptyArray())
         if (nlTcp4.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             nlTcp4.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
             if (nlTcp4.size > 60) builder.appendLine("... (${nlTcp4.size - 60} more truncated)")
@@ -169,7 +174,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- TCP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv6) --")
         val nlTcp6 = runCatching { NativeSignsBridge.netlinkSockDiag(10, 6) }.getOrDefault(emptyArray())
         if (nlTcp6.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             nlTcp6.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
             if (nlTcp6.size > 60) builder.appendLine("... (${nlTcp6.size - 60} more truncated)")
@@ -179,7 +184,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- UDP sockets via AF_NETLINK NETLINK_SOCK_DIAG (IPv4) --")
         val nlUdp4 = runCatching { NativeSignsBridge.netlinkSockDiag(2, 17) }.getOrDefault(emptyArray())
         if (nlUdp4.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             nlUdp4.take(60).forEach { builder.appendLine(maskNetlinkPipeRow(it)) }
             if (nlUdp4.size > 60) builder.appendLine("... (${nlUdp4.size - 60} more truncated)")
@@ -206,10 +211,10 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- /proc/self/maps markers (native classification) --")
         val mapsFindings = runCatching { NativeInterfaceProbe.collectMapsFindings() }.getOrDefault(emptyList())
         if (mapsFindings.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             mapsFindings.forEach { f ->
-                builder.appendLine("kind=${f.kind} marker=${f.marker ?: "<none>"} detail=${f.detail ?: "<none>"}")
+                builder.appendLine("kind=${f.kind} marker=${f.marker ?: NONE} detail=${f.detail ?: NONE}")
             }
         }
 
@@ -217,11 +222,11 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- libraryIntegrity (dlsym+dladdr) --")
         val integrity = runCatching { NativeInterfaceProbe.collectLibraryIntegrity() }.getOrDefault(emptyList())
         if (integrity.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             integrity.forEach { sym ->
                 builder.appendLine(
-                    "symbol=${sym.symbol} missing=${sym.missing} addr=${sym.address ?: "<none>"} lib=${sym.library ?: "<none>"}",
+                    "symbol=${sym.symbol} missing=${sym.missing} addr=${sym.address ?: NONE} lib=${sym.library ?: NONE}",
                 )
             }
         }
@@ -230,7 +235,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("-- probeFeatureFlags --")
         val flags = runCatching { NativeSignsBridge.probeFeatureFlags() }.getOrDefault(emptyArray())
         if (flags.isEmpty()) {
-            builder.appendLine("<empty>")
+            builder.appendLine(EMPTY)
         } else {
             flags.forEach { builder.appendLine(it) }
         }
@@ -331,7 +336,7 @@ object DebugDiagnosticsFormatter {
 
     private fun renderProcContent(content: String?, maxLines: Int = 0): String {
         if (content == null) return "<unavailable (null)>"
-        if (content.isEmpty()) return "<empty>"
+        if (content.isEmpty()) return EMPTY
         val masked = maskIpsInText(content).trimEnd()
         if (maxLines <= 0) return masked
         val lines = masked.lines()
@@ -340,7 +345,7 @@ object DebugDiagnosticsFormatter {
     }
 
     private fun renderJvmInterfaces(privacyMode: Boolean): String {
-        val ifaces = NetworkInterface.getNetworkInterfaces() ?: return "<none>"
+        val ifaces = NetworkInterface.getNetworkInterfaces() ?: return NONE
         val sb = StringBuilder()
         while (ifaces.hasMoreElements()) {
             val iface = ifaces.nextElement() ?: continue
@@ -367,7 +372,7 @@ object DebugDiagnosticsFormatter {
                 sb.append("  addr ").append(rendered).append('\n')
             }
         }
-        if (sb.isEmpty()) return "<none>"
+        if (sb.isEmpty()) return NONE
         return sb.toString().trimEnd()
     }
 
@@ -388,9 +393,9 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("matchedAppsCount: ${category.matchedApps.size}")
         builder.appendLine("activeAppsCount: ${category.activeApps.size}")
         builder.appendLine("callTransportCount: ${category.callTransportLeaks.size}")
-        builder.appendLine("findings:")
+        builder.appendLine(FINDINGS_LABEL)
         if (category.findings.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             category.findings.forEach { finding ->
                 builder.appendLine("- ${formatFinding(finding)}")
@@ -420,7 +425,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("dominantDelayMs: ${dominantDelay.durationMs}")
         builder.appendLine("steps:")
         if (diagnostics.steps.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             diagnostics.steps.forEach { timing ->
                 builder.appendLine("- ${formatStepTiming(timing)}")
@@ -439,7 +444,7 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("callTransport.noResponseStunTargets: ${callTransport.noResponseStunTargets}")
         builder.appendLine("callTransport.steps:")
         if (callTransport.steps.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             callTransport.steps.forEach { timing ->
                 builder.appendLine("- ${formatStepTiming(timing)}")
@@ -447,7 +452,7 @@ object DebugDiagnosticsFormatter {
         }
         builder.appendLine("callTransport.stunScopes:")
         if (callTransport.stunScopeTimings.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             callTransport.stunScopeTimings.forEach { timing ->
                 builder.appendLine("- ${formatStunScopeTiming(timing)}")
@@ -478,12 +483,12 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("wifiCachedScanCandidatesCount: ${diagnostics.wifiCachedScanCandidatesCount}")
         builder.appendLine("wifiFreshScanCandidatesCount: ${diagnostics.wifiFreshScanCandidatesCount?.toString() ?: "<timeout>"}")
         builder.appendLine("wifiConnectedCandidateAvailable: ${diagnostics.wifiConnectedCandidateAvailable}")
-        builder.appendLine("bssidSource: ${diagnostics.bssidSource ?: "<none>"}")
-        builder.appendLine("bssidUnavailableReason: ${diagnostics.bssidUnavailableReason ?: "<none>"}")
+        builder.appendLine("bssidSource: ${diagnostics.bssidSource ?: NONE}")
+        builder.appendLine("bssidUnavailableReason: ${diagnostics.bssidUnavailableReason ?: NONE}")
     }
 
     private fun formatStringList(values: List<String>): String {
-        return values.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "<none>"
+        return values.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: NONE
     }
 
     private fun appendIpComparison(
@@ -511,16 +516,16 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("needsReview: ${bypass.needsReview}")
         builder.appendLine("hasError: ${bypass.hasError}")
         builder.appendLine("status: ${sectionStatusTag(bypass.detected, bypass.needsReview, bypass.hasError)}")
-        builder.appendLine("directIp: ${bypass.directIp?.let(::maskIp) ?: "<none>"}")
-        builder.appendLine("proxyIp: ${bypass.proxyIp?.let(::maskIp) ?: "<none>"}")
-        builder.appendLine("vpnNetworkIp: ${bypass.vpnNetworkIp?.let(::maskIp) ?: "<none>"}")
-        builder.appendLine("underlyingIp: ${bypass.underlyingIp?.let(::maskIp) ?: "<none>"}")
+        builder.appendLine("directIp: ${bypass.directIp?.let(::maskIp) ?: NONE}")
+        builder.appendLine("proxyIp: ${bypass.proxyIp?.let(::maskIp) ?: NONE}")
+        builder.appendLine("vpnNetworkIp: ${bypass.vpnNetworkIp?.let(::maskIp) ?: NONE}")
+        builder.appendLine("underlyingIp: ${bypass.underlyingIp?.let(::maskIp) ?: NONE}")
         builder.appendLine("proxyEndpoint: ${formatProxyEndpoint(bypass)}")
         builder.appendLine("proxyOwner: ${formatProxyOwner(bypass.proxyOwner)}")
         builder.appendLine("xrayApi: ${formatXrayApiHeader(bypass.xrayApiScanResult)}")
-        builder.appendLine("findings:")
+        builder.appendLine(FINDINGS_LABEL)
         if (bypass.findings.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             bypass.findings.forEach { finding ->
                 builder.appendLine("- ${formatFinding(finding)}")
@@ -557,9 +562,9 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("hasError: ${result.hasError}")
         builder.appendLine("status: ${sectionStatusTag(result.detected, result.needsReview, result.hasError)}")
         builder.appendLine("summary: ${maskIpsInText(result.summary)}")
-        builder.appendLine("findings:")
+        builder.appendLine(FINDINGS_LABEL)
         if (result.findings.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
         } else {
             result.findings.forEach { finding ->
                 builder.appendLine("- ${formatFinding(finding)}")
@@ -567,7 +572,7 @@ object DebugDiagnosticsFormatter {
         }
         builder.appendLine("responses:")
         if (result.responses.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
             return
         }
         result.responses.forEach { response ->
@@ -584,13 +589,13 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("resolverPreset: ${resolver.preset}")
         builder.appendLine(
             "resolverDirectServers: ${
-                resolver.effectiveDirectServers().joinToString(", ") { maskIp(it) }.ifBlank { "<none>" }
+                resolver.effectiveDirectServers().joinToString(", ") { maskIp(it) }.ifBlank { NONE }
             }",
         )
-        builder.appendLine("resolverDohUrl: ${resolver.effectiveDohUrl() ?: "<none>"}")
+        builder.appendLine("resolverDohUrl: ${resolver.effectiveDohUrl() ?: NONE}")
         builder.appendLine(
             "resolverDohBootstrap: ${
-                resolver.effectiveDohBootstrapHosts().joinToString(", ") { maskIp(it) }.ifBlank { "<none>" }
+                resolver.effectiveDohBootstrapHosts().joinToString(", ") { maskIp(it) }.ifBlank { NONE }
             }",
         )
     }
@@ -605,11 +610,11 @@ object DebugDiagnosticsFormatter {
         builder.appendLine("$label.needsReview: ${group.needsReview}")
         builder.appendLine("$label.statusLabel: ${group.statusLabel}")
         builder.appendLine("$label.summary: ${maskIpsInText(group.summary)}")
-        builder.appendLine("$label.canonicalIp: ${group.canonicalIp?.let(::maskIp) ?: "<none>"}")
+        builder.appendLine("$label.canonicalIp: ${group.canonicalIp?.let(::maskIp) ?: NONE}")
         builder.appendLine("$label.ignoredIpv6ErrorCount: ${group.ignoredIpv6ErrorCount}")
         builder.appendLine("$label.responses:")
         if (group.responses.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
             return
         }
         group.responses.forEach { response ->
@@ -625,7 +630,7 @@ object DebugDiagnosticsFormatter {
     ) {
         builder.appendLine("$label:")
         if (items.isEmpty()) {
-            builder.appendLine("- <none>")
+            builder.appendLine(NONE_DASH)
             return
         }
         items.forEach { item ->
@@ -674,10 +679,10 @@ object DebugDiagnosticsFormatter {
 
     private fun formatActiveVpnApp(app: ActiveVpnApp): String {
         return buildList {
-            add("package=${app.packageName ?: "<none>"}")
-            add("serviceName=${app.serviceName ?: "<none>"}")
-            add("family=${app.family ?: "<none>"}")
-            add("kind=${app.kind ?: "<none>"}")
+            add("package=${app.packageName ?: NONE}")
+            add("serviceName=${app.serviceName ?: NONE}")
+            add("family=${app.family ?: NONE}")
+            add("kind=${app.kind ?: NONE}")
             add("source=${app.source}")
             add("confidence=${app.confidence}")
             addAll(formatTechnicalMetadata(app.technicalMetadata))
@@ -708,7 +713,7 @@ object DebugDiagnosticsFormatter {
             leak.targetPort?.let { add("targetPort=$it") }
             add(
                 "resolvedIps=${
-                    leak.resolvedIps.joinToString(", ") { maskIp(it) }.ifBlank { "<none>" }
+                    leak.resolvedIps.joinToString(", ") { maskIp(it) }.ifBlank { NONE }
                 }",
             )
             leak.mappedIp?.let { add("mappedIp=${maskIp(it)}") }
@@ -743,11 +748,11 @@ object DebugDiagnosticsFormatter {
             add("type=${proxyCheck.endpoint.type}")
             add("ownerStatus=${proxyCheck.ownerStatus}")
             add("owner=${formatProxyOwner(proxyCheck.owner)}")
-            add("proxyIp=${proxyCheck.proxyIp?.let(::maskIp) ?: "<none>"}")
+            add("proxyIp=${proxyCheck.proxyIp?.let(::maskIp) ?: NONE}")
             add("status=${proxyCheck.status}")
             add("mtProtoReachable=${proxyCheck.mtProtoReachable?.toString() ?: "<not-run>"}")
-            add("mtProtoTarget=${proxyCheck.mtProtoTarget?.let(::maskHostPort) ?: "<none>"}")
-            add("summaryReason=${proxyCheck.summaryReason ?: "<none>"}")
+            add("mtProtoTarget=${proxyCheck.mtProtoTarget?.let(::maskHostPort) ?: NONE}")
+            add("summaryReason=${proxyCheck.summaryReason ?: NONE}")
         }.joinToString(" ")
     }
 
@@ -755,8 +760,8 @@ object DebugDiagnosticsFormatter {
         return buildList {
             add("provider=${response.provider}")
             add("isCustom=${response.isCustom}")
-            add("ip=${response.ip?.let(::maskIp) ?: "<none>"}")
-            add("error=${response.error?.let(::maskIpsInText) ?: "<none>"}")
+            add("ip=${response.ip?.let(::maskIp) ?: NONE}")
+            add("error=${response.error?.let(::maskIpsInText) ?: NONE}")
             add("rawBody=${formatRawBody(response.rawBody)}")
         }.joinToString(" ")
     }
@@ -766,16 +771,16 @@ object DebugDiagnosticsFormatter {
             add("label=${response.label}")
             add("scope=${response.scope}")
             add("url=${response.url}")
-            add("ip=${response.ip?.let(::maskIp) ?: "<none>"}")
-            add("error=${response.error?.let(::maskIpsInText) ?: "<none>"}")
+            add("ip=${response.ip?.let(::maskIp) ?: NONE}")
+            add("error=${response.error?.let(::maskIpsInText) ?: NONE}")
             add(
                 "ipv4Records=${
-                    response.ipv4Records.joinToString(", ") { maskIp(it) }.ifBlank { "<none>" }
+                    response.ipv4Records.joinToString(", ") { maskIp(it) }.ifBlank { NONE }
                 }",
             )
             add(
                 "ipv6Records=${
-                    response.ipv6Records.joinToString(", ") { maskIp(it) }.ifBlank { "<none>" }
+                    response.ipv6Records.joinToString(", ") { maskIp(it) }.ifBlank { NONE }
                 }",
             )
             add("ignoredIpv6Error=${response.ignoredIpv6Error}")
@@ -786,13 +791,13 @@ object DebugDiagnosticsFormatter {
         return buildList {
             add("target=${response.targetLabel}")
             add("url=${response.url}")
-            add("ip=${response.ip?.let(::maskIp) ?: "<none>"}")
-            add("error=${response.error?.let(::maskIpsInText) ?: "<none>"}")
+            add("ip=${response.ip?.let(::maskIp) ?: NONE}")
+            add("error=${response.error?.let(::maskIpsInText) ?: NONE}")
             add(
                 "importantFields=${
                     response.importantFields.entries.joinToString(", ") { entry ->
                         "${entry.key}=${maskIpsInText(entry.value)}"
-                    }.ifBlank { "<none>" }
+                    }.ifBlank { NONE }
                 }",
             )
             add("rawBody=${formatRawBody(response.rawBody)}")
@@ -800,28 +805,28 @@ object DebugDiagnosticsFormatter {
     }
 
     private fun formatProxyEndpoint(bypass: BypassResult): String {
-        val proxyEndpoint = bypass.proxyEndpoint ?: return "<none>"
+        val proxyEndpoint = bypass.proxyEndpoint ?: return NONE
         return "${maskHostOrIp(proxyEndpoint.host)}:${proxyEndpoint.port} (${proxyEndpoint.type})"
     }
 
     private fun formatRawBody(rawBody: String?): String {
         val normalized = rawBody?.trim().orEmpty()
-        if (normalized.isBlank()) return "<none>"
+        if (normalized.isBlank()) return NONE
         return maskIpsInText(normalized).replace("\n", "\\n")
     }
 
     private fun formatProxyOwner(owner: LocalProxyOwner?): String {
-        if (owner == null) return "<none>"
+        if (owner == null) return NONE
         return buildList {
             add("uid=${owner.uid}")
             add("confidence=${owner.confidence}")
-            add("apps=${owner.appLabels.joinToString(", ").ifBlank { "<none>" }}")
-            add("packages=${owner.packageNames.joinToString(", ").ifBlank { "<none>" }}")
+            add("apps=${owner.appLabels.joinToString(", ").ifBlank { NONE }}")
+            add("packages=${owner.packageNames.joinToString(", ").ifBlank { NONE }}")
         }.joinToString(" ")
     }
 
     private fun formatXrayApiHeader(scanResult: XrayApiScanResult?): String {
-        if (scanResult == null) return "<none>"
+        if (scanResult == null) return NONE
         return "endpoint=${maskHostOrIp(scanResult.endpoint.host)}:${scanResult.endpoint.port} outboundCount=${scanResult.outbounds.size}"
     }
 
@@ -845,12 +850,12 @@ object DebugDiagnosticsFormatter {
     private fun formatXrayOutbound(outbound: XrayOutboundSummary): String {
         return buildList {
             add("tag=${outbound.tag}")
-            add("protocol=${outbound.protocolName ?: "<none>"}")
-            add("address=${outbound.address?.let(::maskHostOrIp) ?: "<none>"}")
-            add("port=${outbound.port ?: "<none>"}")
-            add("sni=${outbound.sni ?: "<none>"}")
-            add("senderSettingsType=${outbound.senderSettingsType ?: "<none>"}")
-            add("proxySettingsType=${outbound.proxySettingsType ?: "<none>"}")
+            add("protocol=${outbound.protocolName ?: NONE}")
+            add("address=${outbound.address?.let(::maskHostOrIp) ?: NONE}")
+            add("port=${outbound.port ?: NONE}")
+            add("sni=${outbound.sni ?: NONE}")
+            add("senderSettingsType=${outbound.senderSettingsType ?: NONE}")
+            add("proxySettingsType=${outbound.proxySettingsType ?: NONE}")
             add("uuidPresent=${!outbound.uuid.isNullOrBlank()}")
             add("publicKeyPresent=${!outbound.publicKey.isNullOrBlank()}")
         }.joinToString(" ")

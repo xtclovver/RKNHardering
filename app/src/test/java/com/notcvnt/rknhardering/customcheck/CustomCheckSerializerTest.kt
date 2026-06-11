@@ -86,6 +86,26 @@ class CustomCheckSerializerTest {
     }
 
     @Test
+    fun `roundtrip preserves custom geoip provider with ip placeholder`() {
+        val provider = CustomGeoIpProvider(
+            name = "MyAPI",
+            url = "https://example.com/geoip/{ip}?format=json",
+            enabled = true,
+            responseMapping = ResponseMapping(responseType = ResponseType.JSON, ipPath = "$.ip"),
+        )
+        val profile = defaultProfile().copy(
+            checksConfig = ChecksConfig(geoIp = GeoIpConfig(customProviders = listOf(provider)))
+        )
+        val restored = CustomCheckSerializer.deserialize(CustomCheckSerializer.serialize(profile))
+
+        assertEquals(1, restored.checksConfig.geoIp.customProviders.size)
+        assertEquals(
+            "https://example.com/geoip/{ip}?format=json",
+            restored.checksConfig.geoIp.customProviders.first().url,
+        )
+    }
+
+    @Test
     fun `roundtrip preserves custom ip endpoints`() {
         val endpoint = CustomIpEndpoint(
             label = "My Checker",
@@ -119,13 +139,19 @@ class CustomCheckSerializerTest {
 
     @Test
     fun `roundtrip preserves marketplace info`() {
-        val info = MarketplaceInfo(sourceUrl = "https://market.example.com", official = true, verified = true, installCount = 42, marketplaceId = "abc")
+        val info = MarketplaceInfo(sourceUrl = "https://market.example.com", official = true, verified = true, signatureVerified = true, marketplaceId = "abc")
         val profile = defaultProfile().copy(marketplaceInfo = info)
+        // Untrusted deserialize: signature_verified is dropped, which downgrades
+        // official/verified to false. This is the public contract.
         val restored = CustomCheckSerializer.deserialize(CustomCheckSerializer.serialize(profile))
-
         assertEquals("https://market.example.com", restored.marketplaceInfo?.sourceUrl)
-        assertEquals(true, restored.marketplaceInfo?.official)
-        assertEquals(42, restored.marketplaceInfo?.installCount)
+        assertEquals(false, restored.marketplaceInfo?.official)
+        assertEquals(false, restored.marketplaceInfo?.signatureVerified)
+
+        // Trusted deserialize (storage) honors the bit.
+        val fromStorage = CustomCheckSerializer.deserializeFromStorage(CustomCheckSerializer.serialize(profile))
+        assertEquals(true, fromStorage.marketplaceInfo?.official)
+        assertEquals(true, fromStorage.marketplaceInfo?.signatureVerified)
     }
 
     @Test

@@ -19,6 +19,7 @@ import com.notcvnt.rknhardering.probe.IfconfigClient
 import com.notcvnt.rknhardering.probe.LocalSocketInspector
 import com.notcvnt.rknhardering.probe.LocalSocketListener
 import com.notcvnt.rknhardering.probe.MtProtoProber
+import com.notcvnt.rknhardering.probe.PortScanPlan
 import com.notcvnt.rknhardering.probe.PortScanPlanner
 import com.notcvnt.rknhardering.probe.ProxyEndpoint
 import com.notcvnt.rknhardering.probe.PublicIpNetworkComparison
@@ -34,6 +35,7 @@ import com.notcvnt.rknhardering.probe.XrayApiScanResult
 import com.notcvnt.rknhardering.probe.XrayApiScanner
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
 import com.notcvnt.rknhardering.vpn.VpnAppMetadataScanner
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -142,82 +144,13 @@ object BypassChecker {
         }
 
         val proxyDeferred = if (splitTunnelEnabled && proxyScanEnabled && scanPlan != null && scanner != null) {
-            async {
-                onProgress?.invoke(
-                    Progress(
-                        line = ProgressLine.BYPASS,
-                        phase = context.getString(R.string.checker_bypass_progress_port_scan_phase),
-                        detail = context.getString(R.string.checker_bypass_progress_port_scan_detail),
-                    ),
-                )
-                if (scanPlan.mode == ScanMode.POPULAR_ONLY) {
-                    scanner.findOpenProxyEndpoints(
-                        mode = ScanMode.POPULAR_ONLY,
-                        manualPort = null,
-                        onProgress = { progress ->
-                            val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                            onProgress?.invoke(
-                                Progress(
-                                    line = ProgressLine.BYPASS,
-                                    phase = context.getString(R.string.checker_bypass_progress_popular_ports),
-                                    detail = context.getString(
-                                        R.string.checker_bypass_progress_port_detail,
-                                        progress.currentPort,
-                                        percent,
-                                    ),
-                                ),
-                            )
-                        },
-                    )
-                } else {
-                    scanner.findOpenProxyEndpoints(
-                        mode = scanPlan.mode,
-                        manualPort = null,
-                        onProgress = { progress ->
-                            val phaseText = when (progress.phase) {
-                                ScanPhase.POPULAR_PORTS -> context.getString(R.string.checker_bypass_progress_popular_ports)
-                                ScanPhase.FULL_RANGE -> context.getString(R.string.checker_bypass_progress_full_scan)
-                            }
-                            val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                            onProgress?.invoke(
-                                Progress(
-                                    line = ProgressLine.BYPASS,
-                                    phase = phaseText,
-                                    detail = context.getString(
-                                        R.string.checker_bypass_progress_port_detail,
-                                        progress.currentPort,
-                                        percent,
-                                    ),
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
+            startProxyScanAsync(context, scanPlan, scanner, onProgress)
         } else {
             null
         }
 
         val xrayDeferred = if (splitTunnelEnabled && xrayApiScanEnabled && xrayScanner != null) {
-            async {
-                onProgress?.invoke(
-                    Progress(
-                        line = ProgressLine.XRAY_API,
-                        phase = "Xray API",
-                        detail = context.getString(R.string.checker_bypass_progress_xray_detail),
-                    ),
-                )
-                xrayScanner.findXrayApi { progress ->
-                    val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
-                    onProgress?.invoke(
-                        Progress(
-                            line = ProgressLine.XRAY_API,
-                            phase = "Xray API",
-                            detail = "${progress.host}:${progress.currentPort} ($percent%)",
-                        ),
-                    )
-                }
-            }
+            startXrayScanAsync(context, xrayScanner, onProgress)
         } else {
             null
         }
@@ -289,6 +222,88 @@ object BypassChecker {
             needsReview = needsReview,
             evidence = evidence,
         )
+    }
+
+    private fun CoroutineScope.startProxyScanAsync(
+        context: Context,
+        scanPlan: PortScanPlan,
+        scanner: ProxyScanner,
+        onProgress: (suspend (Progress) -> Unit)?,
+    ): Deferred<List<ProxyEndpoint>> = async {
+        onProgress?.invoke(
+            Progress(
+                line = ProgressLine.BYPASS,
+                phase = context.getString(R.string.checker_bypass_progress_port_scan_phase),
+                detail = context.getString(R.string.checker_bypass_progress_port_scan_detail),
+            ),
+        )
+        if (scanPlan.mode == ScanMode.POPULAR_ONLY) {
+            scanner.findOpenProxyEndpoints(
+                mode = ScanMode.POPULAR_ONLY,
+                manualPort = null,
+                onProgress = { progress ->
+                    val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                    onProgress?.invoke(
+                        Progress(
+                            line = ProgressLine.BYPASS,
+                            phase = context.getString(R.string.checker_bypass_progress_popular_ports),
+                            detail = context.getString(
+                                R.string.checker_bypass_progress_port_detail,
+                                progress.currentPort,
+                                percent,
+                            ),
+                        ),
+                    )
+                },
+            )
+        } else {
+            scanner.findOpenProxyEndpoints(
+                mode = scanPlan.mode,
+                manualPort = null,
+                onProgress = { progress ->
+                    val phaseText = when (progress.phase) {
+                        ScanPhase.POPULAR_PORTS -> context.getString(R.string.checker_bypass_progress_popular_ports)
+                        ScanPhase.FULL_RANGE -> context.getString(R.string.checker_bypass_progress_full_scan)
+                    }
+                    val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+                    onProgress?.invoke(
+                        Progress(
+                            line = ProgressLine.BYPASS,
+                            phase = phaseText,
+                            detail = context.getString(
+                                R.string.checker_bypass_progress_port_detail,
+                                progress.currentPort,
+                                percent,
+                            ),
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    private fun CoroutineScope.startXrayScanAsync(
+        context: Context,
+        xrayScanner: XrayApiScanner,
+        onProgress: (suspend (Progress) -> Unit)?,
+    ): Deferred<XrayApiScanResult?> = async {
+        onProgress?.invoke(
+            Progress(
+                line = ProgressLine.XRAY_API,
+                phase = "Xray API",
+                detail = context.getString(R.string.checker_bypass_progress_xray_detail),
+            ),
+        )
+        xrayScanner.findXrayApi { progress ->
+            val percent = if (progress.total > 0) (progress.scanned * 100 / progress.total) else 0
+            onProgress?.invoke(
+                Progress(
+                    line = ProgressLine.XRAY_API,
+                    phase = "Xray API",
+                    detail = "${progress.host}:${progress.currentPort} ($percent%)",
+                ),
+            )
+        }
     }
 
     internal fun proxyChecksNeedReview(proxyChecks: List<LocalProxyCheckResult>): Boolean {

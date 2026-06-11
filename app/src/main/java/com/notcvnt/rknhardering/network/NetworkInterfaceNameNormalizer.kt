@@ -3,15 +3,6 @@ package com.notcvnt.rknhardering.network
 object NetworkInterfaceNameNormalizer {
     private const val STACKED_V4_PREFIX = "v4-"
 
-    private val STANDARD_BASE_PATTERNS = listOf(
-        Regex("^wlan.*"),
-        Regex("^rmnet.*"),
-        Regex("^eth.*"),
-        Regex("^lo$"),
-        Regex("^ccmni.*"),
-        Regex("^ccemni.*"),
-    )
-
     fun canonicalName(name: String?): String? {
         if (name.isNullOrBlank()) return name
         val baseName = name.removePrefix(STACKED_V4_PREFIX)
@@ -20,6 +11,6 @@ object NetworkInterfaceNameNormalizer {
     }
 
     private fun isStandardBaseInterface(name: String): Boolean {
-        return STANDARD_BASE_PATTERNS.any { it.matches(name) }
+        return NetworkInterfacePatterns.STACKED_BASE_INTERFACES.any { it.matches(name) }
     }
 }

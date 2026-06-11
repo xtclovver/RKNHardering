@@ -18,7 +18,7 @@ class MarketplaceModelsTest {
             official = false,
             verified = false,
             profileUrl = "https://example.com/profile.rkncheck",
-            installCount = 42,
+            
             tags = listOf("test", "demo"),
             createdAt = "2026-01-01T00:00:00Z",
             updatedAt = "2026-01-01T00:00:00Z",
@@ -32,7 +32,6 @@ class MarketplaceModelsTest {
         assertFalse(entry.official)
         assertFalse(entry.verified)
         assertEquals("https://example.com/profile.rkncheck", entry.profileUrl)
-        assertEquals(42, entry.installCount)
         assertEquals(listOf("test", "demo"), entry.tags)
     }
 
@@ -47,7 +46,7 @@ class MarketplaceModelsTest {
             official = true,
             verified = true,
             profileUrl = "https://example.com/official.rkncheck",
-            installCount = 0,
+            
             tags = listOf("official"),
             createdAt = "",
             updatedAt = "",
@@ -62,12 +61,12 @@ class MarketplaceModelsTest {
             MarketplaceEntry(
                 id = "1", name = "A", description = "", author = "x", version = "1.0.0",
                 official = true, verified = true, profileUrl = "https://example.com/1.rkncheck",
-                installCount = 0, tags = emptyList(), createdAt = "", updatedAt = "",
+                 tags = emptyList(), createdAt = "", updatedAt = "",
             ),
             MarketplaceEntry(
                 id = "2", name = "B", description = "", author = "y", version = "2.0.0",
                 official = false, verified = false, profileUrl = "https://example.com/2.rkncheck",
-                installCount = 5, tags = listOf("community"), createdAt = "", updatedAt = "",
+                 tags = listOf("community"), createdAt = "", updatedAt = "",
             ),
         )
         val catalog = MarketplaceCatalog(schemaVersion = 1, updatedAt = "2026-01-01T00:00:00Z", entries = entries)

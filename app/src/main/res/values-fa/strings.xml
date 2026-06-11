@@ -796,8 +796,9 @@
     <string name="marketplace_empty">پروفایلی یافت نشد</string>
     <string name="marketplace_error_unknown">خطای ناشناخته</string>
     <string name="marketplace_meta_format">از %1$s · v%2$s</string>
-    <string name="marketplace_install_count">%1$d نصب</string>
     <string name="marketplace_action_install">نصب</string>
+    <string name="install_file_subtitle">فایل محلی</string>
+    <string name="install_dns_override_warning">این پروفایل تنظیمات DNS را بازنویسی می‌کند. تمام درخواست‌های DNS در طول اسکن از طریق سرور بالا خواهند رفت، نه از طریق DNS تنظیم‌شده شما.</string>
     <string name="marketplace_action_update">به‌روزرسانی</string>
     <string name="marketplace_action_clone_edit">کپی و ویرایش</string>
     <string name="marketplace_preview_author">نویسنده: %1$s</string>
@@ -896,4 +897,19 @@
     <string name="domain_reachability_expected_prefix">انتظار:</string>
     <string name="domain_reachability_test_running">در حال آزمایش DNS → TCP → TLS…</string>
     <string name="domain_reachability_test_result">DNS %1$s  →  TCP %2$s  →  TLS %3$s</string>
+
+    <!-- Markdown export -->
+    <string name="export_ip_channels_col_channel">کانال</string>
+    <string name="export_ip_channels_col_country">کشور</string>
+    <string name="export_ip_channels_col_sources">منابع</string>
+    <string name="export_flags_label">پرچم‌ها</string>
+    <string name="export_operator_whitelist_title">فهرست‌های سفید اپراتور</string>
+    <string name="export_detected_label">شناسایی‌شده</string>
+    <string name="export_detected_yes">بله</string>
+    <string name="export_detected_no">خیر</string>
+    <string name="export_control_suffix">کنترل</string>
+    <string name="export_duration_label">مدت</string>
+    <string name="export_duration_unit_ms">میلی‌ثانیه</string>
+    <string name="export_available">در دسترس</string>
+    <string name="export_unavailable">در دسترس نیست</string>
 </resources>

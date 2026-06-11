@@ -71,7 +71,7 @@ std::shared_ptr<NativeCurlCancellationState> RegisterCancellationState(const std
     return nullptr;
   }
   auto state = std::make_shared<NativeCurlCancellationState>();
-  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  std::scoped_lock lock(g_request_states_mutex);
   g_request_states[request_id] = state;
   return state;
 }
@@ -82,7 +82,7 @@ void UnregisterCancellationState(
   if (request_id.empty()) {
     return;
   }
-  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  std::scoped_lock lock(g_request_states_mutex);
   auto it = g_request_states.find(request_id);
   if (it != g_request_states.end() && it->second == state) {
     g_request_states.erase(it);
@@ -90,7 +90,7 @@ void UnregisterCancellationState(
 }
 
 std::shared_ptr<NativeCurlCancellationState> FindCancellationState(const std::string& request_id) {
-  std::lock_guard<std::mutex> lock(g_request_states_mutex);
+  std::scoped_lock lock(g_request_states_mutex);
   auto it = g_request_states.find(request_id);
   return it != g_request_states.end() ? it->second : nullptr;
 }
@@ -99,7 +99,7 @@ void TrackSocket(NativeCurlCancellationState* state, curl_socket_t socket_fd) {
   if (state == nullptr || socket_fd == CURL_SOCKET_BAD) {
     return;
   }
-  std::lock_guard<std::mutex> lock(state->sockets_mutex);
+  std::scoped_lock lock(state->sockets_mutex);
   state->sockets.insert(socket_fd);
 }
 
@@ -107,7 +107,7 @@ bool UntrackSocket(NativeCurlCancellationState* state, curl_socket_t socket_fd) 
   if (state == nullptr || socket_fd == CURL_SOCKET_BAD) {
     return false;
   }
-  std::lock_guard<std::mutex> lock(state->sockets_mutex);
+  std::scoped_lock lock(state->sockets_mutex);
   return state->sockets.erase(socket_fd) > 0;
 }
 
@@ -118,7 +118,7 @@ void CancelTrackedSockets(const std::shared_ptr<NativeCurlCancellationState>& st
 
   std::vector<curl_socket_t> sockets_to_close;
   {
-    std::lock_guard<std::mutex> lock(state->sockets_mutex);
+    std::scoped_lock lock(state->sockets_mutex);
     sockets_to_close.reserve(state->sockets.size());
     for (curl_socket_t socket_fd : state->sockets) {
       sockets_to_close.push_back(socket_fd);
@@ -194,8 +194,7 @@ curl_socket_t OpenSocketCallback(void* clientp, curlsocktype /* purpose */, stru
 }
 
 int CloseSocketCallback(void* clientp, curl_socket_t item) {
-  auto* state = static_cast<NativeCurlCancellationState*>(clientp);
-  if (UntrackSocket(state, item)) {
+  if (auto* state = static_cast<NativeCurlCancellationState*>(clientp); UntrackSocket(state, item)) {
     close(item);
   }
   return 0;
@@ -334,8 +333,8 @@ CurlExecutionResult ExecuteRequest(
   result.curl_code = curl_easy_perform(handle);
   curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &result.http_code);
 
-  char* primary_ip = nullptr;
-  if (curl_easy_getinfo(handle, CURLINFO_PRIMARY_IP, &primary_ip) == CURLE_OK &&
+  if (char* primary_ip = nullptr;
+      curl_easy_getinfo(handle, CURLINFO_PRIMARY_IP, &primary_ip) == CURLE_OK &&
       primary_ip != nullptr && result.resolved_addresses_csv.empty()) {
     result.resolved_addresses_csv = primary_ip;
   }
