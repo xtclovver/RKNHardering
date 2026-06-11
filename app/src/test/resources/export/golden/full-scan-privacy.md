@@ -293,7 +293,7 @@ loc=FI
 ### Call transport
 - <none>
 
-## IP каналы
+## IP channels
 | Канал | Target | IP | Family | Страна | ASN | Источники |
 | --- | --- | --- | --- | --- | --- | --- |
 | DIRECT | RU | 198.51.*.* | V4 | RU | AS64501 Example Direct | geoip, ipcomp:ru:ru-main |

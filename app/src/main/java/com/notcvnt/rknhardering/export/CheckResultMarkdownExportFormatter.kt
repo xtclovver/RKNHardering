@@ -72,7 +72,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendCategorySection(builder, context.getString(R.string.main_card_icmp_spoofing), result.icmpSpoofing, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_rtt_triangulation), result.rttTriangulation, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_location_signals), result.locationSignals, snapshot.privacyMode)
-        appendIpChannelsSection(builder, result.ipConsensus, snapshot.privacyMode)
+        appendIpChannelsSection(builder, context, result.ipConsensus, snapshot.privacyMode)
         appendTunProbeDiagnosticsSection(builder, result.tunProbeDiagnostics, snapshot.privacyMode)
         appendOperatorWhitelistSection(builder, result.operatorWhitelistProbe)
         appendBypassSection(builder, context, result.bypassResult, snapshot.privacyMode)
@@ -616,13 +616,14 @@ internal object CheckResultMarkdownExportFormatter {
 
     private fun appendIpChannelsSection(
         builder: StringBuilder,
+        context: Context,
         consensus: IpConsensusResult,
         privacyMode: Boolean,
     ) {
         if (!consensus.hasReportableContent()) {
             return
         }
-        builder.appendLine("## IP каналы")
+        builder.appendLine("## ${context.getString(R.string.ip_channels_title)}")
         builder.appendLine("| Канал | Target | IP | Family | Страна | ASN | Источники |")
         builder.appendLine("| --- | --- | --- | --- | --- | --- | --- |")
         consensus.observedIps.forEach { ip ->
