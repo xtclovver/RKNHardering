@@ -73,11 +73,11 @@ import com.notcvnt.rknhardering.model.NarrativeRow
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VerdictNarrative
 import com.notcvnt.rknhardering.model.VerdictNarrativeBuilder
-import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
 import com.notcvnt.rknhardering.ui.main.TileSpec
+import com.notcvnt.rknhardering.ui.main.render.CategoryCardRenderer
 import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
 import com.notcvnt.rknhardering.util.formatCallTransportReason
@@ -273,6 +273,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
     private val findingViews by lazy { FindingViewFactory(renderEnv) }
+    private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -1706,6 +1707,8 @@ class MainActivity : AppCompatActivity() {
         cardVerdict.visibility = View.GONE
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity). Resolves the
+    // optional info-section views for the card before delegating.
     private fun displayCategory(
         category: CategoryResult,
         card: MaterialCardView,
@@ -1714,11 +1717,6 @@ class MainActivity : AppCompatActivity() {
         findingsContainer: LinearLayout,
         privacyMode: Boolean = false,
     ) {
-        card.visibility = View.VISIBLE
-        findingsContainer.visibility = View.VISIBLE
-
-        bindCardStatus(category.detected, category.needsReview, icon, status, hasError = category.hasError)
-
         val infoSection = when (card.id) {
             R.id.cardGeoIp -> geoIpInfoSection
             R.id.cardLocation -> locationInfoSection
@@ -1731,118 +1729,7 @@ class MainActivity : AppCompatActivity() {
             R.id.cardDirect -> directDivider
             else -> null
         }
-
-        if (infoSection != null && infoDivider != null) {
-            val infoFindings = category.findings.filter { it.isInformational }
-            val husiModelFindings = buildHusiModelFindings(category)
-            val checkFindings = category.findings.filterNot { it.isInformational || it.isError }
-
-            bindInfoSection(infoFindings + husiModelFindings, infoSection, infoDivider, checkFindings.isNotEmpty(), privacyMode)
-            findingsContainer.removeAllViews()
-            for (finding in checkFindings) {
-                if (finding.description.startsWith("network_mcc_ru:")) continue
-                findingsContainer.addView(createFindingView(finding, privacyMode))
-            }
-            return
-        }
-
-        findingsContainer.removeAllViews()
-        for (finding in category.findings + buildHusiModelFindings(category)) {
-            if (finding.isError) continue
-            if (finding.description.startsWith("network_mcc_ru:")) continue
-            findingsContainer.addView(createFindingView(finding, privacyMode))
-        }
-    }
-
-    private fun buildHusiModelFindings(category: CategoryResult): List<Finding> {
-        val findings = buildList {
-            category.matchedApps.forEach { app ->
-                husiModelFinding(
-                    label = app.appName,
-                    packageName = app.packageName,
-                    serviceName = app.technicalMetadata?.serviceNames?.firstOrNull(),
-                    metadata = app.technicalMetadata,
-                    source = app.source,
-                )?.let(::add)
-            }
-            category.activeApps.forEach { app ->
-                husiModelFinding(
-                    label = app.packageName ?: app.serviceName ?: "active VPN",
-                    packageName = app.packageName,
-                    serviceName = app.serviceName,
-                    metadata = app.technicalMetadata,
-                    source = app.source,
-                )?.let(::add)
-            }
-        }
-        return findings.distinctBy { it.packageName.orEmpty() to it.description }
-    }
-
-    private fun husiModelFinding(
-        label: String,
-        packageName: String?,
-        serviceName: String?,
-        metadata: VpnAppTechnicalMetadata?,
-        source: com.notcvnt.rknhardering.model.EvidenceSource?,
-    ): Finding? {
-        val hasMeaningfulMetadata = metadata != null || !serviceName.isNullOrBlank() || !packageName.isNullOrBlank()
-        if (!hasMeaningfulMetadata) return null
-
-        val description = buildString {
-            append("HUSI model: ")
-            append(label)
-            packageName?.takeIf { it.isNotBlank() }?.let {
-                append(" · package: ")
-                append(it)
-            }
-            metadata?.versionName?.takeIf { it.isNotBlank() }?.let {
-                append(" · app version: ")
-                append(it)
-            }
-            append(" · app type: ")
-            append(metadata?.appType ?: "Other")
-            append(" · core type: ")
-            append(metadata?.coreType ?: "Unknown")
-            metadata?.corePath?.takeIf { it.isNotBlank() }?.let {
-                append(" · core path: ")
-                append(it)
-            }
-            metadata?.goVersion?.takeIf { it.isNotBlank() }?.let {
-                append(" · Go: ")
-                append(it)
-            }
-            serviceName?.takeIf { it.isNotBlank() }?.let {
-                append(" · service: ")
-                append(it)
-            }
-        }
-        return Finding(
-            description = description,
-            isInformational = true,
-            source = source,
-            packageName = packageName,
-        )
-    }
-
-    private fun bindInfoSection(
-        infoFindings: List<Finding>,
-        infoSection: LinearLayout,
-        infoDivider: View,
-        hasCheckFindings: Boolean,
-        privacyMode: Boolean,
-    ) {
-        infoSection.removeAllViews()
-        infoSection.visibility = if (infoFindings.isNotEmpty()) View.VISIBLE else View.GONE
-        for (finding in infoFindings) {
-            val parts = findingViews.splitInfoFinding(finding.description)
-            if (parts != null) {
-                val value = maskInfoValue(parts.second, privacyMode)
-                infoSection.addView(createInfoView(parts.first, value))
-            } else {
-                infoSection.addView(createFindingView(finding, privacyMode))
-            }
-        }
-        infoDivider.visibility = if (infoFindings.isNotEmpty() && hasCheckFindings) View.VISIBLE else View.GONE
+        categoryCards.render(category, card, icon, status, findingsContainer, infoSection, infoDivider, privacyMode)
     }
 
     private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
@@ -2323,41 +2210,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayNativeSigns(result: CategoryResult, privacyMode: Boolean) {
-        if (result.findings.isEmpty() && result.evidence.isEmpty()) {
-            cardNativeSigns.visibility = View.GONE
-            return
-        }
-        cardNativeSigns.visibility = View.VISIBLE
-
-        bindCardStatus(
-            detected = result.detected,
-            needsReview = result.needsReview,
-            icon = iconNativeSigns,
-            status = statusNativeSigns,
-            hasError = result.hasError,
+        categoryCards.renderNativeSigns(
+            result,
+            cardNativeSigns,
+            iconNativeSigns,
+            statusNativeSigns,
+            textNativeSignsSummary,
+            findingsNativeSigns,
+            privacyMode,
         )
-
-        val summaryFinding = result.findings.firstOrNull { finding ->
-            finding.description.startsWith("getifaddrs():") ||
-                finding.description.startsWith("Native library not loaded")
-        }
-        if (summaryFinding != null) {
-            textNativeSignsSummary.text = summaryFinding.description
-            textNativeSignsSummary.visibility = View.VISIBLE
-        } else {
-            textNativeSignsSummary.visibility = View.GONE
-        }
-
-        findingsNativeSigns.removeAllViews()
-        val rest = result.findings.filter { it !== summaryFinding }
-        if (rest.isNotEmpty()) {
-            findingsNativeSigns.visibility = View.VISIBLE
-            for (finding in rest) {
-                findingsNativeSigns.addView(createFindingView(finding, privacyMode))
-            }
-        } else {
-            findingsNativeSigns.visibility = View.GONE
-        }
     }
 
     private fun createStunGroupView(group: StunProbeGroupResult, privacyMode: Boolean): View {
