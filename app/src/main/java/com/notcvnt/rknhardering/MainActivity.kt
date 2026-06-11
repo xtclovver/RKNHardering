@@ -67,11 +67,7 @@ import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.model.StunScope
 import com.notcvnt.rknhardering.model.TargetGroup
-import com.notcvnt.rknhardering.export.CheckResultJsonExportFormatter
-import com.notcvnt.rknhardering.export.CheckResultMarkdownExportFormatter
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
-import com.notcvnt.rknhardering.export.ExportFormat
-import com.notcvnt.rknhardering.export.buildDefaultExportFileName
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
 import com.notcvnt.rknhardering.model.ExposureStatus
 import com.notcvnt.rknhardering.model.NarrativeRow
@@ -81,6 +77,7 @@ import com.notcvnt.rknhardering.model.VerdictNarrativeBuilder
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
+import com.notcvnt.rknhardering.ui.main.MainExportController
 import com.notcvnt.rknhardering.ui.main.TileSpec
 import com.notcvnt.rknhardering.util.formatCallTransportReason
 import com.notcvnt.rknhardering.util.maskInfoValue
@@ -90,7 +87,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 internal fun retainCompletedDiagnosticsSnapshot(
     result: CheckResult,
@@ -257,17 +253,13 @@ class MainActivity : AppCompatActivity() {
         prefs.edit { putBoolean(PREF_RATIONALE_SHOWN, true) }
     }
 
-    private val exportMarkdownLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument(ExportFormat.MARKDOWN.mimeType),
-    ) { uri ->
-        writeExportDocument(uri, ExportFormat.MARKDOWN)
-    }
-
-    private val exportJsonLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument(ExportFormat.JSON.mimeType),
-    ) { uri ->
-        writeExportDocument(uri, ExportFormat.JSON)
-    }
+    // Field initializer: the controller registers its CreateDocument launchers
+    // here, preserving the pre-STARTED registration timing.
+    private val exportController = MainExportController(
+        activity = this,
+        snapshot = { completedExportSnapshot },
+        debugClipboardEnabled = { isDebugClipboardExportEnabled() },
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -297,7 +289,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         btnCopyDiagnostics.setOnClickListener { copyTunProbeDiagnostics() }
-        btnExport.setOnClickListener { showExportFormatDialog() }
+        btnExport.setOnClickListener { exportController.showFormatDialog() }
         observeScanEvents()
 
         handleRkncheckImportIntent()
@@ -654,99 +646,6 @@ class MainActivity : AppCompatActivity() {
     private fun onRunCheckClicked() {
         if (viewModel.isRunning.value) return
         runCheck()
-    }
-
-    private fun showExportFormatDialog() {
-        if (completedExportSnapshot == null) return
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.main_export_title)
-            .setPositiveButton(R.string.main_export_markdown) { _, _ ->
-                onExportFormatSelected(ExportFormat.MARKDOWN)
-            }
-            .setNegativeButton(R.string.main_export_json) { _, _ ->
-                onExportFormatSelected(ExportFormat.JSON)
-            }
-            .setNeutralButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun onExportFormatSelected(format: ExportFormat) {
-        if (isDebugClipboardExportEnabled()) {
-            showExportActionDialog(format)
-        } else {
-            launchExport(format)
-        }
-    }
-
-    private fun showExportActionDialog(format: ExportFormat) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(
-                when (format) {
-                    ExportFormat.MARKDOWN -> R.string.main_export_markdown
-                    ExportFormat.JSON -> R.string.main_export_json
-                },
-            )
-            .setPositiveButton(R.string.main_export_save_file) { _, _ ->
-                launchExport(format)
-            }
-            .setNegativeButton(R.string.main_export_copy_to_clipboard) { _, _ ->
-                copyExportToClipboard(format)
-            }
-            .setNeutralButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun launchExport(format: ExportFormat) {
-        val snapshot = completedExportSnapshot ?: return
-        val defaultFileName = buildDefaultExportFileName(format, snapshot.finishedAtMillis)
-        when (format) {
-            ExportFormat.MARKDOWN -> exportMarkdownLauncher.launch(defaultFileName)
-            ExportFormat.JSON -> exportJsonLauncher.launch(defaultFileName)
-        }
-    }
-
-    private fun copyExportToClipboard(format: ExportFormat) {
-        val snapshot = completedExportSnapshot ?: return
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val labelResId = when (format) {
-            ExportFormat.MARKDOWN -> R.string.main_export_markdown
-            ExportFormat.JSON -> R.string.main_export_json
-        }
-        clipboard.setPrimaryClip(
-            ClipData.newPlainText(
-                getString(labelResId),
-                buildExportContent(snapshot, format),
-            ),
-        )
-        Toast.makeText(this, R.string.main_export_copied, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun writeExportDocument(uri: Uri?, format: ExportFormat) {
-        val targetUri = uri ?: return
-        val snapshot = completedExportSnapshot ?: return
-        val content = buildExportContent(snapshot, format)
-        val exportResult = runCatching {
-            contentResolver.openOutputStream(targetUri)?.use { outputStream ->
-                outputStream.writer(Charsets.UTF_8).use { writer ->
-                    writer.write(content)
-                }
-            } ?: throw IOException("Unable to open export destination")
-        }
-        if (exportResult.isSuccess) {
-            Toast.makeText(this, R.string.main_export_saved, Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, R.string.main_export_failed, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun buildExportContent(
-        snapshot: CompletedExportSnapshot,
-        format: ExportFormat,
-    ): String {
-        return when (format) {
-            ExportFormat.MARKDOWN -> CheckResultMarkdownExportFormatter.format(this, snapshot)
-            ExportFormat.JSON -> CheckResultJsonExportFormatter.format(this, snapshot)
-        }
     }
 
     private fun isDebugClipboardExportEnabled(): Boolean {
