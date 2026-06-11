@@ -46,7 +46,7 @@ object VpnAppClassifier {
     )
 
     private val coreTypeMarkers = listOf(
-        CORE_TYPE_SING_BOX to listOf("sing-box", "singbox"),
+        CORE_TYPE_SING_BOX to listOf(CORE_TYPE_SING_BOX, "singbox"),
         CORE_TYPE_XRAY_V2RAY to listOf("xray", "v2ray", "v2fly"),
         CORE_TYPE_CLASH_MIHOMO to listOf("mihomo", "clash"),
         CORE_TYPE_WIREGUARD to listOf("wireguard"),

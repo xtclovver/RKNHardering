@@ -8,6 +8,8 @@ import java.security.MessageDigest
 // for the offline signing CLI under :app:src/test (host-only path).
 object Ed25519 {
 
+    private const val SHA_512 = "SHA-512"
+
     private val P = BigInteger.ONE.shiftLeft(255).subtract(BigInteger.valueOf(19))
     private val L = BigInteger("7237005577332262213973186563042994240857116359379907606001950938285454250989")
     private val D = BigInteger("-121665").mod(P)
@@ -26,7 +28,7 @@ object Ed25519 {
         val s = decodeScalarLE(signature.copyOfRange(32, 64))
         if (s >= L) return false
         val rPoint = runCatching { decodePoint(r) }.getOrNull() ?: return false
-        val md = MessageDigest.getInstance("SHA-512")
+        val md = MessageDigest.getInstance(SHA_512)
         md.update(r)
         md.update(publicKey)
         md.update(message)
@@ -38,7 +40,7 @@ object Ed25519 {
 
     fun sign(privateKey: ByteArray, publicKey: ByteArray, message: ByteArray): ByteArray {
         require(privateKey.size == 32 && publicKey.size == 32)
-        val md = MessageDigest.getInstance("SHA-512")
+        val md = MessageDigest.getInstance(SHA_512)
         val h = md.digest(privateKey)
         val a = clampScalar(h.copyOfRange(0, 32))
         val prefix = h.copyOfRange(32, 64)
@@ -55,7 +57,7 @@ object Ed25519 {
 
     fun derivePublicKey(privateKey: ByteArray): ByteArray {
         require(privateKey.size == 32)
-        val h = MessageDigest.getInstance("SHA-512").digest(privateKey)
+        val h = MessageDigest.getInstance(SHA_512).digest(privateKey)
         val a = clampScalar(h.copyOfRange(0, 32))
         return encodePoint(scalarMul(B, a))
     }
@@ -92,9 +94,7 @@ object Ed25519 {
         if (x.multiply(x).subtract(xx).mod(P) != BigInteger.ZERO) {
             x = x.multiply(I).mod(P)
         }
-        if (x.multiply(x).subtract(xx).mod(P) != BigInteger.ZERO) {
-            throw IllegalArgumentException("no sqrt")
-        }
+        require(x.multiply(x).subtract(xx).mod(P) == BigInteger.ZERO) { "no sqrt" }
         if ((x.testBit(0)) != sign) x = P.subtract(x).mod(P)
         return x
     }
@@ -105,10 +105,10 @@ object Ed25519 {
         val sign = (raw[31].toInt() and 0x80) != 0
         raw[31] = (raw[31].toInt() and 0x7F).toByte()
         val y = decodeScalarLE(raw)
-        if (y >= P) throw IllegalArgumentException("y out of range")
+        require(y < P) { "y out of range" }
         val x = recoverX(y, sign)
         val p = Point(x, y)
-        if (!onCurve(p)) throw IllegalArgumentException("not on curve")
+        require(onCurve(p)) { "not on curve" }
         return p
     }
 

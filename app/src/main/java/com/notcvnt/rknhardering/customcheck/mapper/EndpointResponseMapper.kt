@@ -83,9 +83,9 @@ object EndpointResponseMapper {
     fun autoDetectResponseType(rawResponse: String): ResponseType {
         val trimmed = rawResponse.trim()
         // 1. Try JSON object
-        try { JSONObject(trimmed); return ResponseType.JSON } catch (_: Exception) { }
+        try { JSONObject(trimmed); return ResponseType.JSON } catch (_: Exception) { /* not a JSON object, try next format */ }
         // 2. Try JSON array
-        try { JSONArray(trimmed); return ResponseType.JSON } catch (_: Exception) { }
+        try { JSONArray(trimmed); return ResponseType.JSON } catch (_: Exception) { /* not a JSON array, try next format */ }
         // 3. key=value lines
         val lines = trimmed.lines().filter { it.isNotBlank() }
         val kvPattern = Regex("""^\w+=.+$""")
@@ -180,9 +180,12 @@ object EndpointResponseMapper {
             if (countryCodePath == null && key in setOf("country_code", "cc", "countrycode", "country") && COUNTRY_CODE_REGEX.matches(strVal)) {
                 countryCodePath = path
             }
-            if (countryNamePath == null && key in setOf("country", "country_name", "countryname")) {
-                // only if it doesn't look like a 2-letter code itself
-                if (!COUNTRY_CODE_REGEX.matches(strVal)) countryNamePath = path
+            // only if it doesn't look like a 2-letter code itself
+            if (countryNamePath == null &&
+                key in setOf("country", "country_name", "countryname") &&
+                !COUNTRY_CODE_REGEX.matches(strVal)
+            ) {
+                countryNamePath = path
             }
             if (ispPath == null && key in setOf("isp", "provider")) {
                 ispPath = path

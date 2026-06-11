@@ -80,7 +80,7 @@ internal class CheckerSectionController(
         updateNoteVisibility()
     }
 
-    fun isExpanded(): Boolean = expanded
+    val isExpanded: Boolean get() = expanded
 
     fun setEnabled(value: Boolean, propagate: Boolean) {
         enabled = value

@@ -162,7 +162,7 @@ internal class SettingsCustomCheckEditorFragment :
 
         // Override expansion listener to track openSectionIds
         sectionView.findViewById<View>(R.id.sectionHeader).setOnClickListener {
-            val nowOpen = !controller.isExpanded()
+            val nowOpen = !controller.isExpanded
             controller.setExpanded(nowOpen, animate = true)
             if (nowOpen) openSectionIds.add(id) else openSectionIds.remove(id)
         }
@@ -225,7 +225,7 @@ internal class SettingsCustomCheckEditorFragment :
                 labelHintRes = R.string.settings_custom_check_description_field,
                 extraInputHintRes = R.string.settings_custom_check_check_type_field,
                 extraSwitchTextRes = null,
-                testAction = { domain, checkType, _ ->
+                testAction = { domain, _, _ ->
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val result = runCatching {
                             val client = okhttp3.OkHttpClient.Builder()

@@ -166,7 +166,7 @@ int ProgressCallback(
     curl_off_t /* dlnow */,
     curl_off_t /* ultotal */,
     curl_off_t /* ulnow */) {
-  auto* state = static_cast<NativeCurlCancellationState*>(clientp);
+  const auto* state = static_cast<const NativeCurlCancellationState*>(clientp);
   return state != nullptr && state->cancelled.load() ? 1 : 0;
 }
 

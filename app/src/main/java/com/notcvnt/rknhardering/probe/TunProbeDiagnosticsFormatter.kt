@@ -13,6 +13,8 @@ import java.util.Locale
 
 object TunProbeDiagnosticsFormatter {
 
+    private const val NONE = "<none>"
+
     fun format(
         diagnostics: TunProbeDiagnostics,
         settings: CheckSettings,
@@ -109,8 +111,8 @@ object TunProbeDiagnosticsFormatter {
         builder.appendLine("available: true")
         builder.appendLine("interfaceName: ${path.interfaceName ?: "<missing>"}")
         builder.appendLine("selectedMode: ${path.selectedMode?.name ?: "NONE"}")
-        builder.appendLine("selectedIp: ${path.selectedIp?.let(::maskIp) ?: "<none>"}")
-        builder.appendLine("selectedError: ${path.selectedError?.let(::maskIpsInText) ?: "<none>"}")
+        builder.appendLine("selectedIp: ${path.selectedIp?.let(::maskIp) ?: NONE}")
+        builder.appendLine("selectedError: ${path.selectedError?.let(::maskIpsInText) ?: NONE}")
         builder.appendLine("dnsPathMismatch: ${path.dnsPathMismatch}")
         appendAttempt(builder, "strict", path.strict)
         appendAttempt(builder, "curl-compatible", path.curlCompatible)
@@ -122,8 +124,8 @@ object TunProbeDiagnosticsFormatter {
         attempt: TunProbeAttemptDiagnostics,
     ) {
         builder.appendLine("$label.status: ${attempt.status}")
-        builder.appendLine("$label.ip: ${attempt.ip?.let(::maskIp) ?: "<none>"}")
-        builder.appendLine("$label.error: ${attempt.error?.let(::maskIpsInText) ?: "<none>"}")
+        builder.appendLine("$label.ip: ${attempt.ip?.let(::maskIp) ?: NONE}")
+        builder.appendLine("$label.error: ${attempt.error?.let(::maskIpsInText) ?: NONE}")
         appendTransportDiagnostics(builder, label, attempt.transportDiagnostics)
         builder.appendLine("$label.endpoints:")
         if (attempt.endpointAttempts.isEmpty()) {
@@ -138,9 +140,9 @@ object TunProbeDiagnosticsFormatter {
 
     private fun formatEndpointAttempt(attempt: TunEndpointAttempt): String {
         val result = when (attempt.status) {
-            PublicIpProbeStatus.SUCCEEDED -> "ip=${attempt.ip?.let(::maskIp) ?: "<none>"}"
+            PublicIpProbeStatus.SUCCEEDED -> "ip=${attempt.ip?.let(::maskIp) ?: NONE}"
             PublicIpProbeStatus.FAILED,
-            PublicIpProbeStatus.SKIPPED -> "error=${attempt.error?.let(::maskIpsInText) ?: "<none>"}"
+            PublicIpProbeStatus.SKIPPED -> "error=${attempt.error?.let(::maskIpsInText) ?: NONE}"
         }
         return "${attempt.endpoint} [${attempt.familyHint}] -> ${attempt.status} ($result)"
     }
@@ -191,14 +193,14 @@ object TunProbeDiagnosticsFormatter {
             DnsResolverMode.DIRECT -> {
                 val servers = settings.resolverConfig.effectiveDirectServers()
                     .joinToString(", ") { maskIp(it) }
-                    .ifBlank { "<none>" }
+                    .ifBlank { NONE }
                 "DIRECT preset=${settings.resolverConfig.preset.name} servers=$servers"
             }
             DnsResolverMode.DOH -> {
                 val bootstrap = settings.resolverConfig.effectiveDohBootstrapHosts()
                     .joinToString(", ") { maskIp(it) }
-                    .ifBlank { "<none>" }
-                "DOH preset=${settings.resolverConfig.preset.name} url=${settings.resolverConfig.effectiveDohUrl() ?: "<none>"} bootstrap=$bootstrap"
+                    .ifBlank { NONE }
+                "DOH preset=${settings.resolverConfig.preset.name} url=${settings.resolverConfig.effectiveDohUrl() ?: NONE} bootstrap=$bootstrap"
             }
         }
     }

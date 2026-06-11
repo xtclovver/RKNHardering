@@ -31,9 +31,10 @@ object CdnPullingChecker {
 
     private const val MAX_FETCH_ATTEMPTS = 1
     private const val RETRY_DELAY_MS = 250L
+    private const val MEDUZA_IO = "meduza.io"
     private val ACTIONABLE_TARGETS = setOf(
         "redirector.googlevideo.com",
-        "meduza.io",
+        MEDUZA_IO,
     )
 
     internal data class EndpointSpec(
@@ -71,7 +72,7 @@ object CdnPullingChecker {
             kind = CdnPullingClient.TargetKind.CLOUDFLARE_TRACE,
         ),
         EndpointSpec(
-            label = "meduza.io",
+            label = MEDUZA_IO,
             url = "https://meduza.io/cdn-cgi/trace",
             kind = CdnPullingClient.TargetKind.CLOUDFLARE_TRACE,
         ),
@@ -92,7 +93,7 @@ object CdnPullingChecker {
                 val activeEndpoints = buildList {
                     if (config.builtinTargetsEnabled) {
                         for (endpoint in ENDPOINTS) {
-                            if (endpoint.label == "meduza.io" && !config.meduzaEnabled) continue
+                            if (endpoint.label == MEDUZA_IO && !config.meduzaEnabled) continue
                             if (endpoint.label == "rutracker.org" && !config.rutrackerEnabled) continue
                             add(endpoint)
                         }

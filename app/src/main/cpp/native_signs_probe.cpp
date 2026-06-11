@@ -22,6 +22,7 @@
 #include <sys/system_properties.h>
 
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <sstream>
 
@@ -254,7 +255,8 @@ jobjectArray nativeReadSelfMapsSummary(JNIEnv *env, jclass /*clazz*/) {
         }
 
         if (rwx) {
-            unsigned long long start = 0, end = 0;
+            unsigned long long start = 0;
+            unsigned long long end = 0;
             if (std::sscanf(line, "%llx-%llx", &start, &end) == 2 && end > start) {
                 unsigned long long size = end - start;
                 if (size >= (256ULL * 1024ULL)) {
@@ -347,8 +349,7 @@ int ipv6PrefixLen(const sockaddr *sa) {
     if (sa == nullptr || sa->sa_family != AF_INET6) return -1;
     const auto *in6 = reinterpret_cast<const sockaddr_in6 *>(sa);
     int bits = 0;
-    for (int i = 0; i < 16; ++i) {
-        unsigned char b = in6->sin6_addr.s6_addr[i];
+    for (unsigned char b : in6->sin6_addr.s6_addr) {
         if (b == 0xff) { bits += 8; continue; }
         for (int k = 7; k >= 0; --k) {
             if (b & (1u << k)) ++bits; else return bits;
@@ -539,7 +540,7 @@ std::vector<std::string> netlinkRouteDump(int family) {
              nh = NLMSG_NEXT(nh, len)) {
             if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
             if (nh->nlmsg_type == NLMSG_ERROR) {
-                auto *err = reinterpret_cast<struct nlmsgerr *>(NLMSG_DATA(nh));
+                const auto *err = reinterpret_cast<const struct nlmsgerr *>(NLMSG_DATA(nh));
                 out.push_back(std::string("error|nlmsg|errno=") + std::to_string(-err->error));
                 done = true;
                 break;
@@ -550,7 +551,10 @@ std::vector<std::string> netlinkRouteDump(int family) {
             int rtaLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(*rtm));
             auto *attr = RTM_RTA(rtm);
 
-            std::string dst, gw, src, prefSrc;
+            std::string dst;
+            std::string gw;
+            std::string src;
+            std::string prefSrc;
             int oif = 0;
             unsigned int priority = 0;
             char iface[IF_NAMESIZE] = {0};
@@ -703,14 +707,14 @@ std::vector<std::string> netlinkInetDiag(int family, int protocol) {
              nh = NLMSG_NEXT(nh, len)) {
             if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
             if (nh->nlmsg_type == NLMSG_ERROR) {
-                auto *err = reinterpret_cast<struct nlmsgerr *>(NLMSG_DATA(nh));
+                const auto *err = reinterpret_cast<const struct nlmsgerr *>(NLMSG_DATA(nh));
                 out.push_back(std::string("error|nlmsg|errno=") + std::to_string(-err->error));
                 done = true;
                 break;
             }
             if (nh->nlmsg_type != SOCK_DIAG_BY_FAMILY) continue;
 
-            auto *diag = reinterpret_cast<struct inet_diag_msg *>(NLMSG_DATA(nh));
+            const auto *diag = reinterpret_cast<const struct inet_diag_msg *>(NLMSG_DATA(nh));
             char src[INET6_ADDRSTRLEN] = {0};
             char dst[INET6_ADDRSTRLEN] = {0};
             int af = diag->idiag_family;
@@ -1041,7 +1045,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
     }
     jclass cls = env->FindClass("com/notcvnt/rknhardering/probe/NativeSignsBridge");
     if (cls == nullptr) return JNI_ERR;
-    jint rc = env->RegisterNatives(cls, kMethods, sizeof(kMethods) / sizeof(kMethods[0]));
+    jint rc = env->RegisterNatives(cls, kMethods, static_cast<jint>(std::size(kMethods)));
     env->DeleteLocalRef(cls);
     if (rc != JNI_OK) return JNI_ERR;
     return JNI_VERSION_1_6;
