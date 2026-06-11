@@ -204,6 +204,7 @@ class ProxyProberTest {
         }
         acceptor.start()
         val cracked = ProxyProber.probeSocks5Auth("127.0.0.1", port, 500, 500, "admin", "admin")
+        acceptor.join(2000)
         server.close()
         assertTrue(cracked)
     }
@@ -224,6 +225,7 @@ class ProxyProberTest {
         }
         acceptor.start()
         val cracked = ProxyProber.probeSocks5Auth("127.0.0.1", port, 500, 500, "admin", "admin")
+        acceptor.join(2000)
         server.close()
         assertFalse(cracked)
     }
@@ -244,6 +246,7 @@ class ProxyProberTest {
         }
         acceptor.start()
         val open = ProxyProber.probeUdpAssociate("127.0.0.1", port, 500, 500)
+        acceptor.join(2000)
         server.close()
         assertTrue(open)
     }
@@ -264,6 +267,7 @@ class ProxyProberTest {
         }
         acceptor.start()
         val open = ProxyProber.probeUdpAssociate("127.0.0.1", port, 500, 500)
+        acceptor.join(2000)
         server.close()
         assertFalse(open)
     }

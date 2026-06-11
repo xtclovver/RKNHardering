@@ -3,7 +3,9 @@ package com.notcvnt.rknhardering.probe
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ProxyScannerTest {
 
@@ -168,5 +170,118 @@ class ProxyScannerTest {
         assertEquals(2, result.size)
         assertEquals(ProxyEndpoint("127.0.0.1", 10808, ProxyType.SOCKS5, authRequired = true), result[0])
         assertEquals(ProxyEndpoint("127.0.0.1", 10809, ProxyType.HTTP, authRequired = true), result[1])
+    }
+
+    // (a) Security gate: with authProbeEnabled=false (the default), the offensive
+    // auth/UDP probes must never run, even for a SOCKS5 endpoint on loopback.
+    @Test
+    fun `auth probes are not invoked when authProbeEnabled is false`() = runBlocking {
+        val socks5AuthInvoked = AtomicBoolean(false)
+        val udpAssociateInvoked = AtomicBoolean(false)
+        val scanner = ProxyScanner(
+            popularPorts = listOf(1080),
+            scanRange = 1080..1080,
+            // authProbeEnabled defaults to false; assert no auth probe runs.
+            probePort = { _, port, _, _ ->
+                if (port == 1080) ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = true) else null
+            },
+            probeSocks5Auth = { _, _, _, _, _, _ ->
+                socks5AuthInvoked.set(true)
+                true
+            },
+            probeUdpAssociate = { _, _, _, _ ->
+                udpAssociateInvoked.set(true)
+                true
+            },
+        )
+
+        val result = scanner.findOpenProxyEndpoints(
+            mode = ScanMode.POPULAR_ONLY,
+            manualPort = null,
+            onProgress = {},
+        )
+
+        assertFalse(socks5AuthInvoked.get())
+        assertFalse(udpAssociateInvoked.get())
+        assertEquals(1, result.size)
+        assertFalse(result[0].weakAuthCracked)
+        assertFalse(result[0].udpAssociateOpen)
+    }
+
+    // (b) Loopback guard: even with authProbeEnabled=true, a non-loopback host must
+    // not be probed. loopbackHosts is injected with a non-loopback address (8.8.8.8)
+    // so the scan reaches it, and maybeProbeAuth's isLoopback(...) check rejects it.
+    @Test
+    fun `auth probes are not invoked for non loopback host even when enabled`() = runBlocking {
+        val socks5AuthInvoked = AtomicBoolean(false)
+        val udpAssociateInvoked = AtomicBoolean(false)
+        val scanner = ProxyScanner(
+            loopbackHosts = listOf("8.8.8.8"),
+            popularPorts = listOf(1080),
+            scanRange = 1080..1080,
+            authProbeEnabled = true,
+            probePort = { _, port, _, _ ->
+                if (port == 1080) ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = true) else null
+            },
+            probeSocks5Auth = { _, _, _, _, _, _ ->
+                socks5AuthInvoked.set(true)
+                true
+            },
+            probeUdpAssociate = { _, _, _, _ ->
+                udpAssociateInvoked.set(true)
+                true
+            },
+        )
+
+        val result = scanner.findOpenProxyEndpoints(
+            mode = ScanMode.POPULAR_ONLY,
+            manualPort = null,
+            onProgress = {},
+        )
+
+        assertFalse(socks5AuthInvoked.get())
+        assertFalse(udpAssociateInvoked.get())
+        assertEquals(1, result.size)
+        assertEquals("8.8.8.8", result[0].host)
+        assertFalse(result[0].weakAuthCracked)
+        assertFalse(result[0].udpAssociateOpen)
+    }
+
+    // (c) Happy path: authProbeEnabled=true on a loopback SOCKS5 endpoint with
+    // authRequired -> weak-cred brute and UDP ASSOCIATE probes run; their results
+    // flow into the endpoint.
+    @Test
+    fun `auth probes mark weakAuthCracked and udpAssociateOpen on loopback socks5`() = runBlocking {
+        val socks5AuthInvoked = AtomicBoolean(false)
+        val udpAssociateInvoked = AtomicBoolean(false)
+        val scanner = ProxyScanner(
+            popularPorts = listOf(1080),
+            scanRange = 1080..1080,
+            authProbeEnabled = true,
+            probePort = { _, port, _, _ ->
+                if (port == 1080) ProxyProber.ProbeResult(ProxyType.SOCKS5, authRequired = true) else null
+            },
+            probeSocks5Auth = { _, _, _, _, _, _ ->
+                socks5AuthInvoked.set(true)
+                true
+            },
+            probeUdpAssociate = { _, _, _, _ ->
+                udpAssociateInvoked.set(true)
+                true
+            },
+        )
+
+        val result = scanner.findOpenProxyEndpoints(
+            mode = ScanMode.POPULAR_ONLY,
+            manualPort = null,
+            onProgress = {},
+        )
+
+        assertTrue(socks5AuthInvoked.get())
+        assertTrue(udpAssociateInvoked.get())
+        assertEquals(1, result.size)
+        assertEquals("127.0.0.1", result[0].host)
+        assertTrue(result[0].weakAuthCracked)
+        assertTrue(result[0].udpAssociateOpen)
     }
 }
