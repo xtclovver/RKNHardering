@@ -192,13 +192,13 @@ class NativeSignsCheckerTest {
         val routes = listOf(
             NativeRouteEntry(
                 interfaceName = "wlan0",
-                destinationHex = "CB007107",
+                destinationHex = "08080808",
                 gatewayHex = "C0A80101",
                 flags = 0,
                 isDefault = false,
                 source = NativeRouteEntry.RouteSource.NETLINK,
                 family = 2,
-                destination = "203.0.113.7",
+                destination = "8.8.8.8",
                 prefixLen = 32,
             ),
         )
@@ -215,9 +215,9 @@ class NativeSignsCheckerTest {
             family = 2, destination = "10.8.0.1", prefixLen = 32,
         )
         val publicViaTun = NativeRouteEntry(
-            interfaceName = "tun0", destinationHex = "CB007107", gatewayHex = "00000000",
+            interfaceName = "tun0", destinationHex = "08080808", gatewayHex = "00000000",
             flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
-            family = 2, destination = "203.0.113.7", prefixLen = 32,
+            family = 2, destination = "8.8.8.8", prefixLen = 32,
         )
         val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(privateViaWlan, publicViaTun))
         assertFalse(outcome.detected)

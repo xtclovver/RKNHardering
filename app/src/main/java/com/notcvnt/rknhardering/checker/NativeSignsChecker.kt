@@ -105,6 +105,7 @@ object NativeSignsChecker {
         findings += hostRouteOutcome.findings
         evidence += hostRouteOutcome.evidence
         detected = detected || hostRouteOutcome.detected
+        needsReview = needsReview || hostRouteOutcome.needsReview
 
         val hookOutcome = evaluateHookMarkers(context)
         findings += hookOutcome.findings
@@ -468,28 +469,12 @@ object NativeSignsChecker {
     }
 
     internal fun isPublicRoutableAddress(addr: String): Boolean {
-        return runCatching {
-            val inet = java.net.InetAddress.getByName(addr)
-            !inet.isLoopbackAddress &&
-                !inet.isLinkLocalAddress &&
-                !inet.isSiteLocalAddress &&
-                !inet.isAnyLocalAddress &&
-                !inet.isMulticastAddress &&
-                !isCgnatOrUla(inet)
-        }.getOrDefault(false)
-    }
-
-    private fun isCgnatOrUla(inet: java.net.InetAddress): Boolean {
+        if (!com.notcvnt.rknhardering.customcheck.UrlSanitizer.isPublicAddress(addr)) return false
+        // UrlSanitizer does not cover IPv6 ULA fc00::/7 — add it here
+        val inet = runCatching { java.net.InetAddress.getByName(addr) }.getOrNull() ?: return false
         val bytes = inet.address ?: return false
-        if (bytes.size == 4) {
-            val b0 = bytes[0].toInt() and 0xFF
-            val b1 = bytes[1].toInt() and 0xFF
-            return b0 == 100 && b1 in 64..127
-        }
-        if (bytes.size == 16) {
-            return (bytes[0].toInt() and 0xFE) == 0xFC
-        }
-        return false
+        if (bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC) return false
+        return true
     }
 
     internal fun evaluateHookMarkers(context: Context): PartialOutcome {
