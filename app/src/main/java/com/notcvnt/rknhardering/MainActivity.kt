@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,8 +16,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.AttrRes
-import androidx.annotation.ColorRes
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -27,7 +24,6 @@ import androidx.core.content.edit
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isNotEmpty
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -59,11 +55,6 @@ import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
-import com.notcvnt.rknhardering.model.ExposureStatus
-import com.notcvnt.rknhardering.model.NarrativeRow
-import com.notcvnt.rknhardering.model.Verdict
-import com.notcvnt.rknhardering.model.VerdictNarrative
-import com.notcvnt.rknhardering.model.VerdictNarrativeBuilder
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
@@ -77,6 +68,8 @@ import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
 import com.notcvnt.rknhardering.ui.main.render.IpChannelsRenderer
 import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
+import com.notcvnt.rknhardering.ui.main.render.VerdictRenderer
+import com.notcvnt.rknhardering.ui.main.render.VerdictViews
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -208,7 +201,6 @@ class MainActivity : AppCompatActivity() {
     private var activeCheckSettings: CheckSettings? = null
     private var retainedDiagnosticsSnapshot: RetainedDiagnosticsSnapshot? = null
     private var completedExportSnapshot: CompletedExportSnapshot? = null
-    private var isVerdictDetailsExpanded = false
 
     // Redesign
     private lateinit var mainContentRoot: LinearLayout
@@ -273,6 +265,7 @@ class MainActivity : AppCompatActivity() {
     private val bypassRenderer by lazy { BypassRenderer(renderEnv, findingViews) }
     private val ipChannelsRenderer by lazy { IpChannelsRenderer(renderEnv) }
     private val domainReachabilityRenderer by lazy { DomainReachabilityRenderer(renderEnv) }
+    private val verdictRenderer by lazy { VerdictRenderer(renderEnv, findingViews) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -710,31 +703,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkStatusStopped(): String = getString(R.string.main_check_stopped)
-
-    private fun themedContext(): android.content.Context = resultsScrollView.context
-
-    private fun themeColor(@AttrRes attrRes: Int, @ColorRes fallbackColorRes: Int): Int {
-        return MaterialColors.getColor(
-            resultsScrollView,
-            attrRes,
-            ContextCompat.getColor(themedContext(), fallbackColorRes),
-        )
-    }
-
-    private fun surfaceColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorSurface, R.color.md_surface)
-
-    private fun onSurfaceColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorOnSurface, R.color.md_on_surface)
-
-    private fun onSurfaceVariantColor(): Int =
-        themeColor(
-            com.google.android.material.R.attr.colorOnSurfaceVariant,
-            R.color.md_on_surface_variant,
-        )
-
-    private fun outlineVariantColor(): Int =
-        themeColor(com.google.android.material.R.attr.colorOutlineVariant, R.color.md_outline_variant)
 
     private fun updateCheckStatus(message: String?) {
         textCheckStatus.text = message.orEmpty()
@@ -1676,9 +1644,6 @@ class MainActivity : AppCompatActivity() {
     private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View =
         findingViews.createFindingView(finding, privacyMode)
 
-    private fun createInfoView(label: String, value: String): View =
-        findingViews.createInfoView(label, value)
-
     // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
     // delegator even without production call sites.
     private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View =
@@ -1768,182 +1733,35 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun verdictViews(): VerdictViews = VerdictViews(
+        cardVerdict = cardVerdict,
+        iconVerdict = iconVerdict,
+        textVerdict = textVerdict,
+        textVerdictExplanation = textVerdictExplanation,
+        textVerdictHomeRoutedRoamingNote = textVerdictHomeRoutedRoamingNote,
+        btnVerdictDetails = btnVerdictDetails,
+        verdictDetailsDivider = verdictDetailsDivider,
+        verdictDetailsContent = verdictDetailsContent,
+        verdictHero = verdictHero,
+        verdictAvatar = verdictAvatar,
+        verdictAvatarIcon = verdictAvatarIcon,
+        verdictLabel = verdictLabel,
+        verdictTitle = verdictTitle,
+        verdictSubtitle = verdictSubtitle,
+        verdictHomeRoutedRoamingNote = verdictHomeRoutedRoamingNote,
+        whitelistWarningBanner = whitelistWarningBanner,
+    )
+
     private fun displayVerdict(result: CheckResult, privacyMode: Boolean) {
-        cardVerdict.visibility = View.VISIBLE
-        isVerdictDetailsExpanded = false
-
-        when (result.verdict) {
-            Verdict.NOT_DETECTED -> {
-                val visual = statusVisual(StatusSemantic.CLEAN)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_not_detected)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-            Verdict.NEEDS_REVIEW -> {
-                val visual = statusVisual(StatusSemantic.REVIEW)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_needs_review)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-            Verdict.DETECTED -> {
-                val visual = statusVisual(StatusSemantic.DETECTED)
-                iconVerdict.setImageResource(visual.iconRes)
-                iconVerdict.imageTintList = ColorStateList.valueOf(visual.accentColor)
-                textVerdict.text = getString(R.string.main_verdict_detected)
-                textVerdict.setTextColor(visual.accentColor)
-                cardVerdict.setCardBackgroundColor(visual.containerColor)
-            }
-        }
-
-        bindVerdictNarrative(VerdictNarrativeBuilder.build(this, result, privacyMode))
-        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
-    }
-
-    private fun bindWhitelistWarningBanner(show: Boolean) {
-        whitelistWarningBanner.visibility = if (show) View.VISIBLE else View.GONE
-    }
-
-    private fun bindVerdictNarrative(narrative: VerdictNarrative) {
-        textVerdictExplanation.text = narrative.explanation
-        textVerdictExplanation.visibility = View.VISIBLE
-
-        bindHomeRoutedRoamingNote(narrative.homeRoutedRoamingNote)
-
-        verdictDetailsContent.removeAllViews()
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_meaning),
-            content = narrative.meaningRows.map(::createVerdictBulletView),
-        )
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_discovered),
-            content = narrative.discoveredRows.map(::createVerdictRowView),
-        )
-        addVerdictSection(
-            title = getString(R.string.main_verdict_section_reasons),
-            content = narrative.reasonRows.map(::createVerdictBulletView),
-        )
-
-        val hasDetails = verdictDetailsContent.isNotEmpty()
-        verdictDetailsDivider.visibility = if (hasDetails) View.VISIBLE else View.GONE
-        btnVerdictDetails.visibility = if (hasDetails) View.VISIBLE else View.GONE
-        verdictDetailsContent.visibility = if (hasDetails && isVerdictDetailsExpanded) View.VISIBLE else View.GONE
-        updateVerdictDetailsButton()
-    }
-
-    private fun bindHomeRoutedRoamingNote(note: String?) {
-        if (note != null) {
-            textVerdictHomeRoutedRoamingNote.text = note
-            textVerdictHomeRoutedRoamingNote.visibility = View.VISIBLE
-            textVerdictHomeRoutedRoamingNote.setTextColor(onSurfaceColor())
-            textVerdictHomeRoutedRoamingNote.setBackgroundResource(
-                R.drawable.bg_verdict_home_routed_roaming_note,
-            )
-            verdictHomeRoutedRoamingNote.text = note
-            verdictHomeRoutedRoamingNote.visibility = View.VISIBLE
-        } else {
-            textVerdictHomeRoutedRoamingNote.text = ""
-            textVerdictHomeRoutedRoamingNote.visibility = View.GONE
-            verdictHomeRoutedRoamingNote.text = ""
-            verdictHomeRoutedRoamingNote.visibility = View.GONE
-        }
-    }
-
-    private fun addVerdictSection(title: String, content: List<View>) {
-        if (content.isEmpty()) return
-
-        if (verdictDetailsContent.isNotEmpty()) {
-            verdictDetailsContent.addView(
-                View(themedContext()).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1.dp,
-                    ).apply {
-                        topMargin = 12.dp
-                        bottomMargin = 12.dp
-                    }
-                    setBackgroundColor(outlineVariantColor())
-                    alpha = 0.7f
-                },
-            )
-        }
-
-        verdictDetailsContent.addView(createVerdictSectionTitleView(title))
-        content.forEach { verdictDetailsContent.addView(it) }
-    }
-
-    private fun createVerdictSectionTitleView(title: String): View {
-        return TextView(themedContext()).apply {
-            text = title
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            isAllCaps = true
-            letterSpacing = 0.05f
-            setPadding(0, 0, 0, 6.dp)
-            setTextColor(onSurfaceVariantColor())
-        }
-    }
-
-    private fun createVerdictBulletView(text: String): View {
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val bullet = TextView(themedContext()).apply {
-            this.text = "•"
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 8.dp, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val body = TextView(themedContext()).apply {
-            this.text = text
-            textSize = 13f
-            setLineSpacing(2.dp.toFloat(), 1f)
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        row.addView(bullet)
-        row.addView(body)
-        return row
-    }
-
-    private fun createVerdictRowView(row: NarrativeRow): View {
-        return createInfoView(row.label, row.value)
+        verdictRenderer.displayVerdict(result, verdictViews(), privacyMode)
     }
 
     private fun clearVerdictCard() {
-        isVerdictDetailsExpanded = false
-        textVerdict.text = ""
-        textVerdictExplanation.text = ""
-        textVerdictExplanation.visibility = View.GONE
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
-        verdictDetailsDivider.visibility = View.GONE
-        btnVerdictDetails.visibility = View.GONE
-        btnVerdictDetails.text = getString(R.string.main_verdict_details)
-        verdictDetailsContent.removeAllViews()
-        verdictDetailsContent.visibility = View.GONE
+        verdictRenderer.clearVerdictCard(verdictViews())
     }
 
     private fun toggleVerdictDetails() {
-        if (btnVerdictDetails.visibility != View.VISIBLE) return
-        isVerdictDetailsExpanded = !isVerdictDetailsExpanded
-        verdictDetailsContent.visibility = if (isVerdictDetailsExpanded) View.VISIBLE else View.GONE
-        updateVerdictDetailsButton()
-        if (isVerdictDetailsExpanded) {
-            animateContentReveal(verdictDetailsContent)
-        }
-    }
-
-    private fun updateVerdictDetailsButton() {
-        btnVerdictDetails.text = if (isVerdictDetailsExpanded) getString(R.string.main_verdict_hide_details) else getString(R.string.main_verdict_details)
+        verdictRenderer.toggleVerdictDetails(verdictViews()) { view -> animateContentReveal(view) }
     }
 
     private val Int.dp: Int
@@ -2291,50 +2109,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindVerdictHeroIdle() {
-        val visual = statusVisual(StatusSemantic.NEUTRAL)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(R.string.verdict_title_idle)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_idle)
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
+        verdictRenderer.bindVerdictHeroIdle(verdictViews())
     }
 
     private fun bindVerdictHeroRunning() {
-        val visual = statusVisual(StatusSemantic.NEUTRAL)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(R.string.verdict_title_idle)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_running)
-        bindHomeRoutedRoamingNote(null)
-        bindWhitelistWarningBanner(false)
+        verdictRenderer.bindVerdictHeroRunning(verdictViews())
     }
 
     private fun bindVerdictHero(result: CheckResult) {
-        val (semantic, titleRes) = when (result.verdict) {
-            Verdict.NOT_DETECTED -> StatusSemantic.CLEAN to R.string.verdict_title_clean
-            Verdict.NEEDS_REVIEW -> StatusSemantic.REVIEW to R.string.verdict_title_review
-            Verdict.DETECTED -> StatusSemantic.DETECTED to R.string.verdict_title_detected
-        }
-        val visual = statusVisual(semantic)
-        applyVerdictHeroColors(visual)
-        verdictAvatarIcon.setImageResource(visual.iconRes)
-        verdictLabel.text = getString(R.string.verdict_label)
-        verdictTitle.text = getString(titleRes)
-        verdictSubtitle.text = getString(R.string.verdict_subtitle_done, tiles.size)
-        bindWhitelistWarningBanner(result.operatorWhitelistProbe?.whitelistDetected == true)
-    }
-
-    private fun applyVerdictHeroColors(visual: StatusVisual) {
-        verdictHero.setCardBackgroundColor(visual.containerColor)
-        verdictTitle.setTextColor(visual.accentColor)
-        verdictLabel.setTextColor(visual.accentColor)
-        val avatarBg = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(visual.accentColor)
-        }
-        verdictAvatar.background = avatarBg
+        verdictRenderer.bindVerdictHero(verdictViews(), result, tiles.size)
     }
 }
