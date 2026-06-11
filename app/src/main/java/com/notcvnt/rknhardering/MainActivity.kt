@@ -188,6 +188,7 @@ class MainActivity : AppCompatActivity() {
     private val bypassProgressOrder = listOf(
         BypassChecker.ProgressLine.BYPASS,
         BypassChecker.ProgressLine.XRAY_API,
+        BypassChecker.ProgressLine.CLASH_API,
         BypassChecker.ProgressLine.UNDERLYING_NETWORK,
     )
     private val loadingStages = linkedSetOf<RunningStage>()
@@ -753,6 +754,7 @@ class MainActivity : AppCompatActivity() {
         val proxyScanEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_SCAN_ENABLED, true)
         val proxyAuthProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_AUTH_PROBE_ENABLED, false)
         val xrayApiScanEnabled = prefs.getBoolean(SettingsActivity.PREF_XRAY_API_SCAN_ENABLED, true)
+        val clashApiScanEnabled = prefs.getBoolean(SettingsActivity.PREF_CLASH_API_SCAN_ENABLED, true)
         val networkRequestsEnabled = prefs.getBoolean(SettingsActivity.PREF_NETWORK_REQUESTS_ENABLED, true)
         val callTransportProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_CALL_TRANSPORT_PROBE_ENABLED, false)
         val cdnPullingEnabled = prefs.getBoolean(SettingsActivity.PREF_CDN_PULLING_ENABLED, false)
@@ -783,6 +785,7 @@ class MainActivity : AppCompatActivity() {
             proxyScanEnabled = proxyScanEnabled,
             proxyAuthProbeEnabled = proxyAuthProbeEnabled,
             xrayApiScanEnabled = xrayApiScanEnabled,
+            clashApiScanEnabled = clashApiScanEnabled,
             networkRequestsEnabled = networkRequestsEnabled,
             callTransportProbeEnabled = callTransportProbeEnabled,
             cdnPullingEnabled = cdnPullingEnabled,

@@ -35,6 +35,19 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `R1 clash api evidence yields detected`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(evidence = listOf(evidence(EvidenceSource.CLASH_API, EvidenceConfidence.HIGH))),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
     fun `R5 transport_vpn evidence alone yields not detected`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),

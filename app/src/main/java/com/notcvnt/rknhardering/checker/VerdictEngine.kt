@@ -14,6 +14,7 @@ object VerdictEngine {
         EvidenceSource.SPLIT_TUNNEL_BYPASS,
         EvidenceSource.PROXY_AUTH_BYPASS,
         EvidenceSource.XRAY_API,
+        EvidenceSource.CLASH_API,
         EvidenceSource.VPN_GATEWAY_LEAK,
         EvidenceSource.VPN_NETWORK_BINDING,
     )

@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">Проверяет localhost на открытые SOCKS5/HTTP proxy-порты.</string>
     <string name="settings_xray_api_scan_title">Скан Xray gRPC API</string>
     <string name="settings_xray_api_scan_desc">Проверяет localhost на открытые порты Xray gRPC API.</string>
+    <string name="settings_clash_api_scan_title">Сканирование REST API Clash/sing-box</string>
+    <string name="settings_clash_api_scan_desc">Проверяет localhost на открытый REST API Clash/mihomo/sing-box, утекающий IP VPN-серверов.</string>
     <string name="settings_proxy_auth_probe">Проверка авторизации локальных прокси</string>
     <string name="settings_proxy_auth_probe_summary">Тестирует прокси на устройстве на слабые учётные данные и UDP-ретрансляцию (только loopback)</string>
     <string name="settings_port_range">Диапазон портов</string>
@@ -483,6 +485,7 @@
     <string name="checker_bypass_progress_full_scan">Полное сканирование</string>
     <string name="checker_bypass_progress_port_detail">Порт %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">Поиск gRPC API на localhost&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">Поиск REST API Clash/sing-box на localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">Проверка доступа к non-VPN сети&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">Проверка IP</string>
     <string name="checker_bypass_progress_ip_detail">Получение прямого IP и IP через прокси&#8230;</string>
@@ -505,6 +508,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds недоступен; outbound-адреса не раскрыты.</string>
     <string name="checker_bypass_xray_stats_sample">Счётчики StatsService: %1$s</string>
+    <string name="checker_bypass_no_clash_api">REST API Clash/sing-box: не найден</string>
+    <string name="checker_bypass_clash_api">REST API Clash/sing-box на %1$s</string>
+    <string name="checker_bypass_clash_leak">Утёкший IP VPN-сервера: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;ещё %1$d аутбаунд</item>
         <item quantity="few">&#160;&#160;&#8230;ещё %1$d аутбаунда</item>

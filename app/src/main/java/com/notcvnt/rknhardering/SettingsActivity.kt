@@ -90,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_SPLIT_TUNNEL_ENABLED = SettingsPrefs.PREF_SPLIT_TUNNEL_ENABLED
         const val PREF_PROXY_SCAN_ENABLED = SettingsPrefs.PREF_PROXY_SCAN_ENABLED
         const val PREF_XRAY_API_SCAN_ENABLED = SettingsPrefs.PREF_XRAY_API_SCAN_ENABLED
+        const val PREF_CLASH_API_SCAN_ENABLED = SettingsPrefs.PREF_CLASH_API_SCAN_ENABLED
         const val PREF_PROXY_AUTH_PROBE_ENABLED = SettingsPrefs.PREF_PROXY_AUTH_PROBE_ENABLED
         const val PREF_PORT_RANGE = SettingsPrefs.PREF_PORT_RANGE
         const val PREF_PORT_RANGE_START = SettingsPrefs.PREF_PORT_RANGE_START

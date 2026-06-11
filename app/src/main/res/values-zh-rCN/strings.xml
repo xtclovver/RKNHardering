@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">扫描 localhost 上开放的 SOCKS5/HTTP 代理端口。</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API 扫描</string>
     <string name="settings_xray_api_scan_desc">扫描 localhost 上暴露的 Xray gRPC API 端口。</string>
+    <string name="settings_clash_api_scan_title">扫描 Clash/sing-box REST API</string>
+    <string name="settings_clash_api_scan_desc">扫描 localhost 上暴露的 Clash/mihomo/sing-box REST API，该接口会泄露 VPN 服务器 IP。</string>
     <string name="settings_proxy_auth_probe">探测本地代理身份验证</string>
     <string name="settings_proxy_auth_probe_summary">测试设备上的代理是否存在弱凭据和 UDP 中继（仅 loopback）</string>
     <string name="settings_port_range">端口范围</string>
@@ -495,6 +497,7 @@
     <string name="checker_bypass_progress_full_scan">完整扫描</string>
     <string name="checker_bypass_progress_port_detail">端口 %1$d（%2$d%%）</string>
     <string name="checker_bypass_progress_xray_detail">正在查找 localhost 上的 gRPC API&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">正在查找 localhost 上的 Clash/sing-box REST API&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">正在检查非 VPN 网络访问能力&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP 检查</string>
     <string name="checker_bypass_progress_ip_detail">正在获取直接 IP 和经代理的 IP&#8230;</string>
@@ -517,6 +520,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService：%1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds 不可用；未暴露出站地址。</string>
     <string name="checker_bypass_xray_stats_sample">StatsService 计数器：%1$s</string>
+    <string name="checker_bypass_no_clash_api">Clash/sing-box REST API：未找到</string>
+    <string name="checker_bypass_clash_api">位于 %1$s 的 Clash/sing-box REST API</string>
+    <string name="checker_bypass_clash_leak">泄露的 VPN 服务器 IP：%1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="other">&#160;&#160;&#8230;还有 %1$d 个 outbound</item>
     </plurals>

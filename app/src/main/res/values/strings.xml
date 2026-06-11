@@ -44,6 +44,8 @@
     <string name="settings_proxy_scan_desc">Scans localhost for open SOCKS5/HTTP proxy ports.</string>
     <string name="settings_xray_api_scan_title">Xray gRPC API scan</string>
     <string name="settings_xray_api_scan_desc">Scans localhost for exposed Xray gRPC API ports.</string>
+    <string name="settings_clash_api_scan_title">Clash/sing-box REST API scan</string>
+    <string name="settings_clash_api_scan_desc">Scans localhost for an exposed Clash/mihomo/sing-box REST API that leaks VPN server IPs.</string>
     <string name="settings_proxy_auth_probe">Probe local proxy authentication</string>
     <string name="settings_proxy_auth_probe_summary">Test on-device proxies for weak credentials and UDP relay (loopback only)</string>
     <string name="settings_port_range">Port range</string>
@@ -481,6 +483,7 @@
     <string name="checker_bypass_progress_full_scan">Full scan</string>
     <string name="checker_bypass_progress_port_detail">Port %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">Looking for a gRPC API on localhost&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">Looking for a Clash/sing-box REST API on localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">Checking access to the non-VPN network&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">IP check</string>
     <string name="checker_bypass_progress_ip_detail">Obtaining the direct IP and the IP via proxy&#8230;</string>
@@ -503,6 +506,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds is unavailable; outbound addresses were not exposed.</string>
     <string name="checker_bypass_xray_stats_sample">StatsService counters: %1$s</string>
+    <string name="checker_bypass_no_clash_api">Clash/sing-box REST API: not found</string>
+    <string name="checker_bypass_clash_api">Clash/sing-box REST API at %1$s</string>
+    <string name="checker_bypass_clash_leak">Leaked VPN server IP: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;%1$d more outbound</item>
         <item quantity="other">&#160;&#160;&#8230;%1$d more outbounds</item>

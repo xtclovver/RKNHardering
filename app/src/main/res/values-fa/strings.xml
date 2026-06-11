@@ -45,6 +45,8 @@
     <string name="settings_proxy_scan_desc">localhost را برای پورت‌های باز SOCKS5/HTTP proxy اسکن می‌کند.</string>
     <string name="settings_xray_api_scan_title">اسکن API gRPC Xray</string>
     <string name="settings_xray_api_scan_desc">localhost را برای پورت‌های آشکار API gRPC Xray اسکن می‌کند.</string>
+    <string name="settings_clash_api_scan_title">اسکن REST API کلش/sing-box</string>
+    <string name="settings_clash_api_scan_desc">localhost را برای REST API آشکار Clash/mihomo/sing-box که IP سرورهای VPN را افشا می‌کند اسکن می‌کند.</string>
     <string name="settings_proxy_auth_probe">بررسی احراز هویت پراکسی محلی</string>
     <string name="settings_proxy_auth_probe_summary">پراکسی‌های روی دستگاه را برای اعتبارنامه‌های ضعیف و رله UDP آزمایش می‌کند (فقط loopback)</string>
     <string name="settings_port_range">بازه پورت</string>
@@ -496,6 +498,7 @@
     <string name="checker_bypass_progress_full_scan">اسکن کامل</string>
     <string name="checker_bypass_progress_port_detail">پورت %1$d (%2$d%%)</string>
     <string name="checker_bypass_progress_xray_detail">در حال جست‌وجوی gRPC API روی localhost&#8230;</string>
+    <string name="checker_bypass_progress_clash_detail">در حال جست‌وجوی REST API کلش/sing-box روی localhost&#8230;</string>
     <string name="checker_bypass_progress_underlying_detail">در حال بررسی دسترسی به شبکه غیر VPN&#8230;</string>
     <string name="checker_bypass_progress_ip_phase">بررسی IP</string>
     <string name="checker_bypass_progress_ip_detail">در حال به‌دست‌آوردن IP مستقیم و IP از طریق proxy&#8230;</string>
@@ -518,6 +521,9 @@
     <string name="checker_bypass_xray_api_stats_only">Xray gRPC StatsService: %1$s</string>
     <string name="checker_bypass_xray_handler_unavailable">HandlerService/ListOutbounds در دسترس نیست؛ نشانی‌های outbound آشکار نشدند.</string>
     <string name="checker_bypass_xray_stats_sample">شمارنده‌های StatsService: %1$s</string>
+    <string name="checker_bypass_no_clash_api">REST API کلش/sing-box: یافت نشد</string>
+    <string name="checker_bypass_clash_api">REST API کلش/sing-box در %1$s</string>
+    <string name="checker_bypass_clash_leak">IP افشاشدهٔ سرور VPN: %1$s</string>
     <plurals name="checker_bypass_extra_outbounds">
         <item quantity="one">&#160;&#160;&#8230;%1$d outbound دیگر</item>
         <item quantity="other">&#160;&#160;&#8230;%1$d outbound دیگر</item>
