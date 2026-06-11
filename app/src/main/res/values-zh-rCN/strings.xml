@@ -630,6 +630,13 @@
     <string name="checker_native_root_magisk_prop">检测到 Magisk 属性：%1$s</string>
     <string name="checker_native_host_route_leak">通过物理接口 %2$s 到 %1$s 的主机路由（VPN 服务器 IP 泄露）</string>
 
+    <!-- NativeSignsChecker: 模拟器 / 沙箱隔离 -->
+    <string name="checker_native_emulator_marker">模拟器标记：%1$s</string>
+    <string name="checker_native_emulator_build">Build 配置看起来像模拟器：%1$s</string>
+    <string name="checker_native_isolation_secondary_user">应用运行在次要 Android 用户 %1$d 中；检测器只能看到该用户，无法在无 root 的情况下检测其他用户中的 VPN</string>
+    <string name="checker_native_isolation_clone">应用运行在克隆/双开容器中（用户 %1$d）；无法检测主资料中的 VPN</string>
+    <string name="checker_native_isolation_work_profile">应用运行在受管理的工作资料中；无法在无 root 的情况下检测个人资料中的 VPN</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">有更新可用</string>
     <string name="update_dialog_message">已安装版本：%1$s\n最新版本：%2$s</string>

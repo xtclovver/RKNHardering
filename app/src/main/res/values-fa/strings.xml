@@ -632,6 +632,13 @@
     <string name="checker_native_root_magisk_prop">ویژگی Magisk شناسایی شد: %1$s</string>
     <string name="checker_native_host_route_leak">مسیر میزبان به %1$s از طریق رابط فیزیکی %2$s (نشت IP سرور VPN)</string>
 
+    <!-- NativeSignsChecker: شبیه‌ساز / جداسازی sandbox -->
+    <string name="checker_native_emulator_marker">نشانه شبیه‌ساز: %1$s</string>
+    <string name="checker_native_emulator_build">پروفایل Build شبیه‌سازی‌شده به نظر می‌رسد: %1$s</string>
+    <string name="checker_native_isolation_secondary_user">برنامه در کاربر ثانویه اندروید %1$d اجرا می‌شود؛ آشکارسازها فقط این کاربر را می‌بینند و VPN در کاربر دیگر بدون روت قابل تشخیص نیست</string>
+    <string name="checker_native_isolation_clone">برنامه در یک محفظه شبیه‌سازی/dual-app اجرا می‌شود (کاربر %1$d)؛ VPN در پروفایل اصلی قابل تشخیص نیست</string>
+    <string name="checker_native_isolation_work_profile">برنامه در یک پروفایل کاری مدیریت‌شده اجرا می‌شود؛ VPN در پروفایل شخصی بدون روت قابل تشخیص نیست</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">به‌روزرسانی موجود است</string>
     <string name="update_dialog_message">نسخه نصب‌شده: %1$s\nآخرین نسخه: %2$s</string>

@@ -39,6 +39,8 @@ object VerdictEngine {
     private val NATIVE_REVIEW_SOURCES = setOf(
         EvidenceSource.NATIVE_HOOK_MARKERS,
         EvidenceSource.NATIVE_LIBRARY_INTEGRITY,
+        EvidenceSource.NATIVE_EMULATOR,
+        EvidenceSource.SANDBOX_ISOLATION,
     )
 
     fun evaluate(

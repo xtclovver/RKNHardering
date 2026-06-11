@@ -557,6 +557,38 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `R6 emulator evidence alone yields needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            nativeSigns = category(
+                evidence = listOf(evidence(EvidenceSource.NATIVE_EMULATOR, EvidenceConfidence.HIGH)),
+            ),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `R6 sandbox isolation evidence alone yields needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            nativeSigns = category(
+                evidence = listOf(evidence(EvidenceSource.SANDBOX_ISOLATION, EvidenceConfidence.MEDIUM)),
+            ),
+        )
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
     fun `proxy assisted udp leak does not affect verdict`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),
