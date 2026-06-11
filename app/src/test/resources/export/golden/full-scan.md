@@ -294,12 +294,12 @@ loc=FI
 - <none>
 
 ## IP channels
-| Канал | Target | IP | Family | Страна | ASN | Источники |
+| Channel | Target | IP | Family | Country | ASN | Sources |
 | --- | --- | --- | --- | --- | --- | --- |
 | DIRECT | RU | 198.51.100.7 | V4 | RU | AS64501 Example Direct | geoip, ipcomp:ru:ru-main |
 | VPN | NON_RU | 203.0.113.64 | V4 | FI | AS64502 Example VPN | underlying-prober.non-ru.vpn, bypass.vpn |
 
-Флаги: crossChannelMismatch=true, dualStackObserved=true, probeTargetDivergence=true, probeTargetDirectDivergence=true, geoCountryMismatch=true, sameAsnAcrossChannels=true, channelConflict=DIRECT, VPN, foreignIps=203.0.113.64, needsReview=true
+Flags: crossChannelMismatch=true, dualStackObserved=true, probeTargetDivergence=true, probeTargetDirectDivergence=true, geoCountryMismatch=true, sameAsnAcrossChannels=true, channelConflict=DIRECT, VPN, foreignIps=203.0.113.64, needsReview=true
 
 Channel IPs:
 - DIRECT: 198.51.100.7

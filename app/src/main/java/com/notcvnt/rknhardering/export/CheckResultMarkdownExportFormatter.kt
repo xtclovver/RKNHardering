@@ -42,8 +42,6 @@ internal object CheckResultMarkdownExportFormatter {
     private const val NONE_DASH = "- <none>"
     private const val NONE_INDENTED = "  - <none>"
     private const val FINDINGS_HEADING = "### Findings"
-    private const val AVAILABLE = "доступен"
-    private const val UNAVAILABLE = "недоступен"
 
     fun format(
         context: Context,
@@ -74,7 +72,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendCategorySection(builder, context.getString(R.string.main_card_location_signals), result.locationSignals, snapshot.privacyMode)
         appendIpChannelsSection(builder, context, result.ipConsensus, snapshot.privacyMode)
         appendTunProbeDiagnosticsSection(builder, result.tunProbeDiagnostics, snapshot.privacyMode)
-        appendOperatorWhitelistSection(builder, result.operatorWhitelistProbe)
+        appendOperatorWhitelistSection(builder, context, result.operatorWhitelistProbe)
         appendBypassSection(builder, context, result.bypassResult, snapshot.privacyMode)
         builder.appendLine("## Footer")
         builder.appendLine("- Timestamp: ${formatExportTimestamp(snapshot.finishedAtMillis)}")
@@ -624,7 +622,10 @@ internal object CheckResultMarkdownExportFormatter {
             return
         }
         builder.appendLine("## ${context.getString(R.string.ip_channels_title)}")
-        builder.appendLine("| Канал | Target | IP | Family | Страна | ASN | Источники |")
+        val channelCol = context.getString(R.string.export_ip_channels_col_channel)
+        val countryCol = context.getString(R.string.export_ip_channels_col_country)
+        val sourcesCol = context.getString(R.string.export_ip_channels_col_sources)
+        builder.appendLine("| $channelCol | Target | IP | Family | $countryCol | ASN | $sourcesCol |")
         builder.appendLine("| --- | --- | --- | --- | --- | --- | --- |")
         consensus.observedIps.forEach { ip ->
             val channel = escapeTableCell(ip.channel.name)
@@ -652,7 +653,7 @@ internal object CheckResultMarkdownExportFormatter {
             if (consensus.needsReview) add("needsReview=true")
         }
         if (flags.isNotEmpty()) {
-            builder.appendLine("Флаги: ${flags.joinToString(", ")}")
+            builder.appendLine("${context.getString(R.string.export_flags_label)}: ${flags.joinToString(", ")}")
         }
         builder.appendLine()
         if (consensus.channelIps.isNotEmpty()) {
@@ -693,16 +694,31 @@ internal object CheckResultMarkdownExportFormatter {
 
     private fun appendOperatorWhitelistSection(
         builder: StringBuilder,
+        context: Context,
         probe: OperatorWhitelistProbeResult?,
     ) {
         probe ?: return
-        builder.appendLine("## Белые списки оператора")
-        builder.appendLine("- Детектировано: ${if (probe.whitelistDetected) "да" else "нет"}")
-        builder.appendLine("- google.com/generate_204: ${if (probe.googleReachable) AVAILABLE else UNAVAILABLE}")
-        builder.appendLine("- apple captive portal: ${if (probe.appleReachable) AVAILABLE else UNAVAILABLE}")
-        builder.appendLine("- firefox detectportal: ${if (probe.firefoxReachable) AVAILABLE else UNAVAILABLE}")
-        builder.appendLine("- yandex.ru (контроль): ${if (probe.russianControlReachable) AVAILABLE else UNAVAILABLE}")
-        builder.appendLine("- Длительность: ${probe.durationMs} мс")
+        val available = context.getString(R.string.export_available)
+        val unavailable = context.getString(R.string.export_unavailable)
+        fun reachable(value: Boolean): String = if (value) available else unavailable
+        val detected = if (probe.whitelistDetected) {
+            context.getString(R.string.export_detected_yes)
+        } else {
+            context.getString(R.string.export_detected_no)
+        }
+        builder.appendLine("## ${context.getString(R.string.export_operator_whitelist_title)}")
+        builder.appendLine("- ${context.getString(R.string.export_detected_label)}: $detected")
+        builder.appendLine("- google.com/generate_204: ${reachable(probe.googleReachable)}")
+        builder.appendLine("- apple captive portal: ${reachable(probe.appleReachable)}")
+        builder.appendLine("- firefox detectportal: ${reachable(probe.firefoxReachable)}")
+        builder.appendLine(
+            "- yandex.ru (${context.getString(R.string.export_control_suffix)}): " +
+                reachable(probe.russianControlReachable),
+        )
+        builder.appendLine(
+            "- ${context.getString(R.string.export_duration_label)}: " +
+                "${probe.durationMs} ${context.getString(R.string.export_duration_unit_ms)}",
+        )
         builder.appendLine()
     }
 

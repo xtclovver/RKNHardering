@@ -252,11 +252,11 @@ class CheckResultMarkdownExportFormatterTest {
             buildType = "debug",
         )
 
-        assertTrue(markdown.contains("## Белые списки оператора"))
-        assertTrue(markdown.contains("Детектировано: да"))
-        assertTrue(markdown.contains("google.com/generate_204: недоступен"))
-        assertTrue(markdown.contains("yandex.ru (контроль): доступен"))
-        assertTrue(markdown.contains("Длительность: 3000 мс"))
+        assertTrue(markdown.contains("## Operator whitelists"))
+        assertTrue(markdown.contains("Detected: yes"))
+        assertTrue(markdown.contains("google.com/generate_204: unavailable"))
+        assertTrue(markdown.contains("yandex.ru (control): available"))
+        assertTrue(markdown.contains("Duration: 3000 ms"))
     }
 
     @Test
