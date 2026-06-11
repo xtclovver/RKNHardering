@@ -26,7 +26,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.core.content.ContextCompat
-import androidx.core.text.BidiFormatter
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isNotEmpty
@@ -79,6 +78,8 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
 import com.notcvnt.rknhardering.ui.main.TileSpec
+import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
+import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
 import com.notcvnt.rknhardering.util.formatCallTransportReason
 import com.notcvnt.rknhardering.util.maskInfoValue
 import com.notcvnt.rknhardering.util.maskIp
@@ -260,6 +261,18 @@ class MainActivity : AppCompatActivity() {
         snapshot = { completedExportSnapshot },
         debugClipboardEnabled = { isDebugClipboardExportEnabled() },
     )
+
+    // Lazy: the render environment anchors on resultsScrollView, which is
+    // bound in bindViews() before the first render call.
+    private val renderEnv by lazy {
+        MainRenderEnvironment(
+            context = this,
+            anchorView = resultsScrollView,
+            statusVisual = ::statusVisual,
+            colorVisionMode = ::colorVisionMode,
+        )
+    }
+    private val findingViews by lazy { FindingViewFactory(renderEnv) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -1090,7 +1103,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showDomainReachabilityLoading(stage: RunningStage) {
         findingsDomainReachability.removeAllViews()
-        findingsDomainReachability.addView(createLoadingHintView(stageLoadingMessage(stage)))
+        findingsDomainReachability.addView(findingViews.createLoadingHintView(stageLoadingMessage(stage)))
         findingsDomainReachability.visibility = View.VISIBLE
         ensureCardVisible(cardDomainReachability)
     }
@@ -1408,7 +1421,7 @@ class MainActivity : AppCompatActivity() {
         }
         infoDivider?.visibility = View.GONE
         findingsContainer.removeAllViews()
-        findingsContainer.addView(createLoadingHintView(hint))
+        findingsContainer.addView(findingViews.createLoadingHintView(hint))
         findingsContainer.visibility = View.VISIBLE
         ensureCardVisible(card)
     }
@@ -1458,7 +1471,7 @@ class MainActivity : AppCompatActivity() {
                 RunningStage.BYPASS -> showBypassStopped(stage)
                 RunningStage.DOMAIN_REACHABILITY -> {
                     findingsDomainReachability.removeAllViews()
-                    findingsDomainReachability.addView(createLoadingHintView(stageStoppedMessage(stage)))
+                    findingsDomainReachability.addView(findingViews.createLoadingHintView(stageStoppedMessage(stage)))
                     findingsDomainReachability.visibility = View.VISIBLE
                 }
                 RunningStage.IP_CONSENSUS -> Unit
@@ -1502,7 +1515,7 @@ class MainActivity : AppCompatActivity() {
         }
         infoDivider?.visibility = View.GONE
         findingsContainer.removeAllViews()
-        findingsContainer.addView(createLoadingHintView(message))
+        findingsContainer.addView(findingViews.createLoadingHintView(message))
         findingsContainer.visibility = View.VISIBLE
         ensureCardVisible(card)
     }
@@ -1687,16 +1700,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createLoadingHintView(message: String): View {
-        return TextView(themedContext()).apply {
-            text = message
-            textSize = 13f
-            setLineSpacing(2.dp.toFloat(), 1f)
-            setPadding(0, 8.dp, 0, 2.dp)
-            setTextColor(onSurfaceVariantColor())
-        }
-    }
-
     private fun hideCards() {
         collapseExpanded()
         cardIpChannels.visibility = View.GONE
@@ -1831,7 +1834,7 @@ class MainActivity : AppCompatActivity() {
         infoSection.removeAllViews()
         infoSection.visibility = if (infoFindings.isNotEmpty()) View.VISIBLE else View.GONE
         for (finding in infoFindings) {
-            val parts = splitInfoFinding(finding.description)
+            val parts = findingViews.splitInfoFinding(finding.description)
             if (parts != null) {
                 val value = maskInfoValue(parts.second, privacyMode)
                 infoSection.addView(createInfoView(parts.first, value))
@@ -1877,125 +1880,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
-        val semantic = statusSemantic(finding.detected, finding.needsReview, finding.isError)
-        val visual = statusVisual(semantic)
-        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            setPadding(0, 3.dp, 0, 3.dp)
-            contentDescription = "${getString(visual.labelRes)}. $descriptionText"
-        }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createFindingView(finding: Finding, privacyMode: Boolean = false): View =
+        findingViews.createFindingView(finding, privacyMode)
 
-        val indicator = View(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(8.dp, 8.dp).apply {
-                topMargin = 6.dp
-                marginEnd = 8.dp
-            }
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            background = StatusVisualResolver.indicatorDrawable(themedContext(), semantic, colorVisionMode())
-        }
-
-        val description = TextView(themedContext()).apply {
-            text = wrapForDisplay(descriptionText)
-            textSize = 13f
-            setLineSpacing(0f, 1.45f)
-            setTextColor(onSurfaceVariantColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        row.addView(indicator)
-        row.addView(description)
-        finding.packageName
-            ?.takeIf { it.isNotBlank() }
-            ?.let { packageName ->
-                row.isClickable = true
-                row.isFocusable = true
-                row.setOnClickListener {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", packageName, null)
-                    }
-                    startActivity(intent)
-                }
-            }
-        return row
-    }
-
-    private fun createInfoView(label: String, value: String): View {
-        val rtl = isRtlLayout()
-        val row = LinearLayout(themedContext()).apply {
-            orientation = if (rtl) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-            gravity = if (rtl) Gravity.END else Gravity.CENTER_VERTICAL
-            setPadding(0, 2.dp, 0, if (rtl) 6.dp else 2.dp)
-        }
-
-        val labelView = TextView(themedContext()).apply {
-            text = wrapForDisplay(label)
-            textSize = 13f
-            setTextColor(onSurfaceVariantColor())
-            layoutParams = if (rtl) {
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
-            } else {
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.32f)
-            }
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = if (rtl) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        val valueView = TextView(themedContext()).apply {
-            text = wrapForDisplay(value)
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = if (rtl) {
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    topMargin = 2.dp
-                }
-            } else {
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.68f)
-            }
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = if (rtl) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        row.addView(labelView)
-        row.addView(valueView)
-        return row
-    }
-
-    private fun splitInfoFinding(description: String): Pair<String, String>? {
-        val separatorIndex = sequenceOf(
-            description.indexOf(": "),
-            description.indexOf('：'),
-            description.indexOf(':'),
-        ).filter { it >= 0 }.minOrNull() ?: return null
-        val separatorLength = when {
-            description.startsWith(": ", separatorIndex) -> 2
-            else -> 1
-        }
-        val label = description.substring(0, separatorIndex).trim()
-        val value = description.substring(separatorIndex + separatorLength).trim()
-        if (label.isBlank() || value.isBlank()) return null
-        return label to value
-    }
-
-    private fun wrapForDisplay(text: String): String {
-        return if (isRtlLayout()) {
-            BidiFormatter.getInstance(true).unicodeWrap(text)
-        } else {
-            text
-        }
-    }
-
-    private fun isRtlLayout(): Boolean = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+    private fun createInfoView(label: String, value: String): View =
+        findingViews.createInfoView(label, value)
 
     private fun createIpCheckerGroupView(
         group: IpCheckerGroupResult,
@@ -3285,7 +3176,7 @@ class MainActivity : AppCompatActivity() {
     private fun syncHintOnlyContainer(container: LinearLayout, message: String) {
         if (container.childCount > 0) return
         container.removeAllViews()
-        container.addView(createLoadingHintView(message))
+        container.addView(findingViews.createLoadingHintView(message))
         container.visibility = View.VISIBLE
     }
 
