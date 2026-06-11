@@ -11,7 +11,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Gravity
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -46,25 +45,18 @@ import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
-import com.notcvnt.rknhardering.model.CallTransportNetworkPath
-import com.notcvnt.rknhardering.model.CallTransportService
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
-import com.notcvnt.rknhardering.model.Channel
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.DomainReachabilityResult
-import com.notcvnt.rknhardering.model.DomainReachabilityStepStatus
 import com.notcvnt.rknhardering.model.Finding
-import com.notcvnt.rknhardering.model.IpFamily
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
-import com.notcvnt.rknhardering.model.StunScope
-import com.notcvnt.rknhardering.model.TargetGroup
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
 import com.notcvnt.rknhardering.model.ExposureStatus
@@ -76,14 +68,15 @@ import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
 import com.notcvnt.rknhardering.ui.main.TileSpec
+import com.notcvnt.rknhardering.ui.main.render.BypassRenderer
+import com.notcvnt.rknhardering.ui.main.render.CallTransportRenderer
 import com.notcvnt.rknhardering.ui.main.render.CategoryCardRenderer
 import com.notcvnt.rknhardering.ui.main.render.CdnPullingRenderer
+import com.notcvnt.rknhardering.ui.main.render.DomainReachabilityRenderer
 import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
+import com.notcvnt.rknhardering.ui.main.render.IpChannelsRenderer
 import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
-import com.notcvnt.rknhardering.util.formatCallTransportReason
-import com.notcvnt.rknhardering.util.maskInfoValue
-import com.notcvnt.rknhardering.util.maskIp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -276,6 +269,10 @@ class MainActivity : AppCompatActivity() {
     private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
     private val ipComparisonRenderer by lazy { IpComparisonRenderer(renderEnv) }
     private val cdnPullingRenderer by lazy { CdnPullingRenderer(renderEnv, findingViews) }
+    private val callTransportRenderer by lazy { CallTransportRenderer(renderEnv, findingViews) }
+    private val bypassRenderer by lazy { BypassRenderer(renderEnv, findingViews) }
+    private val ipChannelsRenderer by lazy { IpChannelsRenderer(renderEnv) }
+    private val domainReachabilityRenderer by lazy { DomainReachabilityRenderer(renderEnv) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -1000,93 +997,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayDomainReachability(result: DomainReachabilityResult) {
-        findingsDomainReachability.removeAllViews()
-        if (result.isEmpty) return
-
-        result.responses.forEach { response ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 8.dp, 0, 8.dp)
-            }
-
-            // Header with match/mismatch indicator
-            val matchIcon = if (response.matchesExpectation) "✅" else "⚠\uFE0F"
-            val header = TextView(this).apply {
-                text = "$matchIcon ${response.label}"
-                setTextColor(resolveTextColorPrimary())
-                textSize = 13f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-            }
-            row.addView(header)
-
-            val stepsLine = TextView(this).apply {
-                val dns = stepIcon(response.dnsStatus)
-                val tcp = stepIcon(response.tcpStatus)
-                val tls = stepIcon(response.tlsStatus)
-                text = buildString {
-                    append("DNS $dns")
-                    append("  \u2192  ")
-                    append("TCP $tcp")
-                    append("  \u2192  ")
-                    append("TLS $tls")
-                }
-                textSize = 12f
-                setTextColor(resolveTextColorSecondary())
-            }
-            row.addView(stepsLine)
-
-            // Show expected line when not all expected=true (custom expectations)
-            val hasCustomExpectations = !response.expectedDnsAvailable || !response.expectedTcpAvailable || !response.expectedTlsAvailable
-            if (hasCustomExpectations) {
-                val expectedLine = TextView(this).apply {
-                    val dn = if (response.expectedDnsAvailable) "\u2705" else "\u274C"
-                    val tc = if (response.expectedTcpAvailable) "\u2705" else "\u274C"
-                    val tl = if (response.expectedTlsAvailable) "\u2705" else "\u274C"
-                    text = getString(R.string.domain_reachability_expected_prefix) + " DNS $dn  TCP $tc  TLS $tl"
-                    textSize = 11f
-                    setTextColor(resolveTextColorSecondary())
-                    setPadding(0, 2.dp, 0, 0)
-                }
-                row.addView(expectedLine)
-            }
-
-            // Show error detail if any step failed
-            val errorDetail = when {
-                response.dnsStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.dnsError?.let { "DNS: $it" }
-                response.tcpStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.tcpError?.let { "TCP: $it" }
-                response.tlsStatus == DomainReachabilityStepStatus.FAILED ->
-                    response.tlsError?.let { "TLS: $it" }
-                else -> null
-            }
-            if (errorDetail != null) {
-                val errorView = TextView(this).apply {
-                    text = errorDetail
-                    textSize = 11f
-                    setTextColor(statusColor(StatusSemantic.DETECTED))
-                    setPadding(0, 2.dp, 0, 0)
-                }
-                row.addView(errorView)
-            }
-
-            findingsDomainReachability.addView(row)
-        }
-        findingsDomainReachability.visibility = View.VISIBLE
-    }
-
-    private fun stepIcon(status: DomainReachabilityStepStatus): String = when (status) {
-        DomainReachabilityStepStatus.OK -> "✅"
-        DomainReachabilityStepStatus.FAILED -> "❌"
-        DomainReachabilityStepStatus.SKIPPED -> "⏭"
-    }
-
-    private fun resolveTextColorPrimary(): Int {
-        return MaterialColors.getColor(this, android.R.attr.textColorPrimary, 0xFFFFFFFF.toInt())
-    }
-
-    private fun resolveTextColorSecondary(): Int {
-        return MaterialColors.getColor(this, android.R.attr.textColorSecondary, 0x99FFFFFF.toInt())
+        domainReachabilityRenderer.render(result, findingsDomainReachability)
     }
 
     private fun updateTileFromDomainReachability(result: DomainReachabilityResult) {
@@ -1778,206 +1689,38 @@ class MainActivity : AppCompatActivity() {
     private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View =
         cdnPullingRenderer.createCdnPullingResponseView(response, privacyMode)
 
-    private fun displayIpChannels(consensus: IpConsensusResult, privacyMode: Boolean = false) {
-        if (consensus.observedIps.isEmpty()) {
-            cardIpChannels.visibility = View.GONE
-            return
-        }
-        cardIpChannels.visibility = View.VISIBLE
-        ipChannelsContainer.removeAllViews()
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites (the IP-channels card is
+    // currently not rendered from MainActivity; see IpChannelsRenderer).
+    private fun createIpChannelRow(ip: ObservedIp, privacyMode: Boolean): View =
+        ipChannelsRenderer.createIpChannelRow(ip, privacyMode)
 
-        consensus.observedIps.forEach { ip ->
-            ipChannelsContainer.addView(createIpChannelRow(ip, privacyMode))
-        }
-
-        val hasWarning = consensus.crossChannelMismatch || consensus.warpLikeIndicator ||
-                consensus.geoCountryMismatch || consensus.probeTargetDivergence ||
-                consensus.probeTargetDirectDivergence || consensus.channelConflict.isNotEmpty() ||
-                consensus.needsReview
-
-        if (hasWarning) {
-            val flagsContainer = LinearLayout(themedContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = 8.dp }
-            }
-
-            val warningColor = statusColor(StatusSemantic.DETECTED)
-            val warningBackground = TextView(themedContext()).apply {
-                text = buildIpConsensusWarningText(consensus)
-                textSize = 12f
-                setTextColor(warningColor)
-                setPadding(8.dp, 8.dp, 8.dp, 8.dp)
-            }
-
-            flagsContainer.addView(warningBackground)
-            ipChannelsContainer.addView(flagsContainer)
-        }
-    }
-
-    private fun createIpChannelRow(ip: ObservedIp, privacyMode: Boolean): View {
-        val row = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val channelChip = TextView(themedContext()).apply {
-            text = ipChannelLabel(ip.channel)
-            textSize = 11f
-            setTextColor(onSurfaceColor())
-            typeface = Typeface.DEFAULT_BOLD
-            val padding = 6.dp
-            setPadding(padding, padding / 2, padding, padding / 2)
-            setBackgroundColor(MaterialColors.getColor(themedContext(), com.google.android.material.R.attr.colorSurfaceVariant, 0))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                .apply { marginEnd = 8.dp }
-        }
-
-        val targetChip = if (ip.targetGroup != null) {
-            TextView(themedContext()).apply {
-                text = ipTargetGroupLabel(ip.targetGroup)
-                textSize = 11f
-                setTextColor(onSurfaceColor())
-                typeface = Typeface.DEFAULT_BOLD
-                val padding = 6.dp
-                setPadding(padding, padding / 2, padding, padding / 2)
-                setBackgroundColor(statusContainerColor(StatusSemantic.REVIEW))
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .apply { marginEnd = 8.dp }
-            }
-        } else null
-
-        val infoText = buildString {
-            val maskedIp = maskInfoValue(ip.value, privacyMode)
-            append(maskedIp)
-            if (ip.countryCode != null) append(" (${ip.countryCode})")
-            if (ip.asn != null) append(" ${ip.asn}")
-            append(" • ${ipFamilyLabel(ip.family)}")
-        }
-
-        val infoView = TextView(themedContext()).apply {
-            text = infoText
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            textDirection = View.TEXT_DIRECTION_LOCALE
-            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-        }
-
-        row.addView(channelChip)
-        if (targetChip != null) row.addView(targetChip)
-        row.addView(infoView)
-
-        return row
-    }
-
-    private fun buildIpConsensusWarningText(consensus: IpConsensusResult): String {
-        val warnings = buildList {
-            if (consensus.crossChannelMismatch) add(getString(R.string.ip_channels_flag_cross_channel_mismatch))
-            if (consensus.warpLikeIndicator) add(getString(R.string.ip_channels_flag_warp_like_behavior))
-            if (consensus.geoCountryMismatch) add(getString(R.string.ip_channels_flag_geo_country_mismatch))
-            if (consensus.probeTargetDivergence) add(getString(R.string.ip_channels_flag_probe_target_divergence))
-            if (consensus.probeTargetDirectDivergence) {
-                add(getString(R.string.ip_channels_flag_probe_target_direct_divergence))
-            }
-            if (consensus.channelConflict.isNotEmpty()) {
-                val channels = consensus.channelConflict
-                    .sortedBy { it.ordinal }
-                    .joinToString(", ") { ipChannelLabel(it) }
-                add(getString(R.string.ip_channels_flag_channel_conflict, channels))
-            }
-            if (consensus.needsReview) add(getString(R.string.ip_channels_flag_needs_review))
-        }
-        return warnings.joinToString(separator = "\n") { "\u26A0 $it" }
-    }
-
-    private fun ipChannelLabel(channel: Channel): String = when (channel) {
-        Channel.DIRECT -> getString(R.string.ip_channels_channel_direct)
-        Channel.VPN -> getString(R.string.ip_channels_channel_vpn)
-        Channel.PROXY -> getString(R.string.ip_channels_channel_proxy)
-        Channel.CDN -> getString(R.string.ip_channels_channel_cdn)
-    }
-
-    private fun ipTargetGroupLabel(targetGroup: TargetGroup): String = when (targetGroup) {
-        TargetGroup.RU -> getString(R.string.ip_channels_target_ru)
-        TargetGroup.NON_RU -> getString(R.string.ip_channels_target_non_ru)
-    }
-
-    private fun ipFamilyLabel(family: IpFamily): String = when (family) {
-        IpFamily.V4 -> getString(R.string.main_card_call_transport_stun_ipv4)
-        IpFamily.V6 -> getString(R.string.main_card_call_transport_stun_ipv6)
-    }
-
+    // Reflected by MainActivityUiRenderingTest (name + arity). Card
+    // visibility and the progress reset stay here — they touch activity
+    // state shared with the loading flow.
     private fun displayBypass(bypass: BypassResult, privacyMode: Boolean = false) {
         cardBypass.visibility = View.VISIBLE
         resetBypassProgress()
-
-        bindCardStatus(bypass.detected, bypass.needsReview, iconBypass, statusBypass, hasError = bypass.hasError)
-
-        findingsBypass.removeAllViews()
-        findingsBypass.visibility = View.VISIBLE
-        for (finding in bypass.findings) {
-            findingsBypass.addView(createFindingView(finding, privacyMode))
-        }
+        bypassRenderer.render(bypass, iconBypass, statusBypass, findingsBypass, privacyMode)
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayCallTransport(
         leaks: List<CallTransportLeakResult>,
         stunGroups: List<StunProbeGroupResult>,
         privacyMode: Boolean,
     ) {
-        val hasContent = leaks.isNotEmpty() || stunGroups.any { it.results.isNotEmpty() }
-        if (!hasContent) {
-            cardCallTransport.visibility = View.GONE
-            return
-        }
-        cardCallTransport.visibility = View.VISIBLE
-
-        val hasNeedsReview = leaks.any { it.status == CallTransportStatus.NEEDS_REVIEW }
-        val hasError = leaks.any { it.status == CallTransportStatus.ERROR }
-        bindCardStatus(
-            detected = false,
-            needsReview = hasNeedsReview,
-            icon = iconCallTransport,
-            status = statusCallTransport,
-            hasError = hasError,
+        callTransportRenderer.render(
+            leaks,
+            stunGroups,
+            cardCallTransport,
+            iconCallTransport,
+            statusCallTransport,
+            textCallTransportSummary,
+            stunGroupsContainer,
+            findingsCallTransport,
+            privacyMode,
         )
-
-        val respondedCount = stunGroups.sumOf { it.respondedCount }
-        val totalCount = stunGroups.sumOf { it.totalCount }
-        if (totalCount > 0) {
-            textCallTransportSummary.text = getString(
-                R.string.main_card_call_transport_stun_responded,
-                respondedCount,
-                totalCount,
-            )
-            textCallTransportSummary.visibility = View.VISIBLE
-        } else {
-            textCallTransportSummary.visibility = View.GONE
-        }
-
-        stunGroupsContainer.removeAllViews()
-        if (stunGroups.isNotEmpty()) {
-            stunGroupsContainer.visibility = View.VISIBLE
-            for (group in stunGroups) {
-                stunGroupsContainer.addView(createStunGroupView(group, privacyMode))
-            }
-        } else {
-            stunGroupsContainer.visibility = View.GONE
-        }
-
-        findingsCallTransport.removeAllViews()
-        if (leaks.isNotEmpty()) {
-            findingsCallTransport.visibility = View.VISIBLE
-            for (leak in leaks) {
-                findingsCallTransport.addView(createCallTransportLeakView(leak, privacyMode))
-            }
-        } else {
-            findingsCallTransport.visibility = View.GONE
-        }
     }
 
     private fun displayNativeSigns(result: CategoryResult, privacyMode: Boolean) {
@@ -1990,256 +1733,6 @@ class MainActivity : AppCompatActivity() {
             findingsNativeSigns,
             privacyMode,
         )
-    }
-
-    private fun createStunGroupView(group: StunProbeGroupResult, privacyMode: Boolean): View {
-        val groupTitle = when (group.scope) {
-            StunScope.GLOBAL -> getString(R.string.main_card_call_transport_stun_group_global)
-            StunScope.RU -> getString(R.string.main_card_call_transport_stun_group_ru)
-        }
-        val respondedCount = group.respondedCount
-        val totalCount = group.totalCount
-        val statusLabel = if (respondedCount > 0) {
-            getString(R.string.main_card_call_transport_stun_responded, respondedCount, totalCount)
-        } else {
-            getString(R.string.main_card_call_transport_stun_none_responded)
-        }
-
-        val card = com.google.android.material.card.MaterialCardView(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = 8.dp }
-            radius = 14.dp.toFloat()
-            strokeWidth = 1.dp
-            strokeColor = outlineVariantColor()
-            setCardBackgroundColor(surfaceColor())
-        }
-
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12.dp, 12.dp, 12.dp, 12.dp)
-        }
-
-        val header = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val title = TextView(themedContext()).apply {
-            text = groupTitle
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val statusView = TextView(themedContext()).apply {
-            text = statusLabel
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(statusColor(if (respondedCount > 0) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
-        }
-
-        val expanded = respondedCount > 0
-        val toggle = TextView(themedContext()).apply {
-            text = if (expanded) "▼" else "▶"
-            textSize = 12f
-            setPadding(8.dp, 0, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val details = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = if (expanded) View.VISIBLE else View.GONE
-            setPadding(0, 8.dp, 0, 0)
-        }
-
-        for (result in group.results) {
-            details.addView(createStunProbeResultView(result, privacyMode))
-        }
-
-        val toggleDetails = {
-            val nextExpanded = details.visibility != View.VISIBLE
-            details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
-            toggle.text = if (nextExpanded) "▼" else "▶"
-        }
-        header.setOnClickListener { toggleDetails() }
-
-        header.addView(title)
-        header.addView(statusView)
-        header.addView(toggle)
-        container.addView(header)
-        container.addView(details)
-        card.addView(container)
-        return card
-    }
-
-    private fun createStunProbeResultView(result: com.notcvnt.rknhardering.model.StunProbeResult, privacyMode: Boolean): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 6.dp, 0, 6.dp)
-        }
-
-        val hostRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val hostLabel = TextView(themedContext()).apply {
-            text = "${result.host}:${result.port}"
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val hasAnyResponse = result.hasResponse
-        val hasDualStack = result.mappedIpv4 != null && result.mappedIpv6 != null
-        val responseLabel = TextView(themedContext()).apply {
-            text = when {
-                hasAnyResponse && hasDualStack -> "IPv4 + IPv6"
-                hasAnyResponse -> result.mappedIpDisplay?.let { ip ->
-                    if (privacyMode) maskIp(ip) else ip
-                } ?: getString(R.string.main_card_call_transport_stun_no_response)
-                result.error != null -> getString(R.string.main_card_call_transport_stun_error)
-                else -> getString(R.string.main_card_call_transport_stun_no_response)
-            }
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            setTextColor(statusColor(if (hasAnyResponse) StatusSemantic.CLEAN else StatusSemantic.REVIEW))
-        }
-
-        hostRow.addView(hostLabel)
-        hostRow.addView(responseLabel)
-        container.addView(hostRow)
-
-        if (result.mappedIpv4 != null && result.mappedIpv6 != null) {
-            container.addView(createInfoView(
-                getString(R.string.main_card_call_transport_stun_ipv4),
-                if (privacyMode) maskIp(result.mappedIpv4) else result.mappedIpv4,
-            ))
-            container.addView(createInfoView(
-                getString(R.string.main_card_call_transport_stun_ipv6),
-                if (privacyMode) maskIp(result.mappedIpv6) else result.mappedIpv6,
-            ))
-        }
-
-        result.error?.takeIf { it.isNotBlank() && !hasAnyResponse }?.let { err ->
-            container.addView(TextView(themedContext()).apply {
-                text = err
-                textSize = 11f
-                setTextColor(onSurfaceVariantColor())
-                setPadding(0, 2.dp, 0, 0)
-            })
-        }
-
-        return container
-    }
-
-    private fun createCallTransportLeakView(leak: CallTransportLeakResult, privacyMode: Boolean): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 4.dp, 0, 4.dp)
-        }
-
-        val statusLabel = when (leak.status) {
-            CallTransportStatus.BASELINE -> getString(R.string.main_card_call_transport_status_baseline)
-            CallTransportStatus.NO_SIGNAL -> getString(R.string.main_card_call_transport_status_no_signal)
-            CallTransportStatus.NEEDS_REVIEW -> getString(R.string.main_card_call_transport_status_needs_review)
-            CallTransportStatus.UNSUPPORTED -> getString(R.string.main_card_call_transport_status_unsupported)
-            CallTransportStatus.ERROR -> getString(R.string.main_card_call_transport_status_error)
-        }
-        val pathLabel = when (leak.networkPath) {
-            CallTransportNetworkPath.ACTIVE -> getString(R.string.main_card_call_transport_path_active)
-            CallTransportNetworkPath.UNDERLYING -> getString(R.string.main_card_call_transport_path_underlying)
-            CallTransportNetworkPath.LOCAL_PROXY -> getString(R.string.main_card_call_transport_path_proxy)
-        }
-        val serviceLabel = when (leak.service) {
-            CallTransportService.TELEGRAM -> "Telegram"
-            CallTransportService.WHATSAPP -> "WhatsApp"
-        }
-        val statusColor = when (leak.status) {
-            CallTransportStatus.BASELINE -> statusColor(StatusSemantic.CLEAN)
-            CallTransportStatus.NEEDS_REVIEW -> statusColor(StatusSemantic.REVIEW)
-            CallTransportStatus.ERROR -> statusColor(StatusSemantic.ERROR)
-            CallTransportStatus.NO_SIGNAL -> statusColor(StatusSemantic.NEUTRAL)
-            CallTransportStatus.UNSUPPORTED -> statusColor(StatusSemantic.NEUTRAL)
-        }
-
-        val headerRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val indicator = TextView(themedContext()).apply {
-            text = when (leak.status) {
-                CallTransportStatus.BASELINE -> "\u2713"
-                CallTransportStatus.NEEDS_REVIEW -> "?"
-                CallTransportStatus.ERROR -> "\u26A0"
-                CallTransportStatus.NO_SIGNAL -> "\u2014"
-                CallTransportStatus.UNSUPPORTED -> "\u2014"
-            }
-            setTextColor(statusColor)
-            textSize = 14f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 8.dp, 0)
-        }
-        val headerText = TextView(themedContext()).apply {
-            text = getString(
-                R.string.main_card_call_transport_header,
-                serviceLabel,
-                pathLabel,
-                statusLabel,
-            )
-            textSize = 13f
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        headerRow.addView(indicator)
-        headerRow.addView(headerText)
-        container.addView(headerRow)
-
-        formatCallTransportReason(this, leak, privacyMode)?.let { reason ->
-            val reasonColor = if (leak.status == CallTransportStatus.ERROR) {
-                statusColor(StatusSemantic.ERROR)
-            } else {
-                onSurfaceVariantColor()
-            }
-            container.addView(TextView(themedContext()).apply {
-                text = reason
-                textSize = 12f
-                setPadding(22.dp, 2.dp, 0, 0)
-                setTextColor(reasonColor)
-            })
-        }
-
-        val target = leak.targetHost
-        if (target != null) {
-            val port = leak.targetPort
-            val targetStr = if (port != null) {
-                if (target.contains(':')) "[$target]:$port" else "$target:$port"
-            } else target
-            container.addView(createInfoView(
-                label = "target",
-                value = if (privacyMode) maskIp(targetStr) else targetStr,
-            ))
-        }
-        val mappedIp = leak.mappedIp
-        if (!mappedIp.isNullOrBlank()) {
-            container.addView(createInfoView(
-                label = "mapped IP",
-                value = if (privacyMode) maskIp(mappedIp) else mappedIp,
-            ))
-        }
-        val publicIp = leak.observedPublicIp
-        if (!publicIp.isNullOrBlank()) {
-            container.addView(createInfoView(
-                label = "public IP",
-                value = if (privacyMode) maskIp(publicIp) else publicIp,
-            ))
-        }
-
-        return container
     }
 
     private fun updateBypassProgress(progress: BypassChecker.Progress) {
@@ -2261,40 +1754,11 @@ class MainActivity : AppCompatActivity() {
         textBypassProgress.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
     }
 
-    private fun bindCardStatus(
-        detected: Boolean,
-        needsReview: Boolean,
-        icon: ImageView,
-        status: TextView,
-        hasError: Boolean = false,
-    ) {
-        val visual = statusVisual(statusSemantic(detected, needsReview, hasError))
-        icon.setImageResource(visual.iconRes)
-        icon.imageTintList = ColorStateList.valueOf(visual.accentColor)
-        status.setText(visual.labelRes)
-        status.setTextColor(visual.accentColor)
-    }
-
-    private fun statusSemantic(
-        detected: Boolean,
-        needsReview: Boolean,
-        hasError: Boolean = false,
-    ): StatusSemantic {
-        return when {
-            hasError -> StatusSemantic.ERROR
-            detected -> StatusSemantic.DETECTED
-            needsReview -> StatusSemantic.REVIEW
-            else -> StatusSemantic.CLEAN
-        }
-    }
-
     private fun statusVisual(status: StatusSemantic): StatusVisual {
         return StatusVisualResolver.resolve(this, status, colorVisionMode())
     }
 
     private fun statusColor(status: StatusSemantic): Int = statusVisual(status).accentColor
-
-    private fun statusContainerColor(status: StatusSemantic): Int = statusVisual(status).containerColor
 
     private fun statusLabel(status: StatusSemantic): String = getString(statusVisual(status).labelRes)
 
