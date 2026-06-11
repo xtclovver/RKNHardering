@@ -580,9 +580,7 @@ object GeoIpChecker {
             config = resolverConfig,
             cancellationSignal = executionContext.cancellationSignal,
         )
-        if (response.code !in 200..299) {
-            throw IllegalStateException("HTTP ${response.code}")
-        }
+        check(response.code in 200..299) { "HTTP ${response.code}" }
         return JSONObject(response.body)
     }
 

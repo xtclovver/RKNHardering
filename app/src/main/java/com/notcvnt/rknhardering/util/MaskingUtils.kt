@@ -7,19 +7,21 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 
+private const val IP_MASK_PLACEHOLDER = "*.*.*.*"
+
 fun maskIp(ip: String): String {
     val normalized = ip.trim()
     val parsed = when {
         normalized.contains('.') -> {
             val parts = normalized.split('.')
             if (parts.size != 4 || parts.any { (it.toIntOrNull() ?: -1) !in 0..255 }) {
-                return "*.*.*.*"
+                return IP_MASK_PLACEHOLDER
             }
             runCatching { InetAddress.getByName(normalized) }.getOrNull()
         }
         normalized.contains(':') -> runCatching { InetAddress.getByName(normalized) }.getOrNull()
         else -> null
-    } ?: return "*.*.*.*"
+    } ?: return IP_MASK_PLACEHOLDER
     return when (parsed) {
         is Inet4Address -> {
             if (parsed.isSiteLocalAddress || parsed.isLoopbackAddress || parsed.isLinkLocalAddress) {
@@ -41,7 +43,7 @@ fun maskIp(ip: String): String {
                 }
             }
         }
-        else -> "*.*.*.*"
+        else -> IP_MASK_PLACEHOLDER
     }
 }
 
