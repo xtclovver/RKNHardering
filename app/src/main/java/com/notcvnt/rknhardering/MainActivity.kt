@@ -1209,6 +1209,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.IpConsensusReady -> {
                 markStageCompleted(RunningStage.IP_CONSENSUS)
+                updateTileFromIpConsensus(update.result)
             }
             is CheckUpdate.DomainReachabilityReady -> {
                 markStageCompleted(RunningStage.DOMAIN_REACHABILITY)
