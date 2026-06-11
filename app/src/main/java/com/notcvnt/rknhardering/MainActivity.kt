@@ -58,7 +58,6 @@ import com.notcvnt.rknhardering.model.DomainReachabilityResult
 import com.notcvnt.rknhardering.model.DomainReachabilityStepStatus
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpFamily
-import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
@@ -78,12 +77,13 @@ import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
 import com.notcvnt.rknhardering.ui.main.TileSpec
 import com.notcvnt.rknhardering.ui.main.render.CategoryCardRenderer
+import com.notcvnt.rknhardering.ui.main.render.CdnPullingRenderer
 import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
+import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
 import com.notcvnt.rknhardering.util.formatCallTransportReason
 import com.notcvnt.rknhardering.util.maskInfoValue
 import com.notcvnt.rknhardering.util.maskIp
-import com.notcvnt.rknhardering.util.maskIpsInText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -274,6 +274,8 @@ class MainActivity : AppCompatActivity() {
     }
     private val findingViews by lazy { FindingViewFactory(renderEnv) }
     private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
+    private val ipComparisonRenderer by lazy { IpComparisonRenderer(renderEnv) }
+    private val cdnPullingRenderer by lazy { CdnPullingRenderer(renderEnv, findingViews) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -1732,39 +1734,30 @@ class MainActivity : AppCompatActivity() {
         categoryCards.render(category, card, icon, status, findingsContainer, infoSection, infoDivider, privacyMode)
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayIpComparison(result: IpComparisonResult, privacyMode: Boolean = false) {
-        cardIpComparison.visibility = View.VISIBLE
-        bindCardStatus(result.detected, result.needsReview, iconIpComparison, statusIpComparison, hasError = result.hasError)
-        textIpComparisonSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
-
-        ipComparisonGroups.removeAllViews()
-        ipComparisonGroups.visibility = View.VISIBLE
-        ipComparisonGroups.addView(
-            createIpCheckerGroupView(
-                group = result.ruGroup,
-                expanded = result.detected || result.needsReview || result.hasError || result.ruGroup.needsReview,
-                privacyMode = privacyMode,
-            ),
-        )
-        ipComparisonGroups.addView(
-            createIpCheckerGroupView(
-                group = result.nonRuGroup,
-                expanded = result.detected || result.needsReview || result.hasError || result.nonRuGroup.detected,
-                privacyMode = privacyMode,
-            ),
+        ipComparisonRenderer.render(
+            result,
+            cardIpComparison,
+            iconIpComparison,
+            statusIpComparison,
+            textIpComparisonSummary,
+            ipComparisonGroups,
+            privacyMode,
         )
     }
 
+    // Reflected by MainActivityUiRenderingTest (name + arity).
     private fun displayCdnPulling(result: CdnPullingResult, privacyMode: Boolean = false) {
-        cardCdnPulling.visibility = View.VISIBLE
-        bindCardStatus(result.detected, result.needsReview, iconCdnPulling, statusCdnPulling, hasError = result.hasError)
-        textCdnPullingSummary.text = if (privacyMode) maskIpsInText(result.summary) else result.summary
-
-        cdnPullingResponses.removeAllViews()
-        cdnPullingResponses.visibility = if (result.responses.isEmpty()) View.GONE else View.VISIBLE
-        result.responses.forEach { response ->
-            cdnPullingResponses.addView(createCdnPullingResponseView(response, privacyMode))
-        }
+        cdnPullingRenderer.render(
+            result,
+            cardCdnPulling,
+            iconCdnPulling,
+            statusCdnPulling,
+            textCdnPullingSummary,
+            cdnPullingResponses,
+            privacyMode,
+        )
     }
 
     // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
@@ -1775,237 +1768,15 @@ class MainActivity : AppCompatActivity() {
     private fun createInfoView(label: String, value: String): View =
         findingViews.createInfoView(label, value)
 
-    private fun createIpCheckerGroupView(
-        group: IpCheckerGroupResult,
-        expanded: Boolean,
-        privacyMode: Boolean = false,
-    ): View {
-        val card = MaterialCardView(themedContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = 8.dp
-            }
-            radius = 14.dp.toFloat()
-            strokeWidth = 1.dp
-            strokeColor = outlineVariantColor()
-            setCardBackgroundColor(surfaceColor())
-        }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View =
+        ipComparisonRenderer.createIpCheckerResponseView(response, privacyMode)
 
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12.dp, 12.dp, 12.dp, 12.dp)
-        }
-
-        val header = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val title = TextView(themedContext()).apply {
-            text = group.title
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val status = TextView(themedContext()).apply {
-            text = group.statusLabel
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(statusColor(statusSemantic(group.detected, group.needsReview)))
-        }
-
-        val toggle = TextView(themedContext()).apply {
-            text = if (expanded) "▼" else "▶"
-            textSize = 12f
-            setPadding(8.dp, 0, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val summary = TextView(themedContext()).apply {
-            text = if (privacyMode) maskIpsInText(group.summary) else group.summary
-            textSize = 13f
-            setPadding(0, 6.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        val details = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = if (expanded) View.VISIBLE else View.GONE
-            setPadding(0, 8.dp, 0, 0)
-        }
-        group.responses.forEach { response ->
-            details.addView(createIpCheckerResponseView(response, privacyMode))
-        }
-
-        header.addView(title)
-        header.addView(status)
-        header.addView(toggle)
-
-        val toggleDetails = {
-            val nextExpanded = details.visibility != View.VISIBLE
-            details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
-            toggle.text = if (nextExpanded) "▼" else "▶"
-        }
-        header.setOnClickListener { toggleDetails() }
-        summary.setOnClickListener { toggleDetails() }
-
-        container.addView(header)
-        container.addView(summary)
-        container.addView(details)
-        card.addView(container)
-        return card
-    }
-
-    private fun createIpCheckerResponseView(response: IpCheckerResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 8.dp, 0, 8.dp)
-        }
-
-        val topRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val label = TextView(themedContext()).apply {
-            text = response.label
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val displayIp = if (privacyMode && response.ip != null) maskIp(response.ip) else response.ip
-        val value = TextView(themedContext()).apply {
-            text = displayIp ?: getString(R.string.main_card_status_error)
-            textSize = 13f
-            typeface = Typeface.MONOSPACE
-            setTextColor(statusColor(if (response.ip != null) StatusSemantic.CLEAN else StatusSemantic.ERROR))
-        }
-
-        val url = TextView(themedContext()).apply {
-            text = response.url
-            textSize = 12f
-            setPadding(0, 4.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        topRow.addView(label)
-        topRow.addView(value)
-        container.addView(topRow)
-        container.addView(url)
-
-        return container
-    }
-
-    private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View {
-        val container = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 8.dp, 0, 8.dp)
-        }
-
-        val topRow = LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val label = TextView(themedContext()).apply {
-            text = response.targetLabel
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(onSurfaceColor())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val hasDualStack = response.ipv4 != null && response.ipv6 != null
-        val hasIpv6Only = response.ipv6 != null && response.ipv4 == null
-        val primaryDisplayIp = response.ip
-
-        val valueText = when {
-            hasDualStack -> if (privacyMode) maskIp(response.ipv4!!) else response.ipv4!!
-            hasIpv6Only && response.ipv4Unavailable -> if (privacyMode) maskIp(response.ipv6!!) else response.ipv6!!
-            primaryDisplayIp != null -> if (privacyMode) maskIp(primaryDisplayIp) else primaryDisplayIp
-            response.importantFields.isNotEmpty() -> getString(R.string.main_card_status_detected)
-            response.error != null -> getString(R.string.main_card_status_error)
-            else -> getString(R.string.main_card_status_clean)
-        }
-        val value = TextView(themedContext()).apply {
-            text = valueText
-            textSize = 13f
-            typeface = Typeface.MONOSPACE
-            setTextColor(
-                statusColor(
-                    when {
-                        primaryDisplayIp != null -> StatusSemantic.DETECTED
-                        response.error != null -> StatusSemantic.ERROR
-                        else -> StatusSemantic.CLEAN
-                    },
-                ),
-            )
-        }
-
-        val url = TextView(themedContext()).apply {
-            text = response.url
-            textSize = 12f
-            setPadding(0, 4.dp, 0, 0)
-            setTextColor(onSurfaceVariantColor())
-        }
-
-        topRow.addView(label)
-        topRow.addView(value)
-        container.addView(topRow)
-
-        if (hasDualStack) {
-            container.addView(
-                TextView(themedContext()).apply {
-                    text = if (privacyMode) maskIp(response.ipv6!!) else response.ipv6!!
-                    textSize = 13f
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, 2.dp, 0, 0)
-                    setTextColor(statusColor(StatusSemantic.DETECTED))
-                },
-            )
-        } else if (response.ipv4Unavailable && response.ipv6 != null) {
-            container.addView(
-                TextView(themedContext()).apply {
-                    text = getString(R.string.main_ip_comparison_ipv4_unavailable)
-                    textSize = 12f
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, 2.dp, 0, 0)
-                    setTextColor(onSurfaceVariantColor())
-                },
-            )
-            response.ipv4Error?.takeIf { it.isNotBlank() }?.let { reason ->
-                container.addView(
-                    TextView(themedContext()).apply {
-                        text = reason
-                        textSize = 11f
-                        typeface = Typeface.MONOSPACE
-                        setPadding(0, 0, 0, 0)
-                        setTextColor(onSurfaceVariantColor())
-                    },
-                )
-            }
-        }
-
-        container.addView(url)
-
-        response.importantFields.forEach { (fieldLabel, fieldValue) ->
-            if (response.ip != null && fieldLabel.equals("IP", ignoreCase = true)) return@forEach
-            container.addView(
-                createInfoView(
-                    fieldLabel,
-                    maskInfoValue(fieldValue, privacyMode),
-                ),
-            )
-        }
-
-        return container
-    }
+    // Reflected by MainActivityUiRenderingTest (name + arity) — keep this
+    // delegator even without production call sites.
+    private fun createCdnPullingResponseView(response: CdnPullingResponse, privacyMode: Boolean = false): View =
+        cdnPullingRenderer.createCdnPullingResponseView(response, privacyMode)
 
     private fun displayIpChannels(consensus: IpConsensusResult, privacyMode: Boolean = false) {
         if (consensus.observedIps.isEmpty()) {
