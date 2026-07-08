@@ -599,6 +599,58 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 Высокая уверенность: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
 
+#### 12.6 Deep VPN Detector (`VpnNativeDetectorChecker`)
+
+
+Новые детекты вынесены в отдельную секцию внутри категории Native и сгруппированы по 4 подкатегориям. Данные приходят из нового JNI-метода `nativeDetectVpnDetector()`, строки имеют префикс `vdet|`.
+
+**Прямые признаки (Direct signs) — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `sysfs_vpn_leak` | Утечка tun/wg/ppp/xfrm через sysfs | `/sys/class/net`, `/sys/devices/virtual/net`, `/proc/sys/net/ipv4|6/conf|neigh` |
+| `getifaddrs_vpn` | VPN-интерфейсы в списке `getifaddrs()` | `getifaddrs()` |
+| `sysclassnet_vpn` | VPN-интерфейсы в `/sys/class/net` | `stat("/sys/class/net/<if>")` |
+| `rtm_getlink_vpn` | VPN-интерфейсы через netlink RTM_GETLINK | Netlink `RTM_GETLINK` dump |
+| `proc_if_inet6_vpn` | VPN-интерфейсы в `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| `proc_ipv6_route_vpn` | VPN-маршруты в `/proc/net/ipv6_route` | `/proc/net/ipv6_route` |
+| `proc_net_dev_vpn` | VPN-трафик (RX/TX) в `/proc/net/dev` | `/proc/net/dev` |
+| `ifindexname_vpn` | VPN-интерфейсы через `if_indextoname()` | `if_indextoname()` перебор ifindex |
+| `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
+| `split_tunnel_uid` | Split-tunneling правила по UID (FRA_UID_RANGE) | Netlink `RTM_GETRULE` dump |
+
+**Сетевые признаки (Network signs) — `EvidenceSource.NATIVE_SOCKET`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `fib_trie_denied` | `/proc/net/fib_trie` недоступен (SELinux EACCES) | `fopen("/proc/net/fib_trie")` |
+| `inet_diag_denied` | inet_diag netlink запрещён (SELinux) | `socket(NETLINK_SOCK_DIAG)` |
+| `bindtodevice_leak` | `SO_BINDTODEVICE` к tun + подтверждение `getsockopt` | `setsockopt(SO_BINDTODEVICE)` |
+| `getsockname_leak` | `getsockname()` возвращает приватный VPN-IP | `getsockname()` на UDP-сокете |
+| `udp_port_conflict_physical` | Конфликт UDP-портов (500/4500/1194/1701/51820) на физическом IP | `bind()` на физический IP |
+| `route_count` | Число маршрутов и уникальных интерфейсов | Netlink `RTM_GETROUTE` dump |
+| `trim_oracle` | Расхождение bind-probe vs RTM_GETLINK по числу iface | `if_indextoname()` vs `RTM_GETLINK` |
+
+**Косвенные признаки (Indirect signs) — `EvidenceSource.NATIVE_ROUTE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `pmtu_mss_combined` | UDP PMTU + TCP MSS (tcpi_snd_mss/rcv_mss) | `connect()` + `getsockopt(TCP_INFO)` |
+| `udp_pmtu_ok` / `udp_pmtu_fail` | Успех/неудача отправки 1500 байт по UDP | `sendto()` 1500 байт |
+| `normal_pmtu` | Path MTU основного физического интерфейса | `fetchMtu()` через `getifaddrs()` |
+| `timing_oracle` | ARM CNTVCT циклы для `sendto()` (мин/макс/сред) | `mrs cntvct_el0` (aarch64) |
+| `backpressure` | Пропускная способность при 50000 UDP-пакетах | `sendto()` burst + замер времени |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | GSO large send (UDP_SEGMENT) — виртуальный интерфейс не поддерживает | `setsockopt(UDP_SEGMENT)` + `sendto()` |
+| `hw_timestamp` | Аппаратный таймстампинг (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
+
+**Пробы окружения (Environment probes) — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `traceroute_denied` | Traceroute-проба (TTL=1 UDP) заблокирована | `setsockopt(IP_TTL=1)` + `sendto()` |
+
+Высокая уверенность (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `split_tunnel_uid`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`, `gso_failed`, `gso_send_failed`. Остальные → `needsReview`.
+
 ---
 
 ## Вердикт (`VerdictEngine`)

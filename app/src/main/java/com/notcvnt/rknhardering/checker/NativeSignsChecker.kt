@@ -163,6 +163,16 @@ object NativeSignsChecker {
         detected = detected || vpnOutcome.detected
         needsReview = needsReview || vpnOutcome.needsReview
 
+        // Deep VPN detector (ported from reference APK) — kept as its own
+        // sub-section inside the Native category for clarity.
+        val detectorOutcome = runCatching { VpnNativeDetectorChecker.check(context) }.getOrNull()
+        if (detectorOutcome != null) {
+            findings += detectorOutcome.findings
+            evidence += detectorOutcome.evidence
+            detected = detected || detectorOutcome.detected
+            needsReview = needsReview || detectorOutcome.needsReview
+        }
+
         if (findings.isEmpty()) {
             findings += Finding(
                 description = context.getString(R.string.checker_native_no_anomalies),
@@ -989,9 +999,11 @@ object NativeSignsChecker {
                 kind == "bpf_map_accessible"
 
             val source = when {
-                kind.contains("hook") -> EvidenceSource.NATIVE_HOOK_MARKERS
-                kind.contains("route") || kind.contains("policy") || kind.contains("sysctl") || kind.contains("qdisc") -> EvidenceSource.NATIVE_ROUTE
-                kind.contains("inet6") || kind.contains("neigh") || kind.contains("mac") || kind.contains("arp") -> EvidenceSource.NATIVE_INTERFACE
+                kind.contains("hook") || kind.contains("lsposed") || kind.contains("vpnhide") -> EvidenceSource.NATIVE_HOOK_MARKERS
+                kind.contains("route") || kind.contains("policy") || kind.contains("sysctl") ||
+                    kind.contains("qdisc") -> EvidenceSource.NATIVE_ROUTE
+                kind.contains("inet6") || kind.contains("neigh") || kind.contains("mac") ||
+                    kind.contains("arp") -> EvidenceSource.NATIVE_INTERFACE
                 else -> EvidenceSource.NATIVE_SOCKET
             }
 

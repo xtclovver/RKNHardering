@@ -572,6 +572,57 @@ Checks via direct netlink requests and probe connections. Returns `unavailable` 
 
 High confidence: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
 
+#### 12.6 Deep VPN Detector (`VpnNativeDetectorChecker`)
+
+The new detectors live in a dedicated sub-section inside the Native category, grouped into 4 sub-categories. Data comes from the new JNI method `nativeDetectVpnDetector()`, with lines prefixed `vdet|`.
+
+**Direct signs — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `sysfs_vpn_leak` | tun/wg/ppp/xfrm leak via sysfs | `/sys/class/net`, `/sys/devices/virtual/net`, `/proc/sys/net/ipv4|6/conf|neigh` |
+| `getifaddrs_vpn` | VPN interfaces in `getifaddrs()` list | `getifaddrs()` |
+| `sysclassnet_vpn` | VPN interfaces in `/sys/class/net` | `stat("/sys/class/net/<if>")` |
+| `rtm_getlink_vpn` | VPN interfaces via netlink RTM_GETLINK | Netlink `RTM_GETLINK` dump |
+| `proc_if_inet6_vpn` | VPN interfaces in `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| `proc_ipv6_route_vpn` | VPN routes in `/proc/net/ipv6_route` | `/proc/net/ipv6_route` |
+| `proc_net_dev_vpn` | VPN traffic (RX/TX) in `/proc/net/dev` | `/proc/net/dev` |
+| `ifindexname_vpn` | VPN interfaces via `if_indextoname()` | `if_indextoname()` ifindex sweep |
+| `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
+| `split_tunnel_uid` | Split-tunneling UID rules (FRA_UID_RANGE) | Netlink `RTM_GETRULE` dump |
+
+**Network signs — `EvidenceSource.NATIVE_SOCKET`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `fib_trie_denied` | `/proc/net/fib_trie` unavailable (SELinux EACCES) | `fopen("/proc/net/fib_trie")` |
+| `inet_diag_denied` | inet_diag netlink denied (SELinux) | `socket(NETLINK_SOCK_DIAG)` |
+| `bindtodevice_leak` | `SO_BINDTODEVICE` to tun + `getsockopt` confirm | `setsockopt(SO_BINDTODEVICE)` |
+| `getsockname_leak` | `getsockname()` returns private VPN IP | `getsockname()` on UDP socket |
+| `udp_port_conflict_physical` | UDP port conflict (500/4500/1194/1701/51820) on physical IP | `bind()` on physical IP |
+| `route_count` | Route count and unique interface count | Netlink `RTM_GETROUTE` dump |
+| `trim_oracle` | bind-probe vs RTM_GETLINK iface count mismatch | `if_indextoname()` vs `RTM_GETLINK` |
+
+**Indirect signs — `EvidenceSource.NATIVE_ROUTE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `pmtu_mss_combined` | UDP PMTU + TCP MSS (tcpi_snd_mss/rcv_mss) | `connect()` + `getsockopt(TCP_INFO)` |
+| `udp_pmtu_ok` / `udp_pmtu_fail` | Success/failure sending 1500 bytes over UDP | `sendto()` 1500 bytes |
+| `normal_pmtu` | Path MTU of primary physical interface | `fetchMtu()` via `getifaddrs()` |
+| `timing_oracle` | ARM CNTVCT cycles for `sendto()` (min/max/avg) | `mrs cntvct_el0` (aarch64) |
+| `backpressure` | Throughput under 50000 UDP packets | `sendto()` burst + timing |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | GSO large send (UDP_SEGMENT) — virtual iface unsupported | `setsockopt(UDP_SEGMENT)` + `sendto()` |
+| `hw_timestamp` | Hardware timestamping (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
+
+**Environment probes — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `traceroute_denied` | Traceroute probe (TTL=1 UDP) blocked | `setsockopt(IP_TTL=1)` + `sendto()` |
+
+High confidence (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `split_tunnel_uid`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`, `gso_failed`, `gso_send_failed`. Others → `needsReview`.
+
 ---
 
 ## Verdict (`VerdictEngine`)

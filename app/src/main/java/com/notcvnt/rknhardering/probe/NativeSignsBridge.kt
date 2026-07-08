@@ -52,7 +52,7 @@ object NativeSignsBridge {
     internal var detectVpnSyscallsOverride: (() -> Array<String>)? = null
 
     @Volatile
-    internal var runAllChecksJsonOverride: (() -> String?)? = null
+    internal var detectVpnDetectorOverride: (() -> Array<String>)? = null
 
     @Volatile
     private var initialized = false
@@ -180,10 +180,10 @@ object NativeSignsBridge {
         return runCatching { nativeDetectVpnSyscalls() }.getOrDefault(emptyArray())
     }
 
-    fun runAllChecksJson(): String? {
-        runAllChecksJsonOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return null
-        return runCatching { nativeRunAllChecksJson() }.getOrNull()
+    fun detectVpnDetector(): Array<String> {
+        detectVpnDetectorOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectVpnDetector() }.getOrDefault(emptyArray())
     }
 
     internal fun resetForTests() {
@@ -203,7 +203,7 @@ object NativeSignsBridge {
         detectVpnLeaksOverride = null
         detectVpnAdvancedOverride = null
         detectVpnSyscallsOverride = null
-        runAllChecksJsonOverride = null
+        detectVpnDetectorOverride = null
         initialized = false
         libraryLoaded = false
         lastLoadError = null
@@ -224,5 +224,5 @@ object NativeSignsBridge {
     private external fun nativeDetectVpnLeaks(): Array<String>
     private external fun nativeDetectVpnAdvanced(): Array<String>
     private external fun nativeDetectVpnSyscalls(): Array<String>
-    private external fun nativeRunAllChecksJson(): String
+    private external fun nativeDetectVpnDetector(): Array<String>
 }
