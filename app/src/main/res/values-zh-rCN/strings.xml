@@ -694,11 +694,7 @@
     <string name="checker_vpn_detector_unavailable">VPN 检测器库未加载</string>
     <string name="checker_vpn_detector_unavailable_with_reason">VPN 检测器库未加载：%1$s</string>
     <string name="checker_vpn_detector_no_anomalies">未检测到深度 VPN 迹象</string>
-    <string name="vpn_detector_section">— %1$s —</string>
-    <string name="vpn_detector_group_direct">直接迹象</string>
-    <string name="vpn_detector_group_network">网络迹象</string>
-    <string name="vpn_detector_group_indirect">间接迹象</string>
-    <string name="vpn_detector_group_env">环境探测</string>
+
 
     <!-- App update checker -->
     <string name="update_dialog_title">有更新可用</string>

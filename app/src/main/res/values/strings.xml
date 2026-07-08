@@ -723,11 +723,7 @@
     <string name="checker_vpn_detector_unavailable">VPN detector library not loaded</string>
     <string name="checker_vpn_detector_unavailable_with_reason">VPN detector library not loaded: %1$s</string>
     <string name="checker_vpn_detector_no_anomalies">No deep VPN signs detected</string>
-    <string name="vpn_detector_section">— %1$s —</string>
-    <string name="vpn_detector_group_direct">Direct signs</string>
-    <string name="vpn_detector_group_network">Network signs</string>
-    <string name="vpn_detector_group_indirect">Indirect signs</string>
-    <string name="vpn_detector_group_env">Environment probes</string>
+
 
     <!-- App update checker -->
     <string name="update_dialog_title">Update available</string>

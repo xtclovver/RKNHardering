@@ -14,20 +14,8 @@ import kotlinx.coroutines.withContext
  * Deep VPN detector ported from the reference [dev.soranerai.vpndetector] APK.
  * Lives in its own UI category, separate from the legacy [NativeSignsChecker].
  * Every native line is prefixed with "vdet|" and has the shape "vdet|<kind>|<detail>".
- *
- * Checks are grouped into sub-categories so the UI shows them as:
- *  - Direct signs      (interface / route / sysfs leaks)
- *  - Network signs     (sockets / policy rules / BPF)
- *  - Indirect signs    (MTU / MSS / GSO / timing / backpressure)
- *  - Environment       (traceroute / hw timestamp probes)
  */
 object VpnNativeDetectorChecker {
-
-    private val DIRECT_KINDS = setOf(
-        "sysfs_vpn_leak", "getifaddrs_vpn", "sysclassnet_vpn", "rtm_getlink_vpn",
-        "proc_if_inet6_vpn", "proc_ipv6_route_vpn", "proc_net_dev_vpn",
-        "ifindexname_vpn", "vpn_policy_rules_netlink", "split_tunnel_uid",
-    )
 
     private val NETWORK_KINDS = setOf(
         "fib_trie_denied", "inet_diag_denied", "bindtodevice_leak",
@@ -39,10 +27,6 @@ object VpnNativeDetectorChecker {
         "pmtu_mss_combined", "udp_pmtu_ok", "udp_pmtu_fail", "normal_pmtu",
         "timing_oracle", "backpressure", "gso_failed", "gso_send_failed",
         "gso_ok", "hw_timestamp",
-    )
-
-    private val ENV_KINDS = setOf(
-        "traceroute_denied",
     )
 
     private val HIGH_CONFIDENCE = setOf(
@@ -79,39 +63,29 @@ object VpnNativeDetectorChecker {
         var detected = false
         var needsReview = false
 
-        val groups = listOf(
-            Triple(context.getString(R.string.vpn_detector_group_direct), DIRECT_KINDS, EvidenceSource.NATIVE_INTERFACE),
-            Triple(context.getString(R.string.vpn_detector_group_network), NETWORK_KINDS, EvidenceSource.NATIVE_SOCKET),
-            Triple(context.getString(R.string.vpn_detector_group_indirect), INDIRECT_KINDS, EvidenceSource.NATIVE_ROUTE),
-            Triple(context.getString(R.string.vpn_detector_group_env), ENV_KINDS, EvidenceSource.NATIVE_INTERFACE),
-        )
-
-        for ((groupTitle, kinds, source) in groups) {
-            val items = parsed.filter { it.kind in kinds }
-            if (items.isEmpty()) continue
-            findings += Finding(
-                description = context.getString(R.string.vpn_detector_section, groupTitle),
-                isInformational = true,
-            )
-            for (item in items) {
-                val isHigh = item.kind in HIGH_CONFIDENCE
-                val confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM
-                findings += Finding(
-                    description = describe(context, item.kind, item.detail),
-                    detected = isHigh,
-                    needsReview = !isHigh,
-                    source = source,
-                    confidence = confidence,
-                )
-                evidence += com.notcvnt.rknhardering.model.EvidenceItem(
-                    source = source,
-                    detected = true,
-                    confidence = confidence,
-                    description = describe(context, item.kind, item.detail),
-                )
-                detected = detected || isHigh
-                needsReview = needsReview || !isHigh
+        for (item in parsed) {
+            val isHigh = item.kind in HIGH_CONFIDENCE
+            val confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM
+            val source = when {
+                item.kind in NETWORK_KINDS -> EvidenceSource.NATIVE_SOCKET
+                item.kind in INDIRECT_KINDS -> EvidenceSource.NATIVE_ROUTE
+                else -> EvidenceSource.NATIVE_INTERFACE
             }
+            findings += Finding(
+                description = describe(context, item.kind, item.detail),
+                detected = isHigh,
+                needsReview = !isHigh,
+                source = source,
+                confidence = confidence,
+            )
+            evidence += com.notcvnt.rknhardering.model.EvidenceItem(
+                source = source,
+                detected = true,
+                confidence = confidence,
+                description = describe(context, item.kind, item.detail),
+            )
+            detected = detected || isHigh
+            needsReview = needsReview || !isHigh
         }
 
         if (findings.isEmpty()) {

@@ -718,11 +718,7 @@
     <string name="checker_vpn_detector_unavailable">Библиотека VPN-детектора не загружена</string>
     <string name="checker_vpn_detector_unavailable_with_reason">Библиотека VPN-детектора не загружена: %1$s</string>
     <string name="checker_vpn_detector_no_anomalies">Глубоких признаков VPN не обнаружено</string>
-    <string name="vpn_detector_section">— %1$s —</string>
-    <string name="vpn_detector_group_direct">Прямые признаки</string>
-    <string name="vpn_detector_group_network">Сетевые признаки</string>
-    <string name="vpn_detector_group_indirect">Косвенные признаки</string>
-    <string name="vpn_detector_group_env">Пробы окружения</string>
+
 
     <!-- App update checker -->
     <string name="update_dialog_title">Доступно обновление</string>
