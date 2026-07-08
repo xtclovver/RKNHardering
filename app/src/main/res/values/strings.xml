@@ -665,6 +665,33 @@
     <string name="checker_native_isolation_clone">App runs in a cloned/dual-app container (user %1$d); a VPN in the primary profile is not observable</string>
     <string name="checker_native_isolation_work_profile">App runs in a managed work profile; a VPN in the personal profile is not observable without root</string>
 
+    <!-- NativeSignsChecker: VPN signals -->
+    <string name="checker_native_vpn_signal">VPN signal: %1$s</string>
+    <string name="vpn_desc_prop">VPN system property detected</string>
+    <string name="vpn_desc_vpnhide">VPN hide file found</string>
+    <string name="vpn_desc_hook">Hook framework property detected</string>
+    <string name="vpn_desc_dns">DNS property points to VPN</string>
+    <string name="vpn_desc_file">VPN tool file found</string>
+    <string name="vpn_desc_lsposed">LSPosed/Xposed environment detected</string>
+    <string name="vpn_desc_tcp_port">TCP connection on VPN port</string>
+    <string name="vpn_desc_udp_port">UDP socket on VPN port</string>
+    <string name="vpn_desc_inet6">IPv6 VPN interface in /proc</string>
+    <string name="vpn_desc_route">Route via VPN interface</string>
+    <string name="vpn_desc_arp">ARP entry on VPN interface</string>
+    <string name="vpn_desc_forwarding">IP forwarding is enabled</string>
+    <string name="vpn_desc_rpfilter">Reverse path filter disabled</string>
+    <string name="vpn_desc_established">Established connection to private IP on VPN port</string>
+    <string name="vpn_desc_policy_rules">VPN routing rules found</string>
+    <string name="vpn_desc_qdisc">VPN queue discipline detected</string>
+    <string name="vpn_desc_hidden_mac">Hidden MAC addresses in neighbor table</string>
+    <string name="vpn_desc_mss">Suspiciously low MSS (possible tunnel)</string>
+    <string name="vpn_desc_bindtodevice">setsockopt intercepted (VPN hook)</string>
+    <string name="vpn_desc_port_conflict">Port conflict on loopback (VPN listener)</string>
+    <string name="vpn_desc_bpf">Access to netd BPF maps</string>
+    <string name="vpn_desc_recverr">IP_RECVERR intercepted (VPN hook)</string>
+    <string name="vpn_status_not_found">not found</string>
+    <string name="vpn_status_unavailable">unavailable (no permission)</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">Update available</string>
     <string name="update_dialog_message">Installed version: %1$s\nLatest version: %2$s</string>

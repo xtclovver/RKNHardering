@@ -639,6 +639,32 @@
     <string name="checker_native_isolation_clone">برنامه در یک محفظه شبیه‌سازی/dual-app اجرا می‌شود (کاربر %1$d)؛ VPN در پروفایل اصلی قابل تشخیص نیست</string>
     <string name="checker_native_isolation_work_profile">برنامه در یک پروفایل کاری مدیریت‌شده اجرا می‌شود؛ VPN در پروفایل شخصی بدون روت قابل تشخیص نیست</string>
 
+    <string name="checker_native_vpn_signal">سیگنال VPN: %1$s</string>
+    <string name="vpn_desc_prop">ویژگی سیستمی VPN شناسایی شد</string>
+    <string name="vpn_desc_vpnhide">فایل مخفی‌سازی VPN یافت شد</string>
+    <string name="vpn_desc_hook">ویژگی فریمورک hook شناسایی شد</string>
+    <string name="vpn_desc_dns">ویژگی DNS به VPN اشاره می‌کند</string>
+    <string name="vpn_desc_file">فایل ابزار VPN یافت شد</string>
+    <string name="vpn_desc_lsposed">محیط LSPosed/Xposed شناسایی شد</string>
+    <string name="vpn_desc_tcp_port">اتصال TCP روی پورت VPN</string>
+    <string name="vpn_desc_udp_port">سوکت UDP روی پورت VPN</string>
+    <string name="vpn_desc_inet6">رابط VPN IPv6 در /proc</string>
+    <string name="vpn_desc_route">مسیر از طریق رابط VPN</string>
+    <string name="vpn_desc_arp">رکورد ARP روی رابط VPN</string>
+    <string name="vpn_desc_forwarding">Forwarding IP فعال است</string>
+    <string name="vpn_desc_rpfilter">فیلتر reverse path غیرفعال است</string>
+    <string name="vpn_desc_established">اتصال برقرار به IP خصوصی روی پورت VPN</string>
+    <string name="vpn_desc_policy_rules">قوانین مسیریابی VPN یافت شد</string>
+    <string name="vpn_desc_qdisc"> queue discipline VPN شناسایی شد</string>
+    <string name="vpn_desc_hidden_mac">آدرس‌های MAC پنهان در جدول همسایه</string>
+    <string name="vpn_desc_mss">MSS به طور مشکوکی پایین (احتمالاً تونل)</string>
+    <string name="vpn_desc_bindtodevice">setsockopt رهگیری شد (hook VPN)</string>
+    <string name="vpn_desc_port_conflict">تداخل پورت روی loopback (listener VPN)</string>
+    <string name="vpn_desc_bpf">دسترسی به نقشه‌های BPF netd</string>
+    <string name="vpn_desc_recverr">IP_RECVERR رهگیری شد (hook VPN)</string>
+    <string name="vpn_status_not_found">یافت نشد</string>
+    <string name="vpn_status_unavailable">غیرقابل دسترس (بدون مجوز)</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">به‌روزرسانی موجود است</string>
     <string name="update_dialog_message">نسخه نصب‌شده: %1$s\nآخرین نسخه: %2$s</string>

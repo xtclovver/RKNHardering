@@ -12,12 +12,14 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <ifaddrs.h>
 #include <sys/system_properties.h>
 
@@ -787,7 +789,6 @@ jobjectArray nativeLibraryIntegrity(JNIEnv *env, jclass /*clazz*/) {
 jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
     std::vector<std::string> findings;
 
-    // 1. Check for su binary in common paths
     static const char *const kSuPaths[] = {
         "/system/bin/su",
         "/system/xbin/su",
@@ -810,7 +811,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 2. Check root-related system properties
     struct PropCheck {
         const char *prop;
         const char *suspiciousValue;
@@ -835,7 +835,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 3. Check for root management app artifacts
     static const char *const kRootMgmtPaths[] = {
         "/data/adb/magisk",
         "/data/adb/modules",
@@ -856,17 +855,14 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 4. Check /system writability
     if (access("/system", W_OK) == 0) {
         findings.emplace_back("system_rw|/system is writable");
     }
 
-    // 5. Check /proc/self/mounts for suspicious mount entries
     FILE *mounts = std::fopen("/proc/self/mounts", "re");
     if (mounts != nullptr) {
         char line[1024];
         while (std::fgets(line, sizeof(line), mounts) != nullptr) {
-            // Magisk tmpfs overlays on /system, /vendor, /product
             if (std::strstr(line, "magisk") != nullptr ||
                 std::strstr(line, "core-only") != nullptr) {
                 std::string raw(line);
@@ -875,7 +871,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
                 f.append(raw);
                 findings.push_back(f);
             }
-            // Overlayfs on /system suggests rootfs modifications
             if (std::strstr(line, "overlay") != nullptr &&
                 (std::strstr(line, "/system") != nullptr ||
                  std::strstr(line, "/vendor") != nullptr)) {
@@ -889,7 +884,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         std::fclose(mounts);
     }
 
-    // 6. Check SELinux enforcement
     FILE *selinux = std::fopen("/sys/fs/selinux/enforce", "re");
     if (selinux != nullptr) {
         int enforce = -1;
@@ -898,11 +892,9 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
         std::fclose(selinux);
     } else {
-        // SELinux filesystem not accessible — might be disabled entirely
         findings.emplace_back("selinux|absent");
     }
 
-    // 7. Check current process UID/GID
     uid_t uid = getuid();
     uid_t euid = geteuid();
     gid_t gid = getgid();
@@ -914,7 +906,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         findings.push_back(f);
     }
 
-    // 8. Check for Magisk-specific properties
     static const char *const kMagiskProps[] = {
         "init.svc.magisk_daemon",
         "init.svc.magisk_pfs",
@@ -949,7 +940,6 @@ bool fileContains(const char *path, const char *needle) {
 jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
     std::vector<std::string> findings;
 
-    // 1. QEMU system properties
     static const char *const kQemuProps[] = {
         "ro.kernel.qemu",
         "ro.kernel.qemu.gles",
@@ -967,7 +957,6 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 2. Goldfish/ranchu hardware
     static const char *const kHwProps[] = {
         "ro.hardware",
         "ro.product.board",
@@ -986,7 +975,6 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 3. Emulator pipe devices (genyd => Genymotion)
     static const char *const kPipePaths[] = {
         "/dev/qemu_pipe",
         "/dev/socket/qemud",
@@ -1001,12 +989,10 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 4. Goldfish TTY driver
     if (fileContains("/proc/tty/drivers", "goldfish")) {
         findings.emplace_back("qemu_driver|/proc/tty/drivers:goldfish");
     }
 
-    // 5. BlueStacks artifacts
     static const char *const kBlueStacksPaths[] = {
         "/system/lib/libbstfolder_jni.so",
         "/data/bluestacks.prop",
@@ -1016,6 +1002,543 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
             std::string f = "bluestacks|";
             f.append(path);
             findings.push_back(f);
+        }
+    }
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnProperties(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    static const char *const kDnsProps[] = {
+        "net.dns1", "net.dns2", "net.dns3", "net.dns4",
+        "net.vpn.dns1", "net.vpn.dns2",
+        "dhcp.tun0.dns1", "dhcp.tun0.dns2",
+    };
+    for (const char *prop : kDnsProps) {
+        char val[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop, val) > 0 && val[0] != '\0') {
+            std::string f = "dns_prop|";
+            f.append(prop); f.push_back('='); f.append(val);
+            findings.push_back(f);
+        }
+    }
+
+    static const char *const kVpnProps[] = {
+        "net.vpn.default_iface", "net.vpn.dns_suffix",
+        "net.tun0.dns1", "net.tun0.dns2",
+        "net.ppp0.dns1", "net.ppp0.dns2",
+        "vpn.enable", "vpn.interface",
+    };
+    for (const char *prop : kVpnProps) {
+        char val[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop, val) > 0 && val[0] != '\0') {
+            std::string f = "vpn_prop|";
+            f.append(prop); f.push_back('='); f.append(val);
+            findings.push_back(f);
+        }
+    }
+
+    static const char *const kVpnHidePaths[] = {
+        "/data/local/vpnhide", "/data/local/tmp/vpnhide",
+        "/data/adb/vpnhide", "/sdcard/vpnhide",
+        "/data/local/bypass", "/data/local/tmp/bypass",
+    };
+    for (const char *path : kVpnHidePaths) {
+        if (access(path, F_OK) == 0) {
+            std::string f = "vpnhide|"; f.append(path);
+            findings.push_back(f);
+        }
+    }
+
+    static const char *const kLsposedPaths[] = {
+        "/data/adb/lspd", "/data/adb/modules/lsposed",
+        "/data/adb/modules/lsposed_edge", "/data/local/tmp/lspd",
+        "/data/adb/ksu/modules/lsposed",
+    };
+    for (const char *path : kLsposedPaths) {
+        if (access(path, F_OK) == 0) {
+            std::string f = "lsposed_artifact|"; f.append(path);
+            findings.push_back(f);
+        }
+    }
+
+    static const char *const kHookProps[] = {
+        "persist.sys.lspd", "persist.sys.lsposed",
+        "ro.lsposed.hidden", "persist.sys.virtualapp",
+    };
+    for (const char *prop : kHookProps) {
+        char val[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop, val) > 0 && val[0] != '\0') {
+            std::string f = "hook_prop|";
+            f.append(prop); f.push_back('='); f.append(val);
+            findings.push_back(f);
+        }
+    }
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnLeaks(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    static const char *const kProcTcpPaths[] = { "/proc/net/tcp", "/proc/net/tcp6" };
+    for (const char *path : kProcTcpPaths) {
+        FILE *f = std::fopen(path, "re");
+        if (f == nullptr) continue;
+        char line[1024];
+        int vpnPortCount = 0;
+        while (std::fgets(line, sizeof(line), f) != nullptr) {
+            char *lastColon = nullptr;
+            for (char *p = line; *p; p++) {
+                if (*p == ':') lastColon = p;
+            }
+            if (lastColon == nullptr) continue;
+            char *space = std::strchr(lastColon + 1, ' ');
+            if (space == nullptr) continue;
+            *space = '\0';
+            unsigned long port = std::strtoul(lastColon + 1, nullptr, 16);
+            if (port == 443 || port == 1194 || port == 51820 || port == 8443 ||
+                port == 1723 || port == 500 || port == 4500 || port == 11940) {
+                vpnPortCount++;
+            }
+        }
+        std::fclose(f);
+        if (vpnPortCount > 0) {
+            std::string r = "tcp_vpn_port|"; r.append(path); r.push_back('|');
+            r.append(std::to_string(vpnPortCount));
+            findings.push_back(r);
+        }
+    }
+
+    static const char *const kProcUdpPaths[] = { "/proc/net/udp", "/proc/net/udp6" };
+    for (const char *path : kProcUdpPaths) {
+        FILE *f = std::fopen(path, "re");
+        if (f == nullptr) continue;
+        char line[1024];
+        int vpnPortCount = 0;
+        while (std::fgets(line, sizeof(line), f) != nullptr) {
+            char *lastColon = nullptr;
+            for (char *p = line; *p; p++) {
+                if (*p == ':') lastColon = p;
+            }
+            if (lastColon == nullptr) continue;
+            char *space = std::strchr(lastColon + 1, ' ');
+            if (space == nullptr) continue;
+            *space = '\0';
+            unsigned long port = std::strtoul(lastColon + 1, nullptr, 16);
+            if (port == 51820 || port == 1194 || port == 500 || port == 4500) {
+                vpnPortCount++;
+            }
+        }
+        std::fclose(f);
+        if (vpnPortCount > 0) {
+            std::string r = "udp_vpn_port|"; r.append(path); r.push_back('|');
+            r.append(std::to_string(vpnPortCount));
+            findings.push_back(r);
+        }
+    }
+
+    FILE *inet6 = std::fopen("/proc/net/if_inet6", "re");
+    if (inet6 != nullptr) {
+        char line[1024];
+        int tunCount = 0;
+        while (std::fgets(line, sizeof(line), inet6) != nullptr) {
+            if (std::strstr(line, "tun") || std::strstr(line, "wg") ||
+                std::strstr(line, "ppp") || std::strstr(line, "tap")) {
+                tunCount++;
+            }
+        }
+        std::fclose(inet6);
+        if (tunCount > 0) {
+            std::string r = "inet6_vpn_iface|"; r.append(std::to_string(tunCount));
+            findings.push_back(r);
+        }
+    }
+
+    FILE *route = std::fopen("/proc/net/route", "re");
+    if (route != nullptr) {
+        char line[1024];
+        std::fgets(line, sizeof(line), route);
+        int vpnRouteCount = 0;
+        while (std::fgets(line, sizeof(line), route) != nullptr) {
+            char *p = line;
+            while (*p && *p != ' ' && *p != '\t') p++;
+            if (*p == '\0') continue;
+            std::string iface(line, p - line);
+            if (iface.find("tun") != std::string::npos ||
+                iface.find("wg") != std::string::npos ||
+                iface.find("ppp") != std::string::npos ||
+                iface.find("tap") != std::string::npos) {
+                vpnRouteCount++;
+            }
+        }
+        std::fclose(route);
+        if (vpnRouteCount > 0) {
+            std::string r = "route_vpn_iface|"; r.append(std::to_string(vpnRouteCount));
+            findings.push_back(r);
+        }
+    }
+
+    FILE *fib = std::fopen("/proc/net/fib_trie", "re");
+    if (fib != nullptr) {
+        char line[1024];
+        int vpnSubnetCount = 0;
+        while (std::fgets(line, sizeof(line), fib) != nullptr) {
+            if (std::strstr(line, "/32 host") && !std::strstr(line, "LOCAL")) {
+                vpnSubnetCount++;
+            }
+        }
+        std::fclose(fib);
+        if (vpnSubnetCount > 2) {
+            std::string r = "fib_vpn_subnets|"; r.append(std::to_string(vpnSubnetCount));
+            findings.push_back(r);
+        }
+    }
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnAdvanced(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    FILE *arp = std::fopen("/proc/net/arp", "re");
+    if (arp != nullptr) {
+        char line[1024];
+        std::fgets(line, sizeof(line), arp);
+        int vpnArpCount = 0;
+        while (std::fgets(line, sizeof(line), arp) != nullptr) {
+            char *lastSpace = nullptr;
+            for (char *p = line; *p; p++) { if (*p == ' ') lastSpace = p; }
+            if (lastSpace == nullptr) continue;
+            lastSpace++;
+            std::string iface(lastSpace);
+            while (!iface.empty() && (iface.back() == '\n' || iface.back() == '\r')) iface.pop_back();
+            if (iface.find("tun") != std::string::npos ||
+                iface.find("wg") != std::string::npos ||
+                iface.find("ppp") != std::string::npos) {
+                vpnArpCount++;
+            }
+        }
+        std::fclose(arp);
+        if (vpnArpCount > 0) {
+            std::string r = "arp_vpn_iface|"; r.append(std::to_string(vpnArpCount));
+            findings.push_back(r);
+        }
+    }
+
+    static const char *const kSysctlPaths[] = {
+        "/proc/sys/net/ipv4/conf/all/rp_filter",
+        "/proc/sys/net/ipv4/conf/default/rp_filter",
+        "/proc/sys/net/ipv4/ip_forward",
+        "/proc/sys/net/ipv6/conf/all/forwarding",
+    };
+    for (const char *path : kSysctlPaths) {
+        FILE *f = std::fopen(path, "re");
+        if (f == nullptr) continue;
+        int value = -1;
+        if (std::fscanf(f, "%d", &value) == 1) {
+            bool suspicious = false;
+            if (std::strstr(path, "rp_filter") && value == 0) suspicious = true;
+            if (std::strstr(path, "ip_forward") && value == 1) suspicious = true;
+            if (std::strstr(path, "forwarding") && value == 1) suspicious = true;
+            if (suspicious) {
+                std::string r = "sysctl_vpn|"; r.append(path); r.push_back('=');
+                r.append(std::to_string(value));
+                findings.push_back(r);
+            }
+        }
+        std::fclose(f);
+    }
+
+    FILE *tcp = std::fopen("/proc/net/tcp", "re");
+    if (tcp != nullptr) {
+        char line[1024];
+        std::fgets(line, sizeof(line), tcp);
+        int estVpn = 0;
+        while (std::fgets(line, sizeof(line), tcp) != nullptr) {
+            int field = 0;
+            char *p = line;
+            while (*p && field < 4) { if (*p == ' ') field++; if (field < 4) p++; }
+            if (field < 4) continue;
+            unsigned long state = std::strtoul(p, nullptr, 16);
+            if (state != 0x1) continue;
+            char *remoteStart = std::strstr(line, " ");
+            if (remoteStart == nullptr) continue;
+            remoteStart++;
+            char *remoteEnd = std::strstr(remoteStart, " ");
+            if (remoteEnd == nullptr) continue;
+            *remoteEnd = '\0';
+            char *colon = nullptr;
+            for (char *p = remoteStart; *p; p++) { if (*p == ':') colon = p; }
+            if (colon == nullptr) continue;
+            *colon = '\0';
+            unsigned long remoteIp = std::strtoul(remoteStart, nullptr, 16);
+            unsigned long remotePort = std::strtoul(colon + 1, nullptr, 16);
+            bool isPrivate = ((remoteIp >> 24) == 10) ||
+                             ((remoteIp >> 20) == 0xAC1) ||
+                             ((remoteIp >> 16) == 0xC0A8);
+            if (isPrivate && (remotePort == 443 || remotePort == 1194 || remotePort == 51820)) {
+                estVpn++;
+            }
+        }
+        std::fclose(tcp);
+        if (estVpn > 0) {
+            std::string r = "tcp_est_vpn_private|"; r.append(std::to_string(estVpn));
+            findings.push_back(r);
+        }
+    }
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnSyscalls(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    {
+        int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+        if (fd >= 0) {
+            struct { struct nlmsghdr nlh; struct rtmsg rtm; } req;
+            std::memset(&req, 0, sizeof(req));
+            req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+            req.nlh.nlmsg_type = RTM_GETRULE;
+            req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+            req.nlh.nlmsg_seq = 1;
+            req.rtm.rtm_family = AF_UNSPEC;
+
+            struct sockaddr_nl kernel;
+            std::memset(&kernel, 0, sizeof(kernel));
+            kernel.nl_family = AF_NETLINK;
+
+            if (sendto(fd, &req, req.nlh.nlmsg_len, 0, (struct sockaddr *)&kernel, sizeof(kernel)) >= 0) {
+                char buf[8192];
+                int ruleCount = 0;
+                ssize_t len = recv(fd, buf, sizeof(buf), 0);
+                if (len > 0) {
+                    for (auto *nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, (unsigned)len); nh = NLMSG_NEXT(nh, len)) {
+                        if (nh->nlmsg_type == NLMSG_DONE) break;
+                        if (nh->nlmsg_type == NLMSG_ERROR) {
+                            const auto *err = (const struct nlmsgerr *)NLMSG_DATA(nh);
+                            if (-err->error == EACCES || -err->error == EPERM) {
+                                findings.push_back("unavailable|rtm_getrule|permission denied");
+                            }
+                            break;
+                        }
+                        if (nh->nlmsg_type == RTM_NEWRULE) ruleCount++;
+                    }
+                    if (ruleCount > 0) {
+                        std::string r = "vpn_policy_rules|"; r.append(std::to_string(ruleCount));
+                        findings.push_back(r);
+                    }
+                }
+            } else if (errno == EACCES || errno == EPERM) {
+                findings.push_back("unavailable|rtm_getrule|permission denied");
+            }
+            close(fd);
+        } else if (errno == EACCES || errno == EPERM) {
+            findings.push_back("unavailable|rtm_getrule|socket denied");
+        }
+    }
+
+    {
+        int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+        if (fd >= 0) {
+            struct { struct nlmsghdr nlh; struct tcmsg tcm; } req;
+            std::memset(&req, 0, sizeof(req));
+            req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct tcmsg));
+            req.nlh.nlmsg_type = RTM_GETQDISC;
+            req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+            req.nlh.nlmsg_seq = 1;
+            req.tcm.tcm_family = AF_UNSPEC;
+
+            struct sockaddr_nl kernel;
+            std::memset(&kernel, 0, sizeof(kernel));
+            kernel.nl_family = AF_NETLINK;
+
+            if (sendto(fd, &req, req.nlh.nlmsg_len, 0, (struct sockaddr *)&kernel, sizeof(kernel)) >= 0) {
+                char buf[8192];
+                ssize_t len = recv(fd, buf, sizeof(buf), 0);
+                if (len > 0) {
+                    bool hasQdisc = false;
+                    for (auto *nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, (unsigned)len); nh = NLMSG_NEXT(nh, len)) {
+                        if (nh->nlmsg_type == NLMSG_DONE) break;
+                        if (nh->nlmsg_type == NLMSG_ERROR) {
+                            const auto *err = (const struct nlmsgerr *)NLMSG_DATA(nh);
+                            if (-err->error == EACCES || -err->error == EPERM) {
+                                findings.push_back("unavailable|rtm_getqdisc|permission denied");
+                            }
+                            break;
+                        }
+                        if (nh->nlmsg_type == RTM_NEWQDISC) {
+                            auto *tcm = (struct tcmsg *)NLMSG_DATA(nh);
+                            char dev[IF_NAMESIZE] = {0};
+                            if_indextoname(tcm->tcm_ifindex, dev);
+                            hasQdisc = true;
+                        }
+                    }
+                    if (!hasQdisc && findings.empty()) {
+                    }
+                }
+            } else if (errno == EACCES || errno == EPERM) {
+                findings.push_back("unavailable|rtm_getqdisc|permission denied");
+            }
+            close(fd);
+        }
+    }
+
+    {
+        int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+        if (fd >= 0) {
+            struct { struct nlmsghdr nlh; struct ndmsg ndm; } req;
+            std::memset(&req, 0, sizeof(req));
+            req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg));
+            req.nlh.nlmsg_type = RTM_GETNEIGH;
+            req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+            req.nlh.nlmsg_seq = 1;
+            req.ndm.ndm_family = AF_UNSPEC;
+
+            struct sockaddr_nl kernel;
+            std::memset(&kernel, 0, sizeof(kernel));
+            kernel.nl_family = AF_NETLINK;
+
+            if (sendto(fd, &req, req.nlh.nlmsg_len, 0, (struct sockaddr *)&kernel, sizeof(kernel)) >= 0) {
+                char buf[16384];
+                int hiddenMacCount = 0;
+                ssize_t len = recv(fd, buf, sizeof(buf), 0);
+                if (len > 0) {
+                    for (auto *nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, (unsigned)len); nh = NLMSG_NEXT(nh, len)) {
+                        if (nh->nlmsg_type == NLMSG_DONE) break;
+                        if (nh->nlmsg_type == NLMSG_ERROR) {
+                            const auto *err = (const struct nlmsgerr *)NLMSG_DATA(nh);
+                            if (-err->error == EACCES || -err->error == EPERM) {
+                                findings.push_back("unavailable|rtm_getneigh|permission denied");
+                            }
+                            break;
+                        }
+                        if (nh->nlmsg_type == RTM_NEWNEIGH) {
+                            auto *ndm = (struct ndmsg *)NLMSG_DATA(nh);
+                            int attrLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(struct ndmsg));
+                            for (auto *attr = (struct rtattr *)((char *)ndm + NLMSG_ALIGN(sizeof(struct ndmsg)));
+                                 RTA_OK(attr, attrLen); attr = RTA_NEXT(attr, attrLen)) {
+                                if (attr->rta_type == NDA_LLADDR) {
+                                    unsigned char *hwaddr = (unsigned char *)RTA_DATA(attr);
+                                    int hwaddrLen = RTA_PAYLOAD(attr);
+                                    if (hwaddrLen == 6 && (hwaddr[0] | hwaddr[1] | hwaddr[2] | hwaddr[3] | hwaddr[4] | hwaddr[5]) == 0) {
+                                        hiddenMacCount++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (hiddenMacCount > 0) {
+                        std::string r = "hidden_mac_neighbors|"; r.append(std::to_string(hiddenMacCount));
+                        findings.push_back(r);
+                    }
+                }
+            } else if (errno == EACCES || errno == EPERM) {
+                findings.push_back("unavailable|rtm_getneigh|permission denied");
+            }
+            close(fd);
+        }
+    }
+
+    {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd >= 0) {
+            struct sockaddr_in addr;
+            std::memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(443);
+            inet_pton(AF_INET, "8.8.8.8", &addr.sin_addr);
+            struct timeval tv = {0, 500000}; 
+            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+            if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+                struct tcp_info info;
+                socklen_t infoLen = sizeof(info);
+                if (getsockopt(fd, IPPROTO_TCP, TCP_INFO, &info, &infoLen) == 0) {
+                    unsigned int sndMss = info.tcpi_snd_mss;
+                    unsigned int rcvMss = info.tcpi_rcv_mss;
+                    if (sndMss > 0 && sndMss < 500) {
+                        std::string r = "tcp_mss_low|snd_mss="; r.append(std::to_string(sndMss));
+                        r.append("|rcv_mss="); r.append(std::to_string(rcvMss));
+                        findings.push_back(r);
+                    }
+                }
+            } else if (errno == EACCES || errno == EPERM || errno == ECONNREFUSED) {
+            }
+            close(fd);
+        }
+    }
+
+    {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd >= 0) {
+            const char *probeName = "nonexistent_iface_probe_123";
+            if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, probeName, strlen(probeName)) < 0) {
+                if (errno == EACCES || errno == EPERM) {
+                } else if (errno == ENODEV) {
+                }
+            } else {
+            }
+            close(fd);
+        }
+    }
+
+    {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd >= 0) {
+            static const int kVpnPorts[] = { 51820, 1194, 443, 8443 };
+            for (int port : kVpnPorts) {
+                int testFd = socket(AF_INET, SOCK_STREAM, 0);
+                if (testFd < 0) continue;
+                int opt = 1;
+                setsockopt(testFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+                struct sockaddr_in addr;
+                std::memset(&addr, 0, sizeof(addr));
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(port);
+                addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                if (bind(testFd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+                    close(testFd);
+                } else if (errno == EADDRINUSE) {
+                    std::string r = "loopback_port_conflict|port="; r.append(std::to_string(port));
+                    findings.push_back(r);
+                    close(testFd);
+                } else {
+                    close(testFd);
+                }
+            }
+            close(fd);
+        }
+    }
+
+    {
+        const char *bpfPath = "/sys/fs/bpf/map_netd_iface_index_name_map";
+        int bpfFd = open(bpfPath, O_RDONLY);
+        if (bpfFd >= 0) {
+            close(bpfFd);
+            findings.push_back("bpf_map_accessible|/sys/fs/bpf/map_netd_iface_index_name_map");
+        }
+        const char *bpfPath2 = "/sys/fs/bpf/netd_iface_index_name_map";
+        int bpfFd2 = open(bpfPath2, O_RDONLY);
+        if (bpfFd2 >= 0) {
+            close(bpfFd2);
+            findings.push_back("bpf_map_accessible|/sys/fs/bpf/netd_iface_index_name_map");
+        }
+    }
+
+    {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd >= 0) {
+            int opt = 1;
+            if (setsockopt(fd, IPPROTO_IP, IP_RECVERR, &opt, sizeof(opt)) < 0) {
+                if (errno == ENOPROTOOPT) {
+                } else if (errno == EACCES || errno == EPERM) {
+                    findings.push_back("unavailable|ip_recverr|denied");
+                }
+            }
+            close(fd);
         }
     }
 
@@ -1034,9 +1557,13 @@ const JNINativeMethod kMethods[] = {
     {"nativeNetlinkSockDiag", "(II)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkSockDiag)},
     {"nativeDetectRoot", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectRoot)},
     {"nativeDetectEmulator", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectEmulator)},
+    {"nativeDetectVpnProperties", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnProperties)},
+    {"nativeDetectVpnLeaks", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnLeaks)},
+    {"nativeDetectVpnAdvanced", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnAdvanced)},
+    {"nativeDetectVpnSyscalls", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnSyscalls)},
 };
 
-} // namespace
+} 
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
     JNIEnv *env = nullptr;

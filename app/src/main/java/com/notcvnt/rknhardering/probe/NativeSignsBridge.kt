@@ -40,6 +40,21 @@ object NativeSignsBridge {
     internal var detectEmulatorOverride: (() -> Array<String>)? = null
 
     @Volatile
+    internal var detectVpnPropertiesOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var detectVpnLeaksOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var detectVpnAdvancedOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var detectVpnSyscallsOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var runAllChecksJsonOverride: (() -> String?)? = null
+
+    @Volatile
     private var initialized = false
 
     @Volatile
@@ -141,6 +156,36 @@ object NativeSignsBridge {
         return runCatching { nativeDetectEmulator() }.getOrDefault(emptyArray())
     }
 
+    fun detectVpnProperties(): Array<String> {
+        detectVpnPropertiesOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectVpnProperties() }.getOrDefault(emptyArray())
+    }
+
+    fun detectVpnLeaks(): Array<String> {
+        detectVpnLeaksOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectVpnLeaks() }.getOrDefault(emptyArray())
+    }
+
+    fun detectVpnAdvanced(): Array<String> {
+        detectVpnAdvancedOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectVpnAdvanced() }.getOrDefault(emptyArray())
+    }
+
+    fun detectVpnSyscalls(): Array<String> {
+        detectVpnSyscallsOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return emptyArray()
+        return runCatching { nativeDetectVpnSyscalls() }.getOrDefault(emptyArray())
+    }
+
+    fun runAllChecksJson(): String? {
+        runAllChecksJsonOverride?.let { return it.invoke() }
+        if (!isLibraryLoaded()) return null
+        return runCatching { nativeRunAllChecksJson() }.getOrNull()
+    }
+
     internal fun resetForTests() {
         isLibraryLoadedOverride = null
         getIfAddrsOverride = null
@@ -154,6 +199,11 @@ object NativeSignsBridge {
         netlinkSockDiagOverride = null
         detectRootOverride = null
         detectEmulatorOverride = null
+        detectVpnPropertiesOverride = null
+        detectVpnLeaksOverride = null
+        detectVpnAdvancedOverride = null
+        detectVpnSyscallsOverride = null
+        runAllChecksJsonOverride = null
         initialized = false
         libraryLoaded = false
         lastLoadError = null
@@ -170,4 +220,9 @@ object NativeSignsBridge {
     private external fun nativeNetlinkSockDiag(family: Int, protocol: Int): Array<String>
     private external fun nativeDetectRoot(): Array<String>
     private external fun nativeDetectEmulator(): Array<String>
+    private external fun nativeDetectVpnProperties(): Array<String>
+    private external fun nativeDetectVpnLeaks(): Array<String>
+    private external fun nativeDetectVpnAdvanced(): Array<String>
+    private external fun nativeDetectVpnSyscalls(): Array<String>
+    private external fun nativeRunAllChecksJson(): String
 }

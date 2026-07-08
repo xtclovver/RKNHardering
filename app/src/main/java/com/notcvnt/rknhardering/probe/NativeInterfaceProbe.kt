@@ -69,6 +69,29 @@ data class NativeEmulatorFinding(
     val detail: String?,
 )
 
+data class NativeVpnPropertyFinding(
+    val kind: String,
+    val prop: String?,
+    val value: String?,
+)
+
+data class NativeVpnLeakFinding(
+    val kind: String,
+    val detail: String?,
+    val count: Int = 0,
+)
+
+data class NativeVpnAdvancedFinding(
+    val kind: String,
+    val detail: String?,
+    val count: Int = 0,
+)
+
+data class NativeVpnSyscallFinding(
+    val kind: String,
+    val detail: String?,
+)
+
 object NativeInterfaceProbe {
     private const val IPV4_DEFAULT_DESTINATION = "00000000"
     private const val IPV6_DEFAULT_DESTINATION = "00000000000000000000000000000000"
@@ -382,5 +405,88 @@ object NativeInterfaceProbe {
     fun collectEmulatorFindings(): List<NativeEmulatorFinding> {
         val rows = NativeSignsBridge.detectEmulator()
         return parseEmulatorFindings(rows)
+    }
+
+    fun parseVpnPropertyFindings(rows: Array<String>): List<NativeVpnPropertyFinding> {
+        return rows.mapNotNull { row ->
+            val sep = row.indexOf('|')
+            if (sep <= 0) return@mapNotNull null
+            val kind = row.substring(0, sep)
+            val rest = row.substring(sep + 1)
+            val eq = rest.indexOf('=')
+            if (eq <= 0) {
+                NativeVpnPropertyFinding(kind = kind, prop = rest, value = null)
+            } else {
+                NativeVpnPropertyFinding(
+                    kind = kind,
+                    prop = rest.substring(0, eq),
+                    value = rest.substring(eq + 1).takeIf { it.isNotBlank() },
+                )
+            }
+        }
+    }
+
+    fun collectVpnPropertyFindings(): List<NativeVpnPropertyFinding> {
+        val rows = NativeSignsBridge.detectVpnProperties()
+        return parseVpnPropertyFindings(rows)
+    }
+
+    fun parseVpnLeakFindings(rows: Array<String>): List<NativeVpnLeakFinding> {
+        return rows.mapNotNull { row ->
+            val sep = row.indexOf('|')
+            if (sep <= 0) return@mapNotNull null
+            val kind = row.substring(0, sep)
+            val rest = row.substring(sep + 1)
+            val sep2 = rest.lastIndexOf('|')
+            if (sep2 > 0) {
+                val detail = rest.substring(0, sep2)
+                val count = rest.substring(sep2 + 1).toIntOrNull() ?: 0
+                NativeVpnLeakFinding(kind = kind, detail = detail, count = count)
+            } else {
+                NativeVpnLeakFinding(kind = kind, detail = rest)
+            }
+        }
+    }
+
+    fun collectVpnLeakFindings(): List<NativeVpnLeakFinding> {
+        val rows = NativeSignsBridge.detectVpnLeaks()
+        return parseVpnLeakFindings(rows)
+    }
+
+    fun parseVpnAdvancedFindings(rows: Array<String>): List<NativeVpnAdvancedFinding> {
+        return rows.mapNotNull { row ->
+            val sep = row.indexOf('|')
+            if (sep <= 0) return@mapNotNull null
+            val kind = row.substring(0, sep)
+            val rest = row.substring(sep + 1)
+            val sep2 = rest.lastIndexOf('|')
+            if (sep2 > 0) {
+                val detail = rest.substring(0, sep2)
+                val count = rest.substring(sep2 + 1).toIntOrNull() ?: 0
+                NativeVpnAdvancedFinding(kind = kind, detail = detail, count = count)
+            } else {
+                NativeVpnAdvancedFinding(kind = kind, detail = rest)
+            }
+        }
+    }
+
+    fun collectVpnAdvancedFindings(): List<NativeVpnAdvancedFinding> {
+        val rows = NativeSignsBridge.detectVpnAdvanced()
+        return parseVpnAdvancedFindings(rows)
+    }
+
+    fun parseVpnSyscallFindings(rows: Array<String>): List<NativeVpnSyscallFinding> {
+        return rows.mapNotNull { row ->
+            val sep = row.indexOf('|')
+            if (sep <= 0) return@mapNotNull null
+            val kind = row.substring(0, sep)
+            val detail = row.substring(sep + 1).takeIf { it.isNotBlank() }
+            NativeVpnSyscallFinding(kind = kind, detail = detail)
+        }
+    }
+
+    fun collectVpnSyscallFindings(): List<NativeVpnSyscallFinding> {
+        val rows = NativeSignsBridge.detectVpnSyscalls()
+        return parseVpnSyscallFindings(rows)
     }
 }

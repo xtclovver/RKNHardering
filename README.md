@@ -546,6 +546,59 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 Любой из сигналов даёт `needsReview = true` (`EvidenceSource.SANDBOX_ISOLATION`), **никогда** `detected`.
 
+#### 12.5 VPN-сигналы (`evaluateVpnSignals`)
+
+Комплексная проверка VPN через нативные JNI-вызовы. Все проверки работают на **нерутованных** устройствах — при отсутствии прав (SELinux/capabilities) проверка помечается как `unavailable` и не крашится.
+
+**Свойства и файлы (`nativeDetectVpnProperties`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| DNS-свойства | `net.dns1-4`, `net.vpn.dns1-2`, `dhcp.tun0.dns1-2` | `__system_property_get` |
+| VPN-свойства | `net.vpn.default_iface`, `vpn.enable`, `net.tun0.dns1-2`, `net.ppp0.dns1-2` | `__system_property_get` |
+| vpnhide файлы | `/data/local/vpnhide`, `/data/adb/vpnhide`, `/data/local/bypass` и др. | `access(F_OK)` |
+| LSPosed/Xposed | `/data/adb/lspd`, `/data/adb/modules/lsposed`, `/data/adb/ksu/modules/lsposed` | `access(F_OK)` |
+| Hook-свойства | `persist.sys.lspd`, `persist.sys.lsposed`, `ro.lsposed.hidden` | `__system_property_get` |
+
+Высокая уверенность: `vpn_prop`, `vpnhide`, `hook_prop`. Средняя: остальные.
+
+**Утечки через /proc (`nativeDetectVpnLeaks`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| TCP VPN-порты | Соединения на портах 443, 1194, 51820, 8443, 1723, 500, 4500 | `/proc/net/tcp[6]` |
+| UDP VPN-порты | Сокеты на портах 51820 (WireGuard), 1194 (OpenVPN), 500, 4500 | `/proc/net/udp[6]` |
+| if_inet6 | Интерфейсы tun/wg/ppp/tap в `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| Route VPN | Маршруты через tun/wg/ppp/tap | `/proc/net/route` |
+| FIB trie | `/32 host` записи (не LOCAL) — хост-маршруты VPN | `/proc/net/fib_trie` |
+
+Высокая уверенность: `udp_vpn_port`, `route_vpn_iface`, `arp_vpn_iface`, `inet6_vpn_iface`.
+
+**Продвинутые проверки (`nativeDetectVpnAdvanced`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| ARP VPN | Записи на tun/wg/ppp интерфейсах | `/proc/net/arp` |
+| Sysctl | `rp_filter=0`, `ip_forward=1`, `forwarding=1` | `/proc/sys/net/ipv4/conf/*/rp_filter` и др. |
+| ESTABLISHED VPN | Соединения к приватным IP на VPN-портах | `/proc/net/tcp` |
+
+**Нетрадиционные syscall-проверки (`nativeDetectVpnSyscalls`):**
+
+Проверки через прямые netlink-запросы и пробные соединения. При отсутствии прав возвращают `unavailable`:
+
+| Проверка | Метод | Что обнаруживает |
+|----------|-------|-------------------|
+| RTM_GETRULE | Netlink dump роутинг-правил | VPN policy routing rules |
+| RTM_GETQDISC | Netlink dump queueing discipline | VPN qdisc туннели |
+| RTM_GETNEIGH | Netlink dump таблицы соседей | Скрытые MAC-адреса (нулевые LLADDR) |
+| TCP_INFO MSS | Connect к 8.8.8.8:443, чтение `snd_mss` | Снижение MSS (признак туннеля) |
+| SO_BINDTODEVICE | Пробный bind на несуществующий интерфейс | Перехват setsockopt VPN-хуком |
+| Loopback port bind | Попытка занять порты 51820/1194/443/8443 | Конфликты портов (VPN listener) |
+| BPF OBJ GET | Попытка открыть `/sys/fs/bpf/` карты | Доступ к BPF-картам netd |
+| IP_RECVERR | Пробный setsockopt IP_RECVERR | Перехват IP_RECVERR VPN-хуком |
+
+Высокая уверенность: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
+
 ---
 
 ## Вердикт (`VerdictEngine`)

@@ -519,6 +519,59 @@ Identifies contexts where another user's or profile's VPN is invisible to networ
 
 Any of these signals yields `needsReview = true` (`EvidenceSource.SANDBOX_ISOLATION`), never `detected`.
 
+#### 12.5 VPN Signals (`evaluateVpnSignals`)
+
+Comprehensive VPN detection via native JNI calls. All checks work on **non-rooted** devices — when permissions are missing (SELinux/capabilities), the check is marked as `unavailable` and does not crash.
+
+**Properties and files (`nativeDetectVpnProperties`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| DNS properties | `net.dns1-4`, `net.vpn.dns1-2`, `dhcp.tun0.dns1-2` | `__system_property_get` |
+| VPN properties | `net.vpn.default_iface`, `vpn.enable`, `net.tun0.dns1-2`, `net.ppp0.dns1-2` | `__system_property_get` |
+| vpnhide files | `/data/local/vpnhide`, `/data/adb/vpnhide`, `/data/local/bypass` etc. | `access(F_OK)` |
+| LSPosed/Xposed | `/data/adb/lspd`, `/data/adb/modules/lsposed`, `/data/adb/ksu/modules/lsposed` | `access(F_OK)` |
+| Hook properties | `persist.sys.lspd`, `persist.sys.lsposed`, `ro.lsposed.hidden` | `__system_property_get` |
+
+High confidence: `vpn_prop`, `vpnhide`, `hook_prop`. Medium: others.
+
+**Leaks via /proc (`nativeDetectVpnLeaks`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| TCP VPN ports | Connections on ports 443, 1194, 51820, 8443, 1723, 500, 4500 | `/proc/net/tcp[6]` |
+| UDP VPN ports | Sockets on ports 51820 (WireGuard), 1194 (OpenVPN), 500, 4500 | `/proc/net/udp[6]` |
+| if_inet6 | tun/wg/ppp/tap interfaces in `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| Route VPN | Routes via tun/wg/ppp/tap | `/proc/net/route` |
+| FIB trie | `/32 host` entries (non-LOCAL) — VPN host routes | `/proc/net/fib_trie` |
+
+High confidence: `udp_vpn_port`, `route_vpn_iface`, `arp_vpn_iface`, `inet6_vpn_iface`.
+
+**Advanced checks (`nativeDetectVpnAdvanced`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| ARP VPN | Entries on tun/wg/ppp interfaces | `/proc/net/arp` |
+| Sysctl | `rp_filter=0`, `ip_forward=1`, `forwarding=1` | `/proc/sys/net/ipv4/conf/*/rp_filter` etc. |
+| ESTABLISHED VPN | Connections to private IPs on VPN ports | `/proc/net/tcp` |
+
+**Non-traditional syscall checks (`nativeDetectVpnSyscalls`):**
+
+Checks via direct netlink requests and probe connections. Returns `unavailable` when permissions are missing:
+
+| Check | Method | What it detects |
+|-------|--------|-----------------|
+| RTM_GETRULE | Netlink dump of routing policy rules | VPN policy routing rules |
+| RTM_GETQDISC | Netlink dump of queueing disciplines | VPN qdisc tunnels |
+| RTM_GETNEIGH | Netlink dump of neighbor table | Hidden MAC addresses (zero LLADDR) |
+| TCP_INFO MSS | Connect to 8.8.8.8:443, read `snd_mss` | MSS reduction (tunnel indicator) |
+| SO_BINDTODEVICE | Probe bind to non-existent interface | VPN hook intercepting setsockopt |
+| Loopback port bind | Try to claim ports 51820/1194/443/8443 | Port conflicts (VPN listener) |
+| BPF OBJ GET | Try to open `/sys/fs/bpf/` maps | Access to netd BPF maps |
+| IP_RECVERR | Probe setsockopt IP_RECVERR | VPN hook intercepting IP_RECVERR |
+
+High confidence: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
+
 ---
 
 ## Verdict (`VerdictEngine`)

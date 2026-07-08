@@ -660,6 +660,33 @@
     <string name="checker_native_isolation_clone">Приложение работает в клонированном/dual-app контейнере (пользователь %1$d); VPN в основном профиле не обнаруживается</string>
     <string name="checker_native_isolation_work_profile">Приложение работает в управляемом рабочем профиле; VPN в личном профиле не обнаруживается без root</string>
 
+    <!-- NativeSignsChecker: VPN сигналы -->
+    <string name="checker_native_vpn_signal">VPN сигнал: %1$s</string>
+    <string name="vpn_desc_prop">Обнаружены VPN-свойства системы</string>
+    <string name="vpn_desc_vpnhide">Файл сокрытия VPN</string>
+    <string name="vpn_desc_hook">Свойства хук-фреймворков</string>
+    <string name="vpn_desc_dns">DNS-свойства указывают на VPN</string>
+    <string name="vpn_desc_file">Файлы VPN-инструментов</string>
+    <string name="vpn_desc_lsposed">Обнаружена LSPosed/Xposed среда</string>
+    <string name="vpn_desc_tcp_port">TCP-соединение на VPN-порту</string>
+    <string name="vpn_desc_udp_port">UDP-сокет на VPN-порту</string>
+    <string name="vpn_desc_inet6">IPv6-интерфейс VPN в /proc</string>
+    <string name="vpn_desc_route">Маршрут через VPN-интерфейс</string>
+    <string name="vpn_desc_arp">ARP-запись VPN-интерфейса</string>
+    <string name="vpn_desc_forwarding">IP-форвардинг включён</string>
+    <string name="vpn_desc_rpfilter">Reverse path filter отключен</string>
+    <string name="vpn_desc_established">Установленное соединение к приватному IP через VPN-порт</string>
+    <string name="vpn_desc_policy_rules">Найдены VPN-правила роутинга</string>
+    <string name="vpn_desc_qdisc">Обнаружена VPN queue discipline</string>
+    <string name="vpn_desc_hidden_mac">Скрытые MAC-адреса в таблице соседей</string>
+    <string name="vpn_desc_mss">Подозрительно низкий MSS (возможно туннель)</string>
+    <string name="vpn_desc_bindtodevice">Перехват setsockopt (VPN-хук)</string>
+    <string name="vpn_desc_port_conflict">Конфликт портов на loopback (VPN listener)</string>
+    <string name="vpn_desc_bpf">Доступ к BPF-картам netd</string>
+    <string name="vpn_desc_recverr">Перехват IP_RECVERR (VPN-хук)</string>
+    <string name="vpn_status_not_found">не обнаружено</string>
+    <string name="vpn_status_unavailable">недоступно (нет прав)</string>
+
     <!-- App update checker -->
     <string name="update_dialog_title">Доступно обновление</string>
     <string name="update_dialog_message">Установленная версия: %1$s\nАктуальная версия: %2$s</string>
