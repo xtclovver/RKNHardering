@@ -37,55 +37,64 @@ object VpnNativeDetectorChecker {
         "gso_failed", "gso_send_failed",
     )
 
+    private fun libraryUnavailableResult(context: Context): CategoryResult {
+        val loadError = NativeSignsBridge.lastLoadErrorMessage()
+        val description = if (loadError != null) {
+            context.getString(R.string.checker_vpn_detector_unavailable_with_reason, loadError)
+        } else {
+            context.getString(R.string.checker_vpn_detector_unavailable)
+        }
+        return CategoryResult(
+            name = context.getString(R.string.checker_vpn_detector_category_name),
+            detected = false,
+            findings = listOf(Finding(description = description, isInformational = true)),
+            needsReview = false,
+            evidence = emptyList(),
+        )
+    }
+
+    private fun mapSource(kind: String): EvidenceSource = when (kind) {
+        in NETWORK_KINDS -> EvidenceSource.NATIVE_SOCKET
+        in INDIRECT_KINDS -> EvidenceSource.NATIVE_ROUTE
+        else -> EvidenceSource.NATIVE_INTERFACE
+    }
+
+    private fun evaluateItem(
+        context: Context,
+        item: ParsedRow,
+        findings: MutableList<Finding>,
+        evidence: MutableList<com.notcvnt.rknhardering.model.EvidenceItem>,
+    ) {
+        val isHigh = item.kind in HIGH_CONFIDENCE
+        val confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM
+        val source = mapSource(item.kind)
+        findings += Finding(
+            description = describe(context, item.kind, item.detail),
+            detected = isHigh,
+            needsReview = !isHigh,
+            source = source,
+            confidence = confidence,
+        )
+        evidence += com.notcvnt.rknhardering.model.EvidenceItem(
+            source = source,
+            detected = true,
+            confidence = confidence,
+            description = describe(context, item.kind, item.detail),
+        )
+    }
+
     suspend fun check(context: Context): CategoryResult = withContext(Dispatchers.IO) {
         NativeSignsBridge.initIfNeeded()
-        if (!NativeSignsBridge.isLibraryLoaded()) {
-            val loadError = NativeSignsBridge.lastLoadErrorMessage()
-            val description = if (loadError != null) {
-                context.getString(R.string.checker_vpn_detector_unavailable_with_reason, loadError)
-            } else {
-                context.getString(R.string.checker_vpn_detector_unavailable)
-            }
-            return@withContext CategoryResult(
-                name = context.getString(R.string.checker_vpn_detector_category_name),
-                detected = false,
-                findings = listOf(Finding(description = description, isInformational = true)),
-                needsReview = false,
-                evidence = emptyList(),
-            )
-        }
+        if (!NativeSignsBridge.isLibraryLoaded()) return@withContext libraryUnavailableResult(context)
 
         val rows = runCatching { NativeSignsBridge.detectVpnDetector() }.getOrDefault(emptyArray())
         val parsed = rows.mapNotNull { parseRow(it) }
 
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<com.notcvnt.rknhardering.model.EvidenceItem>()
-        var detected = false
-        var needsReview = false
 
         for (item in parsed) {
-            val isHigh = item.kind in HIGH_CONFIDENCE
-            val confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM
-            val source = when {
-                item.kind in NETWORK_KINDS -> EvidenceSource.NATIVE_SOCKET
-                item.kind in INDIRECT_KINDS -> EvidenceSource.NATIVE_ROUTE
-                else -> EvidenceSource.NATIVE_INTERFACE
-            }
-            findings += Finding(
-                description = describe(context, item.kind, item.detail),
-                detected = isHigh,
-                needsReview = !isHigh,
-                source = source,
-                confidence = confidence,
-            )
-            evidence += com.notcvnt.rknhardering.model.EvidenceItem(
-                source = source,
-                detected = true,
-                confidence = confidence,
-                description = describe(context, item.kind, item.detail),
-            )
-            detected = detected || isHigh
-            needsReview = needsReview || !isHigh
+            evaluateItem(context, item, findings, evidence)
         }
 
         if (findings.isEmpty()) {
@@ -97,9 +106,9 @@ object VpnNativeDetectorChecker {
 
         CategoryResult(
             name = context.getString(R.string.checker_vpn_detector_category_name),
-            detected = detected,
+            detected = findings.any { it.detected },
             findings = findings,
-            needsReview = needsReview,
+            needsReview = findings.any { it.needsReview },
             evidence = evidence,
         )
     }
