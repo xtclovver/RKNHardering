@@ -30,4 +30,14 @@ class NetworkInterfacePatternsTest {
         assertTrue(NetworkInterfacePatterns.isIpsecInterface("xfrm0"))
         assertFalse(NetworkInterfacePatterns.isVpnInterface("xfrm0"))
     }
+
+    @Test
+    fun `classifies cellular modem interfaces`() {
+        val modemNames = listOf("rmnet_data0", "ccmni0", "ccemni1", "pdp0", "seth_lte0", "v4-ccmni0")
+        for (name in modemNames) {
+            assertTrue("expected $name to be cellular", NetworkInterfacePatterns.isCellularModemInterface(name))
+        }
+        assertFalse(NetworkInterfacePatterns.isCellularModemInterface("wlan0"))
+        assertFalse(NetworkInterfacePatterns.isCellularModemInterface("eth0"))
+    }
 }

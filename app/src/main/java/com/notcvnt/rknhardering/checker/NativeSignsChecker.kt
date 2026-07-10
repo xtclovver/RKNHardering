@@ -39,6 +39,7 @@ object NativeSignsChecker {
     )
 
     private const val ARPHRD_TUNTAP = 65534
+    private const val RTPROT_KERNEL = 2
 
     private val HIGH_CONFIDENCE_ROOT_MOUNT_MARKERS = setOf(
         "magisk",
@@ -548,16 +549,19 @@ object NativeSignsChecker {
     }
 
     /**
-     * Excludes kernel-managed entries from the `local` routing table, which the kernel
-     * auto-creates for every configured interface address (issue #78). These are NOT
-     * VPN host-route leaks:
+     * Excludes kernel-managed entries that are not VPN host-route leaks:
+     *  - every entry from the kernel `local` table (255), even if a vendor reports
+     *    incomplete type/scope metadata
      *  - `type=local` (the interface's own address) / `broadcast` / `anycast` / `multicast`
      *  - `scope=host` (the route never leaves the box)
      *  - `dst == prefsrc` (route destination equals the interface's own source address)
+     *  - kernel-created link routes on cellular modem interfaces; carriers use these
+     *    for service addressing and they exist independently of a VPN (issue #80)
      * A genuine VPN server host-route leak is a `unicast` route to a *foreign* public IP
      * (dst != prefsrc) in the main/policy tables.
      */
     internal fun isKernelManagedLocalRoute(route: NativeRouteEntry): Boolean {
+        if (route.table == 255) return true
         when (route.type?.lowercase()) {
             "local", "broadcast", "anycast", "multicast" -> return true
         }
@@ -565,6 +569,13 @@ object NativeSignsChecker {
         val dst = route.destination
         val src = route.prefSrc
         if (dst != null && src != null && dst == src) return true
+        if (
+            route.protocol == RTPROT_KERNEL &&
+            route.scope?.lowercase() == "link" &&
+            NetworkInterfacePatterns.isCellularModemInterface(route.interfaceName)
+        ) {
+            return true
+        }
         return false
     }
 

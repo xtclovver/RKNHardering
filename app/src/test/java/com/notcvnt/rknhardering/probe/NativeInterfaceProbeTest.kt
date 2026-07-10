@@ -147,13 +147,28 @@ class NativeInterfaceProbeTest {
     @Test
     fun `parseNetlinkRoutes preserves prefix length for host routes`() {
         val rows = arrayOf(
-            "route|family=2|dst=203.0.113.7/32|via=192.168.1.1|dev=wlan0|oif=5",
+            "route|family=2|dst=203.0.113.7/32|via=192.168.1.1|dev=wlan0|oif=5|proto=2",
             "route|family=2|dst=10.8.0.0/24|dev=tun0|oif=7",
         )
         val parsed = NativeInterfaceProbe.parseNetlinkRoutes(rows)
         val hostRoute = parsed.first { it.destination == "203.0.113.7" }
         assertEquals(32, hostRoute.prefixLen)
+        assertEquals(2, hostRoute.protocol)
         val subnet = parsed.first { it.destination == "10.8.0.0" }
         assertEquals(24, subnet.prefixLen)
+    }
+
+    @Test
+    fun `parseNetlinkRoutes recognizes native textual address families`() {
+        val rows = arrayOf(
+            "route|family=inet|dst=default/0|dev=rmnet_data0|oif=5|table=254|scope=global|type=unicast|proto=3",
+            "route|family=inet6|dst=default/0|dev=rmnet_data0|oif=5|table=254|scope=global|type=unicast|proto=3",
+        )
+
+        val parsed = NativeInterfaceProbe.parseNetlinkRoutes(rows)
+
+        assertEquals(listOf(2, 10), parsed.map { it.family })
+        assertEquals(listOf(8, 32), parsed.map { it.destinationHex.length })
+        assertTrue(parsed.all { it.isDefault })
     }
 }

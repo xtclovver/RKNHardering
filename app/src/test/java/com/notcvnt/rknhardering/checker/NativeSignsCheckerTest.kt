@@ -247,6 +247,57 @@ class NativeSignsCheckerTest {
     }
 
     @Test
+    fun `carrier service host routes do not emit VPN server leak evidence`() {
+        val routes = listOf(
+            NativeRouteEntry(
+                interfaceName = "ccmni0", destinationHex = "1A1272F5", gatewayHex = "00000000",
+                flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+                family = 2, destination = "26.18.114.245", scope = "link",
+                type = "unicast", table = 1008, prefixLen = 32, protocol = 2,
+            ),
+            NativeRouteEntry(
+                interfaceName = "rmnet_data0", destinationHex = "1A1272F5", gatewayHex = "00000000",
+                flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+                family = 2, destination = "26.18.114.245", scope = "link",
+                type = "unicast", table = 1009, prefixLen = 32, protocol = 2,
+            ),
+        )
+
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, routes)
+
+        assertFalse(outcome.detected)
+        assertFalse(outcome.evidence.any { it.source == EvidenceSource.NATIVE_ROUTE })
+    }
+
+    @Test
+    fun `malformed local table route does not emit VPN server leak evidence`() {
+        val route = NativeRouteEntry(
+            interfaceName = "ccmni0", destinationHex = "1A1272F5", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "26.18.114.245", scope = "link",
+            type = "unicast", table = 255, prefixLen = 32,
+        )
+
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
+
+        assertFalse(outcome.detected)
+    }
+
+    @Test
+    fun `static public host route via cellular interface remains detectable`() {
+        val route = NativeRouteEntry(
+            interfaceName = "ccmni0", destinationHex = "1A1272F5", gatewayHex = "00000000",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "26.18.114.245", scope = "global",
+            type = "unicast", table = 1008, prefixLen = 32, protocol = 4,
+        )
+
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
+
+        assertTrue(outcome.detected)
+    }
+
+    @Test
     fun `interface with tuntap type and nonstandard name emits NATIVE_INTERFACE evidence`() {
         val ifaces = listOf(
             NativeInterface(

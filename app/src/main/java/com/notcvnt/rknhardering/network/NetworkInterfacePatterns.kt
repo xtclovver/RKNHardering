@@ -17,6 +17,14 @@ object NetworkInterfacePatterns {
 
     val IPSEC_INTERFACE_PATTERN: Regex = Regex("^(ipsec|xfrm).*")
 
+    private val CELLULAR_MODEM_INTERFACES: List<Regex> = listOf(
+        Regex("^rmnet.*"),
+        Regex("^ccmni.*"),
+        Regex("^ccemni.*"),
+        Regex("^pdp.*"),
+        Regex("^seth.*"),
+    )
+
     val STANDARD_INTERFACES: List<Regex> = listOf(
         Regex("^wlan.*"),
         Regex("^rmnet.*"),
@@ -57,5 +65,11 @@ object NetworkInterfacePatterns {
         val canonical = NetworkInterfaceNameNormalizer.canonicalName(name)
         if (canonical.isNullOrBlank()) return false
         return STANDARD_INTERFACES.any { it.matches(canonical) }
+    }
+
+    fun isCellularModemInterface(name: String?): Boolean {
+        val canonical = NetworkInterfaceNameNormalizer.canonicalName(name)
+        if (canonical.isNullOrBlank()) return false
+        return CELLULAR_MODEM_INTERFACES.any { it.matches(canonical) }
     }
 }

@@ -42,6 +42,7 @@ data class NativeRouteEntry(
     val type: String? = null,
     val table: Int? = null,
     val prefixLen: Int? = null,
+    val protocol: Int? = null,
 ) {
     enum class RouteSource { PROC, NETLINK }
 }
@@ -93,6 +94,8 @@ data class NativeVpnSyscallFinding(
 )
 
 object NativeInterfaceProbe {
+    private const val IPV4_ADDRESS_FAMILY = 2
+    private const val IPV6_ADDRESS_FAMILY = 10
     private const val IPV4_DEFAULT_DESTINATION = "00000000"
     private const val IPV6_DEFAULT_DESTINATION = "00000000000000000000000000000000"
     private const val IPV6_DEFAULT_PREFIX_LENGTH = "00"
@@ -204,13 +207,14 @@ object NativeInterfaceProbe {
             var scope: String? = null
             var type: String? = null
             var table: Int? = null
+            var protocol: Int? = null
             for (token in tokens) {
                 val eq = token.indexOf('=')
                 if (eq <= 0) continue
                 val key = token.substring(0, eq)
                 val value = token.substring(eq + 1)
                 when (key) {
-                    "family" -> family = value.toIntOrNull() ?: 0
+                    "family" -> family = parseNetlinkFamily(value)
                     "dst" -> {
                         val slash = value.indexOf('/')
                         if (slash > 0) {
@@ -228,6 +232,7 @@ object NativeInterfaceProbe {
                     "scope" -> scope = value
                     "type" -> type = value
                     "table" -> table = value.toIntOrNull()
+                    "proto" -> protocol = value.toIntOrNull()
                 }
             }
             val iface = dev ?: oif?.let { "if$it" } ?: continue
@@ -252,10 +257,17 @@ object NativeInterfaceProbe {
                     type = type,
                     table = table,
                     prefixLen = prefixLen,
+                    protocol = protocol,
                 ),
             )
         }
         return result
+    }
+
+    private fun parseNetlinkFamily(value: String): Int = when (value) {
+        "inet" -> IPV4_ADDRESS_FAMILY
+        "inet6" -> IPV6_ADDRESS_FAMILY
+        else -> value.toIntOrNull() ?: 0
     }
 
     fun collectNetlinkRoutes(): List<NativeRouteEntry> {

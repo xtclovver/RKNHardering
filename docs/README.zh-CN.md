@@ -502,7 +502,7 @@ TLS 步骤使用信任所有证书的 X.509 manager，因为目标是检测 DPI 
 
 #### 12.2 host-route /32 启发式
 
-在路由表（NETLINK）中查找非默认路由，其目标为公开可路由地址，前缀长度为 `/32`（IPv4）或 `/128`（IPv6），且经由物理接口（`wlan0`、`rmnet`、`eth0`）。这是 VPN 客户端绕过隧道直连 VPN 服务器 IP 的经典主机路由，会泄露真实 VPN 服务器地址。结果：`detected = true`（`EvidenceSource.NATIVE_ROUTE`）。
+在路由表（NETLINK）中查找非默认路由，其目标为公开可路由地址，前缀长度为 `/32`（IPv4）或 `/128`（IPv6），且经由物理接口（`wlan0`、`rmnet`、`eth0`）。这是 VPN 客户端绕过隧道直连 VPN 服务器 IP 的经典主机路由，会泄露真实 VPN 服务器地址。`local` 表中的条目以及内核在调制解调器接口（`rmnet*`、`ccmni*`、`pdp*`、`seth*`）上创建的 link 路由会被排除，因为运营商会独立于 VPN 使用这些路由进行内部服务寻址。这些接口上的静态全局 host-route 仍会作为候选项。结果：`detected = true`（`EvidenceSource.NATIVE_ROUTE`）。
 
 #### 12.3 模拟器检测器
 
