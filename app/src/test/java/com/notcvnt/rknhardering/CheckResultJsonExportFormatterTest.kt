@@ -5,6 +5,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.export.CheckResultJsonExportFormatter
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
+import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.EvidenceConfidence
+import com.notcvnt.rknhardering.model.EvidenceItem
+import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import org.json.JSONObject
@@ -59,6 +63,60 @@ class CheckResultJsonExportFormatterTest {
         assertTrue(outbound.getBoolean("publicKeyPresent"))
         assertFalse(outbound.has("uuid"))
         assertFalse(outbound.has("publicKey"))
+    }
+
+    @Test
+    fun `json export includes deep native detector findings and evidence`() {
+        val result = exportRichCheckResult().copy(
+            nativeSigns = CategoryResult(
+                name = "Native signs",
+                detected = true,
+                findings = listOf(
+                    Finding(
+                        description = "backpressure: 50000 packets",
+                        isInformational = true,
+                        source = EvidenceSource.NATIVE_ROUTE,
+                        confidence = EvidenceConfidence.LOW,
+                    ),
+                    Finding(
+                        description = "bindtodevice_leak: tun0",
+                        detected = true,
+                        source = EvidenceSource.NATIVE_SOCKET,
+                        confidence = EvidenceConfidence.HIGH,
+                    ),
+                ),
+                evidence = listOf(
+                    EvidenceItem(
+                        source = EvidenceSource.NATIVE_SOCKET,
+                        detected = true,
+                        confidence = EvidenceConfidence.HIGH,
+                        description = "bindtodevice_leak: tun0",
+                    ),
+                ),
+            ),
+        )
+
+        val json = JSONObject(
+            CheckResultJsonExportFormatter.format(
+                context = context,
+                snapshot = createCompletedExportSnapshot(
+                    result = result,
+                    privacyMode = false,
+                    finishedAtMillis = 0L,
+                ),
+                appVersionName = "1.0",
+                buildType = "debug",
+            ),
+        )
+        val nativeSigns = json.getJSONObject("results").getJSONObject("nativeSigns")
+        val findings = nativeSigns.getJSONArray("findings")
+        val evidence = nativeSigns.getJSONArray("evidence")
+
+        assertEquals("backpressure: 50000 packets", findings.getJSONObject(0).getString("description"))
+        assertTrue(findings.getJSONObject(0).getBoolean("isInformational"))
+        assertEquals("bindtodevice_leak: tun0", findings.getJSONObject(1).getString("description"))
+        assertEquals("NATIVE_SOCKET", evidence.getJSONObject(0).getString("source"))
+        assertEquals("bindtodevice_leak: tun0", evidence.getJSONObject(0).getString("description"))
     }
 
     @Test

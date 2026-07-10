@@ -678,7 +678,6 @@
     <string name="vpn_desc_udp_port_physical">تداخل پورت UDP روی رابط فیزیکی</string>
     <string name="vpn_desc_trim_oracle">عدم تطابق bind probe و RTM_GETLINK</string>
     <string name="vpn_desc_ifindexname">رابط VPN از طریق if_indextoname</string>
-    <string name="vpn_desc_split_tunnel">قوانین مسیریابی UID برای split tunneling</string>
     <string name="vpn_desc_pmtu_mss">تحلیل UDP PMTU و TCP MSS</string>
     <string name="vpn_desc_udp_pmtu_ok">ارسال UDP موفق (بدون مشکل PMTU)</string>
     <string name="vpn_desc_udp_pmtu_fail">ارسال UDP ناموفق (مشکل PMTU)</string>
@@ -686,8 +685,8 @@
     <string name="vpn_desc_traceroute">تست traceroute (ICMP/TTL)</string>
     <string name="vpn_desc_timing_oracle">ARM CNTVCT timing oracle</string>
     <string name="vpn_desc_backpressure">Backpressure تحت بار مداوم</string>
-    <string name="vpn_desc_gso_failed">ارسال GSO large ناموفق (VPN شناسایی شد)</string>
-    <string name="vpn_desc_gso_send_failed">ارسال GSO ناموفق (VPN شناسایی شد)</string>
+    <string name="vpn_desc_gso_failed">پشتیبانی GSO در دسترس نیست (فقط تشخیصی)</string>
+    <string name="vpn_desc_gso_send_failed">ارسال GSO ناموفق بود (فقط تشخیصی)</string>
     <string name="vpn_desc_gso_ok">GSO پشتیبانی می‌شود (رابط عادی)</string>
     <string name="vpn_desc_hw_timestamp">بررسی تایم‌استمپینگ سخت‌افزاری</string>
     <string name="vpn_status_not_found">یافت نشد</string>

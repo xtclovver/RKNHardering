@@ -2,8 +2,10 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
+import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
@@ -32,9 +34,14 @@ object VpnNativeDetectorChecker {
     private val HIGH_CONFIDENCE = setOf(
         "sysfs_vpn_leak", "getifaddrs_vpn", "sysclassnet_vpn", "rtm_getlink_vpn",
         "proc_if_inet6_vpn", "proc_ipv6_route_vpn", "proc_net_dev_vpn",
-        "ifindexname_vpn", "vpn_policy_rules_netlink", "split_tunnel_uid",
+        "ifindexname_vpn", "vpn_policy_rules_netlink",
         "bindtodevice_leak", "getsockname_leak", "udp_port_conflict_physical",
-        "gso_failed", "gso_send_failed",
+    )
+
+    private val INFORMATIONAL_KINDS = setOf(
+        "route_count", "pmtu_mss_combined", "udp_pmtu_ok", "normal_pmtu",
+        "timing_oracle", "backpressure", "gso_failed", "gso_send_failed",
+        "gso_ok", "hw_timestamp",
     )
 
     private fun libraryUnavailableResult(context: Context): CategoryResult {
@@ -63,35 +70,51 @@ object VpnNativeDetectorChecker {
         context: Context,
         item: ParsedRow,
         findings: MutableList<Finding>,
-        evidence: MutableList<com.notcvnt.rknhardering.model.EvidenceItem>,
+        evidence: MutableList<EvidenceItem>,
     ) {
+        val description = describe(context, item.kind, item.detail)
+        val source = mapSource(item.kind)
+        if (item.kind in INFORMATIONAL_KINDS) {
+            findings += Finding(
+                description = description,
+                isInformational = true,
+                source = source,
+                confidence = EvidenceConfidence.LOW,
+            )
+            return
+        }
+
         val isHigh = item.kind in HIGH_CONFIDENCE
         val confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM
-        val source = mapSource(item.kind)
         findings += Finding(
-            description = describe(context, item.kind, item.detail),
+            description = description,
             detected = isHigh,
             needsReview = !isHigh,
             source = source,
             confidence = confidence,
         )
-        evidence += com.notcvnt.rknhardering.model.EvidenceItem(
+        evidence += EvidenceItem(
             source = source,
             detected = true,
             confidence = confidence,
-            description = describe(context, item.kind, item.detail),
+            description = description,
         )
     }
 
     suspend fun check(context: Context): CategoryResult = withContext(Dispatchers.IO) {
+        val executionContext = ScanExecutionContext.currentOrDefault()
+        executionContext.throwIfCancelled()
         NativeSignsBridge.initIfNeeded()
         if (!NativeSignsBridge.isLibraryLoaded()) return@withContext libraryUnavailableResult(context)
 
-        val rows = runCatching { NativeSignsBridge.detectVpnDetector() }.getOrDefault(emptyArray())
+        val rows = runCatching {
+            NativeSignsBridge.detectVpnDetector(executionContext.cancellationSignal)
+        }.getOrDefault(emptyArray())
+        executionContext.throwIfCancelled()
         val parsed = rows.mapNotNull { parseRow(it) }
 
         val findings = mutableListOf<Finding>()
-        val evidence = mutableListOf<com.notcvnt.rknhardering.model.EvidenceItem>()
+        val evidence = mutableListOf<EvidenceItem>()
 
         for (item in parsed) {
             evaluateItem(context, item, findings, evidence)
@@ -136,7 +159,6 @@ object VpnNativeDetectorChecker {
             "proc_net_dev_vpn" -> R.string.vpn_desc_proc_net_dev
             "ifindexname_vpn" -> R.string.vpn_desc_ifindexname
             "vpn_policy_rules_netlink" -> R.string.vpn_desc_policy_rules_netlink
-            "split_tunnel_uid" -> R.string.vpn_desc_split_tunnel
             "fib_trie_denied" -> R.string.vpn_desc_fib_trie
             "inet_diag_denied" -> R.string.vpn_desc_inet_diag
             "bindtodevice_leak" -> R.string.vpn_desc_bindtodevice_leak

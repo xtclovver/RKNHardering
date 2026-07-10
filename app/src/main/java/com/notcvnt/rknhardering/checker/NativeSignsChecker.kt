@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -165,7 +166,12 @@ object NativeSignsChecker {
 
         // Deep VPN detector (ported from reference APK) — kept as its own
         // sub-section inside the Native category for clarity.
-        val detectorOutcome = runCatching { VpnNativeDetectorChecker.check(context) }.getOrNull()
+        val detectorOutcome = try {
+            VpnNativeDetectorChecker.check(context)
+        } catch (error: Throwable) {
+            rethrowIfCancellation(error)
+            null
+        }
         if (detectorOutcome != null) {
             findings += detectorOutcome.findings
             evidence += detectorOutcome.evidence
@@ -1118,4 +1124,3 @@ object NativeSignsChecker {
         return "$detail — ${context.getString(resId)}"
     }
 }
-

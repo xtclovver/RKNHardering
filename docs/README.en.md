@@ -589,7 +589,6 @@ The new detectors live in a dedicated sub-section inside the Native category, gr
 | `proc_net_dev_vpn` | VPN traffic (RX/TX) in `/proc/net/dev` | `/proc/net/dev` |
 | `ifindexname_vpn` | VPN interfaces via `if_indextoname()` | `if_indextoname()` ifindex sweep |
 | `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
-| `split_tunnel_uid` | Split-tunneling UID rules (FRA_UID_RANGE) | Netlink `RTM_GETRULE` dump |
 
 **Network signs — `EvidenceSource.NATIVE_SOCKET`:**
 
@@ -611,8 +610,8 @@ The new detectors live in a dedicated sub-section inside the Native category, gr
 | `udp_pmtu_ok` / `udp_pmtu_fail` | Success/failure sending 1500 bytes over UDP | `sendto()` 1500 bytes |
 | `normal_pmtu` | Path MTU of primary physical interface | `fetchMtu()` via `getifaddrs()` |
 | `timing_oracle` | ARM CNTVCT cycles for `sendto()` (min/max/avg) | `mrs cntvct_el0` (aarch64) |
-| `backpressure` | Throughput under 50000 UDP packets | `sendto()` burst + timing |
-| `gso_failed` / `gso_send_failed` / `gso_ok` | GSO large send (UDP_SEGMENT) — virtual iface unsupported | `setsockopt(UDP_SEGMENT)` + `sendto()` |
+| `backpressure` | Throughput under 50000 UDP packets with scan cancellation | Non-blocking `sendto()` burst + cancellation check every 64 packets |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | UDP GSO capability diagnostics; the result is not VPN evidence | `UDP_SEGMENT=1200` + 4800-byte send |
 | `hw_timestamp` | Hardware timestamping (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
 
 **Environment probes — `EvidenceSource.NATIVE_INTERFACE`:**
@@ -621,7 +620,7 @@ The new detectors live in a dedicated sub-section inside the Native category, gr
 |--------------|-------------------|--------|
 | `traceroute_denied` | Traceroute probe (TTL=1 UDP) blocked | `setsockopt(IP_TTL=1)` + `sendto()` |
 
-High confidence (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `split_tunnel_uid`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`, `gso_failed`, `gso_send_failed`. Others → `needsReview`.
+High confidence (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`. Raw measurements and GSO results are informational; other anomalies → `needsReview`.
 
 ---
 
@@ -648,7 +647,7 @@ The `expectedRoamingExit` flag (resolved by `HomeNetworkCatalog` from SIM MCC/MN
 
 - `geoHit` = `GeoIP.outsideRu == true` (excluding roaming)
 - `directHit` = detected evidence from `DIRECT_NETWORK_CAPABILITIES` or `SYSTEM_PROXY`
-- `indirectHit` = detected evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`
+- `indirectHit` = detected evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`, or high-confidence `NATIVE_SOCKET`
 
 | Geo | Direct | Indirect | Verdict |
 |-----|--------|----------|---------|

@@ -4,6 +4,7 @@ import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.Verdict
@@ -106,7 +107,12 @@ object VerdictEngine {
         val geoHit = geo?.outsideRu == true && !expectedRoamingExit
         val directHit = directSigns.evidence.any { it.detected && it.source in MATRIX_DIRECT_SOURCES }
         val indirectHit = indirectSigns.evidence.any { it.detected && it.source in MATRIX_INDIRECT_SOURCES } ||
-            nativeSigns.evidence.any { it.detected && it.source in MATRIX_INDIRECT_SOURCES }
+            nativeSigns.evidence.any {
+                it.detected && (
+                    it.source in MATRIX_INDIRECT_SOURCES ||
+                        (it.source == EvidenceSource.NATIVE_SOCKET && it.confidence == EvidenceConfidence.HIGH)
+                    )
+            }
         val matrix = when {
             !geoHit && !directHit && !indirectHit -> Verdict.NOT_DETECTED
             !geoHit && directHit && !indirectHit -> Verdict.NOT_DETECTED
@@ -125,7 +131,12 @@ object VerdictEngine {
             it.status == CallTransportStatus.NEEDS_REVIEW &&
                 it.networkPath != CallTransportNetworkPath.LOCAL_PROXY
         }
-        val nativeReviewHit = nativeSigns.evidence.any { it.detected && it.source in NATIVE_REVIEW_SOURCES }
+        val nativeReviewHit = nativeSigns.evidence.any {
+            it.detected && (
+                it.source in NATIVE_REVIEW_SOURCES ||
+                    (it.source == EvidenceSource.NATIVE_SOCKET && it.confidence == EvidenceConfidence.HIGH)
+                )
+        }
         val tunProbeReview = directSigns.evidence.any {
             it.source == EvidenceSource.TUN_ACTIVE_PROBE && !it.detected
         }

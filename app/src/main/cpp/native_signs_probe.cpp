@@ -1032,7 +1032,7 @@ static void detectBpfMaps(std::vector<std::string> &findings);
 static void detectLoopbackConflicts(std::vector<std::string> &findings);
 static void detectSocketLeaks(std::vector<std::string> &findings);
 static void detectIpRecvErr(std::vector<std::string> &findings);
-static jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/);
+static jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/, jobject cancellationSignal);
 static void detectSysfsLeak(std::vector<std::string> &findings);
 static void detectGetifaddrsVpn(std::vector<std::string> &findings);
 static void detectSysclassnetVpn(std::vector<std::string> &findings);
@@ -1049,13 +1049,17 @@ static void detectRouteCount(std::vector<std::string> &findings);
 static void detectUdpPortConflictPhysicalIp(std::vector<std::string> &findings);
 static void detectTrimOracle(std::vector<std::string> &findings);
 static void detectIfindexnameVpn(std::vector<std::string> &findings);
-static void detectSplitTunnelingUid(std::vector<std::string> &findings);
 static void detectPmtuMssCombined(std::vector<std::string> &findings);
 static void detectUdpPmtu(std::vector<std::string> &findings);
 static void detectNormalPmtu(std::vector<std::string> &findings);
 static void detectTraceroute(std::vector<std::string> &findings);
 static void detectTimingOracle(std::vector<std::string> &findings);
-static void detectBackpressure(std::vector<std::string> &findings);
+static void detectBackpressure(
+    JNIEnv *env,
+    jobject cancellationSignal,
+    jmethodID isCancelledMethod,
+    std::vector<std::string> &findings
+);
 static void detectGsoLargeSend(std::vector<std::string> &findings);
 static void detectHwTimestamp(std::vector<std::string> &findings);
 
@@ -1770,19 +1774,6 @@ static void detectVpnPolicyRules(std::vector<std::string> &findings) {
                 }
             }
 
-            // Also check for UID-based rules (split tunneling)
-            if (rtm->rtm_scope == RT_SCOPE_UNIVERSE) {
-                // Check RTA_UID_RANGE for split tunneling
-                for (auto *a = reinterpret_cast<struct rtattr *>(rtm + 1);
-                     RTA_OK(a, rtaLen); a = RTA_NEXT(a, rtaLen)) {
-                    if (a->rta_type == FRA_UID_RANGE) {
-                        vpnRuleCount++;
-                        if (!ruleSummary.empty()) ruleSummary += "; ";
-                        ruleSummary += "uid_range table=" + std::to_string(table);
-                        break;
-                    }
-                }
-            }
         }
         if (done) break;
     }
@@ -1954,76 +1945,6 @@ static void detectIfindexnameVpn(std::vector<std::string> &findings) {
     }
 }
 
-// --- n39: Split tunneling UID routing rules ---
-static void detectSplitTunnelingUid(std::vector<std::string> &findings) {
-    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
-    if (fd < 0) return;
-
-    struct {
-        struct nlmsghdr nlh;
-        struct rtmsg rtm;
-    } req;
-    std::memset(&req, 0, sizeof(req));
-    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-    req.nlh.nlmsg_type = RTM_GETRULE;
-    req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-    req.nlh.nlmsg_seq = 1;
-    req.rtm.rtm_family = AF_INET;
-
-    struct sockaddr_nl kernel;
-    std::memset(&kernel, 0, sizeof(kernel));
-    kernel.nl_family = AF_NETLINK;
-
-    if (sendto(fd, &req, req.nlh.nlmsg_len, 0,
-               reinterpret_cast<struct sockaddr *>(&kernel), sizeof(kernel)) < 0) {
-        close(fd);
-        return;
-    }
-
-    int uidRuleCount = 0;
-    std::string ruleDetails;
-    char buf[8192];
-    while (true) {
-        struct pollfd pfd = {fd, POLLIN, 0};
-        int pr = poll(&pfd, 1, 2000);
-        if (pr <= 0) break;
-        ssize_t len = recv(fd, buf, sizeof(buf), 0);
-        if (len <= 0) break;
-        bool done = false;
-        for (auto *nh = reinterpret_cast<struct nlmsghdr *>(buf);
-             NLMSG_OK(nh, static_cast<unsigned int>(len));
-             nh = NLMSG_NEXT(nh, len)) {
-            if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
-            if (nh->nlmsg_type == NLMSG_ERROR) { done = true; break; }
-            if (nh->nlmsg_type != RTM_NEWRULE) continue;
-            auto *rtm = reinterpret_cast<struct rtmsg *>(NLMSG_DATA(nh));
-            int rtaLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(*rtm));
-            auto *attr = reinterpret_cast<struct rtattr *>(rtm + 1);
-            int table = rtm->rtm_table;
-            bool hasUidRange = false;
-            for (; RTA_OK(attr, rtaLen); attr = RTA_NEXT(attr, rtaLen)) {
-                if (attr->rta_type == FRA_UID_RANGE) {
-                    hasUidRange = true;
-                    break;
-                }
-            }
-            if (hasUidRange) {
-                uidRuleCount++;
-                if (!ruleDetails.empty()) ruleDetails += "; ";
-                ruleDetails += "table=" + std::to_string(table);
-            }
-        }
-        if (done) break;
-    }
-    close(fd);
-
-    if (uidRuleCount > 0) {
-        std::string r = "split_tunnel_uid|count=" + std::to_string(uidRuleCount);
-        if (!ruleDetails.empty()) r += " " + ruleDetails;
-        findings.push_back(r);
-    }
-}
-
 // --- n22: UDP PMTU + TCP MSS combined ---
 static void detectPmtuMssCombined(std::vector<std::string> &findings) {
     // Check TCP MSS
@@ -2165,7 +2086,23 @@ static void detectTimingOracle(std::vector<std::string> &findings) {
 }
 
 // --- n35: Backpressure flood test ---
-static void detectBackpressure(std::vector<std::string> &findings) {
+static bool isScanCancelled(JNIEnv *env, jobject cancellationSignal, jmethodID isCancelledMethod) {
+    if (cancellationSignal == nullptr || isCancelledMethod == nullptr) return true;
+    jboolean cancelled = env->CallBooleanMethod(cancellationSignal, isCancelledMethod);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return true;
+    }
+    return cancelled == JNI_TRUE;
+}
+
+static void detectBackpressure(
+    JNIEnv *env,
+    jobject cancellationSignal,
+    jmethodID isCancelledMethod,
+    std::vector<std::string> &findings
+) {
+    if (isScanCancelled(env, cancellationSignal, isCancelledMethod)) return;
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) return;
     struct sockaddr_in addr;
@@ -2180,13 +2117,18 @@ static void detectBackpressure(std::vector<std::string> &findings) {
     int sent = 0;
     auto start = std::chrono::steady_clock::now();
     for (int i = 0; i < pktCount; ++i) {
-        ssize_t rc = sendto(fd, buf, sizeof(buf), 0,
+        if ((i & 63) == 0 && isScanCancelled(env, cancellationSignal, isCancelledMethod)) {
+            close(fd);
+            return;
+        }
+        ssize_t rc = sendto(fd, buf, sizeof(buf), MSG_DONTWAIT,
                             reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
         if (rc < 0) break;
         sent++;
     }
     auto end = std::chrono::steady_clock::now();
     close(fd);
+    if (isScanCancelled(env, cancellationSignal, isCancelledMethod)) return;
     double elapsedMs = std::chrono::duration<double, std::milli>(end - start).count();
     double throughputMB = (static_cast<double>(sent) * pktSize) / (1024.0 * 1024.0) / (elapsedMs / 1000.0);
     std::string r = "backpressure|" + std::to_string(sent) + "/" + std::to_string(pktCount) +
@@ -2200,8 +2142,9 @@ static void detectGsoLargeSend(std::vector<std::string> &findings) {
 #if defined(__linux__)
     int fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) return;
-    // Try GSO with large segment
-    int gsoSize = 65535;
+    // Use a segment size that fits a normal path MTU. GSO availability is
+    // diagnostic only; lack of support is not VPN evidence.
+    int gsoSize = 1200;
     int rc = setsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &gsoSize, sizeof(gsoSize));
     if (rc < 0) {
         std::string r = "gso_failed|errno=" + std::to_string(errno);
@@ -2213,7 +2156,7 @@ static void detectGsoLargeSend(std::vector<std::string> &findings) {
         addr.sin_family = AF_INET;
         addr.sin_port = htons(53);
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        char buf[65535];
+        char buf[4800];
         std::memset(buf, 0, sizeof(buf));
         ssize_t sent = sendto(fd, buf, sizeof(buf), 0,
                               reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
@@ -2311,14 +2254,26 @@ const JNINativeMethod kMethods[] = {
     {"nativeDetectVpnLeaks", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnLeaks)},
     {"nativeDetectVpnAdvanced", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnAdvanced)},
     {"nativeDetectVpnSyscalls", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnSyscalls)},
-    {"nativeDetectVpnDetector", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnDetector)},
+    {"nativeDetectVpnDetector", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnDetector)},
 };
 
 // New consolidated VPN detector: returns ONLY the new deep checks (prefixed
 // with "vdet|") so they can live in their own UI category, separate from the
 // legacy NativeSignsChecker output.
-jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/) {
+jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/, jobject cancellationSignal) {
     std::vector<std::string> raw;
+    jmethodID isCancelledMethod = nullptr;
+    if (cancellationSignal != nullptr) {
+        jclass cancellationClass = env->GetObjectClass(cancellationSignal);
+        if (cancellationClass != nullptr) {
+            isCancelledMethod = env->GetMethodID(cancellationClass, "isCancelled", "()Z");
+            env->DeleteLocalRef(cancellationClass);
+        }
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            isCancelledMethod = nullptr;
+        }
+    }
     detectSysfsLeak(raw);
     detectGetifaddrsVpn(raw);
     detectSysclassnetVpn(raw);
@@ -2332,13 +2287,12 @@ jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/) {
     detectFibTrieAccess(raw);
     detectInetDiagAccess(raw);
     detectVpnPolicyRules(raw);
-    detectSplitTunnelingUid(raw);
     detectTrimOracle(raw);
     detectPmtuMssCombined(raw);
     detectUdpPmtu(raw);
     detectTraceroute(raw);
     detectTimingOracle(raw);
-    detectBackpressure(raw);
+    detectBackpressure(env, cancellationSignal, isCancelledMethod, raw);
     detectGsoLargeSend(raw);
     detectHwTimestamp(raw);
     detectSetsockoptBindToDevice(raw);

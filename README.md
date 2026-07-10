@@ -602,7 +602,7 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 #### 12.6 Deep VPN Detector (`VpnNativeDetectorChecker`)
 
 
-Новые детекты вынесены в отдельную секцию внутри категории Native и сгруппированы по 4 подкатегориям. Данные приходят из нового JNI-метода `nativeDetectVpnDetector()`, строки имеют префикс `vdet|`.
+Новые детекты вынесены в отдельную секцию внутри категории Native и сгруппированы по 4 подкатегориям. Данные приходят из нового JNI-метода `nativeDetectVpnDetector(cancellationSignal)`, строки имеют префикс `vdet|`.
 
 **Прямые признаки (Direct signs) — `EvidenceSource.NATIVE_INTERFACE`:**
 
@@ -617,7 +617,6 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 | `proc_net_dev_vpn` | VPN-трафик (RX/TX) в `/proc/net/dev` | `/proc/net/dev` |
 | `ifindexname_vpn` | VPN-интерфейсы через `if_indextoname()` | `if_indextoname()` перебор ifindex |
 | `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
-| `split_tunnel_uid` | Split-tunneling правила по UID (FRA_UID_RANGE) | Netlink `RTM_GETRULE` dump |
 
 **Сетевые признаки (Network signs) — `EvidenceSource.NATIVE_SOCKET`:**
 
@@ -639,8 +638,8 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 | `udp_pmtu_ok` / `udp_pmtu_fail` | Успех/неудача отправки 1500 байт по UDP | `sendto()` 1500 байт |
 | `normal_pmtu` | Path MTU основного физического интерфейса | `fetchMtu()` через `getifaddrs()` |
 | `timing_oracle` | ARM CNTVCT циклы для `sendto()` (мин/макс/сред) | `mrs cntvct_el0` (aarch64) |
-| `backpressure` | Пропускная способность при 50000 UDP-пакетах | `sendto()` burst + замер времени |
-| `gso_failed` / `gso_send_failed` / `gso_ok` | GSO large send (UDP_SEGMENT) — виртуальный интерфейс не поддерживает | `setsockopt(UDP_SEGMENT)` + `sendto()` |
+| `backpressure` | Пропускная способность при 50000 UDP-пакетах с отменой скана | Неблокирующий `sendto()` burst + проверка cancellation каждые 64 пакета |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | Диагностика поддержки UDP GSO; результат не является признаком VPN | `UDP_SEGMENT=1200` + отправка 4800 байт |
 | `hw_timestamp` | Аппаратный таймстампинг (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
 
 **Пробы окружения (Environment probes) — `EvidenceSource.NATIVE_INTERFACE`:**
@@ -649,7 +648,7 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 |-----------------|----------|----------|
 | `traceroute_denied` | Traceroute-проба (TTL=1 UDP) заблокирована | `setsockopt(IP_TTL=1)` + `sendto()` |
 
-Высокая уверенность (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `split_tunnel_uid`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`, `gso_failed`, `gso_send_failed`. Остальные → `needsReview`.
+Высокая уверенность (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`. Сырые измерения и GSO-результаты информационные; остальные аномалии → `needsReview`.
 
 ---
 
@@ -676,7 +675,7 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 - `geoHit` = `GeoIP.outsideRu == true` (кроме роуминга)
 - `directHit` = detected-evidence из `DIRECT_NETWORK_CAPABILITIES` или `SYSTEM_PROXY`
-- `indirectHit` = detected-evidence из `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`
+- `indirectHit` = detected-evidence из `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH` либо high-confidence `NATIVE_SOCKET`
 
 | Geo | Direct | Indirect | Вердикт |
 |-----|--------|----------|---------|

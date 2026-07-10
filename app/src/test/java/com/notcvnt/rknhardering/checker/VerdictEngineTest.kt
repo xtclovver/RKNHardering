@@ -589,6 +589,57 @@ class VerdictEngineTest {
     }
 
     @Test
+    fun `high confidence native socket evidence confirms foreign geo`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(geoFacts = GeoIpFacts(outsideRu = true, countryCode = "DE")),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            nativeSigns = category(
+                evidence = listOf(evidence(EvidenceSource.NATIVE_SOCKET, EvidenceConfidence.HIGH)),
+            ),
+        )
+
+        assertEquals(Verdict.DETECTED, verdict)
+    }
+
+    @Test
+    fun `high confidence native socket evidence alone yields needs review`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            nativeSigns = category(
+                evidence = listOf(evidence(EvidenceSource.NATIVE_SOCKET, EvidenceConfidence.HIGH)),
+            ),
+        )
+
+        assertEquals(Verdict.NEEDS_REVIEW, verdict)
+    }
+
+    @Test
+    fun `medium confidence native socket evidence does not enter verdict matrix`() {
+        val verdict = VerdictEngine.evaluate(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+            nativeSigns = category(
+                evidence = listOf(evidence(EvidenceSource.NATIVE_SOCKET, EvidenceConfidence.MEDIUM)),
+            ),
+        )
+
+        assertEquals(Verdict.NOT_DETECTED, verdict)
+    }
+
+    @Test
     fun `proxy assisted udp leak does not affect verdict`() {
         val verdict = VerdictEngine.evaluate(
             geoIp = category(),

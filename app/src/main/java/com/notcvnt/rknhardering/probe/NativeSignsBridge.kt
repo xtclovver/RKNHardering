@@ -1,5 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
+import com.notcvnt.rknhardering.ScanCancellationSignal
+
 object NativeSignsBridge {
     private const val LIBRARY_NAME = "native_signs_probe"
 
@@ -52,7 +54,7 @@ object NativeSignsBridge {
     internal var detectVpnSyscallsOverride: (() -> Array<String>)? = null
 
     @Volatile
-    internal var detectVpnDetectorOverride: (() -> Array<String>)? = null
+    internal var detectVpnDetectorOverride: ((ScanCancellationSignal?) -> Array<String>)? = null
 
     @Volatile
     private var initialized = false
@@ -180,10 +182,10 @@ object NativeSignsBridge {
         return runCatching { nativeDetectVpnSyscalls() }.getOrDefault(emptyArray())
     }
 
-    fun detectVpnDetector(): Array<String> {
-        detectVpnDetectorOverride?.let { return it.invoke() }
+    fun detectVpnDetector(cancellationSignal: ScanCancellationSignal? = null): Array<String> {
+        detectVpnDetectorOverride?.let { return it.invoke(cancellationSignal) }
         if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnDetector() }.getOrDefault(emptyArray())
+        return runCatching { nativeDetectVpnDetector(cancellationSignal) }.getOrDefault(emptyArray())
     }
 
     internal fun resetForTests() {
@@ -224,5 +226,5 @@ object NativeSignsBridge {
     private external fun nativeDetectVpnLeaks(): Array<String>
     private external fun nativeDetectVpnAdvanced(): Array<String>
     private external fun nativeDetectVpnSyscalls(): Array<String>
-    private external fun nativeDetectVpnDetector(): Array<String>
+    private external fun nativeDetectVpnDetector(cancellationSignal: ScanCancellationSignal?): Array<String>
 }

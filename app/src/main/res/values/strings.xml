@@ -705,7 +705,6 @@
     <string name="vpn_desc_udp_port_physical">UDP port conflict on physical interface</string>
     <string name="vpn_desc_trim_oracle">Bind probe vs RTM_GETLINK discrepancy</string>
     <string name="vpn_desc_ifindexname">VPN interface exposed via if_indextoname</string>
-    <string name="vpn_desc_split_tunnel">Split tunneling UID routing rules</string>
     <string name="vpn_desc_pmtu_mss">UDP PMTU and TCP MSS analysis</string>
     <string name="vpn_desc_udp_pmtu_ok">UDP send succeeded (no PMTU bottleneck)</string>
     <string name="vpn_desc_udp_pmtu_fail">UDP send failed (PMTU issue)</string>
@@ -713,8 +712,8 @@
     <string name="vpn_desc_traceroute">Traceroute probe (ICMP/TTL)</string>
     <string name="vpn_desc_timing_oracle">ARM CNTVCT timing oracle</string>
     <string name="vpn_desc_backpressure">Backpressure under sustained burst</string>
-    <string name="vpn_desc_gso_failed">GSO large send failed (VPN detected)</string>
-    <string name="vpn_desc_gso_send_failed">GSO send failed (VPN detected)</string>
+    <string name="vpn_desc_gso_failed">GSO support unavailable (diagnostic only)</string>
+    <string name="vpn_desc_gso_send_failed">GSO send failed (diagnostic only)</string>
     <string name="vpn_desc_gso_ok">GSO supported (normal interface)</string>
     <string name="vpn_desc_hw_timestamp">Hardware timestamping check</string>
     <string name="vpn_status_not_found">not found</string>

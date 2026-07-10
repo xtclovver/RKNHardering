@@ -676,7 +676,6 @@
     <string name="vpn_desc_udp_port_physical">物理接口上的 UDP 端口冲突</string>
     <string name="vpn_desc_trim_oracle">bind probe 与 RTM_GETLINK 不符</string>
     <string name="vpn_desc_ifindexname">通过 if_indextoname 暴露的 VPN 接口</string>
-    <string name="vpn_desc_split_tunnel">Split tunneling UID 路由规则</string>
     <string name="vpn_desc_pmtu_mss">UDP PMTU 和 TCP MSS 分析</string>
     <string name="vpn_desc_udp_pmtu_ok">UDP 发送成功（无 PMTU 瓶颈）</string>
     <string name="vpn_desc_udp_pmtu_fail">UDP 发送失败（PMTU 问题）</string>
@@ -684,8 +683,8 @@
     <string name="vpn_desc_traceroute">Traceroute 探测 (ICMP/TTL)</string>
     <string name="vpn_desc_timing_oracle">ARM CNTVCT 计时神谕</string>
     <string name="vpn_desc_backpressure">持续突发下的背压</string>
-    <string name="vpn_desc_gso_failed">GSO 大发送失败（检测到 VPN）</string>
-    <string name="vpn_desc_gso_send_failed">GSO 发送失败（检测到 VPN）</string>
+    <string name="vpn_desc_gso_failed">GSO 支持不可用（仅诊断）</string>
+    <string name="vpn_desc_gso_send_failed">GSO 发送失败（仅诊断）</string>
     <string name="vpn_desc_gso_ok">支持 GSO（正常接口）</string>
     <string name="vpn_desc_hw_timestamp">硬件时间戳检查</string>
     <string name="vpn_status_not_found">未发现</string>
