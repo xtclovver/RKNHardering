@@ -14,6 +14,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.InetAddress
 import kotlin.system.measureTimeMillis
 
 @RunWith(RobolectricTestRunner::class)
@@ -76,6 +78,51 @@ class IcmpSpoofingCheckerTest {
 
         assertFalse(result.needsReview)
         assertTrue(result.hasError)
+    }
+
+    @Test
+    fun `dns sinkhole address is not pinged or reported as spoofing`() = runBlocking {
+        var sinkholePingCalled = false
+        IcmpSpoofingChecker.dependenciesOverride = IcmpSpoofingChecker.Dependencies(
+            resolveIpv4 = { host, _ -> if (host == "instagram.com") "0.0.0.0" else "8.8.8.8" },
+            ping = { address, _, _ ->
+                if (address == "0.0.0.0") sinkholePingCalled = true
+                pingResult(received = 3, min = 0.1, avg = 0.2, max = 0.3)
+            },
+        )
+
+        val result = IcmpSpoofingChecker.check(context, DnsResolverConfig.system())
+
+        assertFalse(sinkholePingCalled)
+        assertFalse(result.needsReview)
+        assertFalse(result.evidence.any { it.source == EvidenceSource.ICMP_SPOOFING && it.detected })
+        assertTrue(result.hasError)
+    }
+
+    @Test
+    fun `only globally usable unicast IPv4 addresses may be pinged`() {
+        val rejected = listOf(
+            "0.0.0.0",
+            "0.0.0.1",
+            "10.0.0.1",
+            "100.64.0.1",
+            "127.0.0.1",
+            "169.254.0.1",
+            "172.16.0.1",
+            "192.0.0.1",
+            "192.0.2.1",
+            "192.168.0.1",
+            "198.18.0.1",
+            "198.51.100.1",
+            "203.0.113.1",
+            "224.0.0.1",
+            "255.255.255.255",
+        )
+
+        rejected.forEach { address ->
+            assertFalse(address, IcmpSpoofingChecker.isUsablePublicIpv4(ipv4(address)))
+        }
+        assertTrue(IcmpSpoofingChecker.isUsablePublicIpv4(ipv4("8.8.8.8")))
     }
 
     @Test
@@ -147,5 +194,9 @@ class IcmpSpoofingCheckerTest {
             exitCode = if (received > 0) 0 else 1,
             rawOutput = "",
         )
+    }
+
+    private fun ipv4(address: String): Inet4Address {
+        return InetAddress.getByName(address) as Inet4Address
     }
 }

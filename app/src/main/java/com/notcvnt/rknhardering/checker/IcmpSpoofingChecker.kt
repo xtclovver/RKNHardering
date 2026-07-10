@@ -14,6 +14,7 @@ import com.notcvnt.rknhardering.network.ResolverNetworkStack
 import com.notcvnt.rknhardering.probe.SystemPingProber
 import java.io.IOException
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.util.Locale
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -47,8 +48,8 @@ object IcmpSpoofingChecker {
                 config = resolverConfig,
                 cancellationSignal = ScanExecutionContext.currentOrDefault().cancellationSignal,
             )
-            val ipv4 = addresses.firstOrNull { it is Inet4Address }
-                ?: throw IOException("No IPv4 address resolved for $host")
+            val ipv4 = addresses.filterIsInstance<Inet4Address>().firstOrNull(::isUsablePublicIpv4)
+                ?: throw IOException("No usable public IPv4 address resolved for $host")
             ipv4.hostAddress ?: throw IOException("Resolved IPv4 address is empty for $host")
         },
         val ping: suspend (String, Int, Int) -> SystemPingProber.PingResult = { address, count, timeoutSeconds ->
@@ -94,6 +95,14 @@ object IcmpSpoofingChecker {
                 effectiveTargets.map { target ->
                     async {
                         val address = dependencies.resolveIpv4(target.host, resolverConfig)
+                        val parsedAddress = if (DnsResolverConfig.isValidIpLiteral(address)) {
+                            runCatching { InetAddress.getByName(address) }.getOrNull() as? Inet4Address
+                        } else {
+                            null
+                        }
+                        if (parsedAddress == null || !isUsablePublicIpv4(parsedAddress)) {
+                            throw IOException("No usable public IPv4 address resolved for ${target.host}")
+                        }
                         val pingResult = dependencies.ping(address, pingCount, timeoutSeconds)
                         TargetOutcome(target = target, address = address, ping = pingResult)
                     }
@@ -263,5 +272,32 @@ object IcmpSpoofingChecker {
 
     private fun formatRtt(value: Double?): String {
         return value?.let { String.format(Locale.US, "%.1f ms", it) } ?: "n/a"
+    }
+
+    internal fun isUsablePublicIpv4(address: Inet4Address): Boolean {
+        if (
+            address.isAnyLocalAddress ||
+            address.isLoopbackAddress ||
+            address.isLinkLocalAddress ||
+            address.isSiteLocalAddress ||
+            address.isMulticastAddress
+        ) {
+            return false
+        }
+
+        val bytes = address.address.map { it.toInt() and 0xff }
+        val first = bytes[0]
+        val second = bytes[1]
+        val third = bytes[2]
+        return when {
+            first == 0 -> false
+            first == 100 && second in 64..127 -> false
+            first == 192 && second == 0 && (third == 0 || third == 2) -> false
+            first == 198 && second in 18..19 -> false
+            first == 198 && second == 51 && third == 100 -> false
+            first == 203 && second == 0 && third == 113 -> false
+            first >= 240 -> false
+            else -> true
+        }
     }
 }
