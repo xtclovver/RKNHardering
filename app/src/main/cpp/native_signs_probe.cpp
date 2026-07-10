@@ -12,26 +12,37 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <ifaddrs.h>
 #include <sys/system_properties.h>
+#include <sys/stat.h>
 
 #include <algorithm>
+#include <chrono>
 #include <iterator>
 #include <map>
+#include <fstream>
+#include <iomanip>
 #include <sstream>
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
 #include <linux/sock_diag.h>
+#include <linux/fib_rules.h>
+#include <linux/udp.h>
+#include <linux/net_tstamp.h>
+#include <linux/sockios.h>
 #include <sys/uio.h>
 #include <poll.h>
+#include <dlfcn.h>
 
 namespace {
 
@@ -787,7 +798,6 @@ jobjectArray nativeLibraryIntegrity(JNIEnv *env, jclass /*clazz*/) {
 jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
     std::vector<std::string> findings;
 
-    // 1. Check for su binary in common paths
     static const char *const kSuPaths[] = {
         "/system/bin/su",
         "/system/xbin/su",
@@ -810,7 +820,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 2. Check root-related system properties
     struct PropCheck {
         const char *prop;
         const char *suspiciousValue;
@@ -835,7 +844,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 3. Check for root management app artifacts
     static const char *const kRootMgmtPaths[] = {
         "/data/adb/magisk",
         "/data/adb/modules",
@@ -856,17 +864,14 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 4. Check /system writability
     if (access("/system", W_OK) == 0) {
         findings.emplace_back("system_rw|/system is writable");
     }
 
-    // 5. Check /proc/self/mounts for suspicious mount entries
     FILE *mounts = std::fopen("/proc/self/mounts", "re");
     if (mounts != nullptr) {
         char line[1024];
         while (std::fgets(line, sizeof(line), mounts) != nullptr) {
-            // Magisk tmpfs overlays on /system, /vendor, /product
             if (std::strstr(line, "magisk") != nullptr ||
                 std::strstr(line, "core-only") != nullptr) {
                 std::string raw(line);
@@ -875,7 +880,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
                 f.append(raw);
                 findings.push_back(f);
             }
-            // Overlayfs on /system suggests rootfs modifications
             if (std::strstr(line, "overlay") != nullptr &&
                 (std::strstr(line, "/system") != nullptr ||
                  std::strstr(line, "/vendor") != nullptr)) {
@@ -889,7 +893,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         std::fclose(mounts);
     }
 
-    // 6. Check SELinux enforcement
     FILE *selinux = std::fopen("/sys/fs/selinux/enforce", "re");
     if (selinux != nullptr) {
         int enforce = -1;
@@ -898,11 +901,9 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         }
         std::fclose(selinux);
     } else {
-        // SELinux filesystem not accessible — might be disabled entirely
         findings.emplace_back("selinux|absent");
     }
 
-    // 7. Check current process UID/GID
     uid_t uid = getuid();
     uid_t euid = geteuid();
     gid_t gid = getgid();
@@ -914,7 +915,6 @@ jobjectArray nativeDetectRoot(JNIEnv *env, jclass /*clazz*/) {
         findings.push_back(f);
     }
 
-    // 8. Check for Magisk-specific properties
     static const char *const kMagiskProps[] = {
         "init.svc.magisk_daemon",
         "init.svc.magisk_pfs",
@@ -949,7 +949,6 @@ bool fileContains(const char *path, const char *needle) {
 jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
     std::vector<std::string> findings;
 
-    // 1. QEMU system properties
     static const char *const kQemuProps[] = {
         "ro.kernel.qemu",
         "ro.kernel.qemu.gles",
@@ -967,7 +966,6 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 2. Goldfish/ranchu hardware
     static const char *const kHwProps[] = {
         "ro.hardware",
         "ro.product.board",
@@ -986,7 +984,6 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 3. Emulator pipe devices (genyd => Genymotion)
     static const char *const kPipePaths[] = {
         "/dev/qemu_pipe",
         "/dev/socket/qemud",
@@ -1001,12 +998,10 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
         }
     }
 
-    // 4. Goldfish TTY driver
     if (fileContains("/proc/tty/drivers", "goldfish")) {
         findings.emplace_back("qemu_driver|/proc/tty/drivers:goldfish");
     }
 
-    // 5. BlueStacks artifacts
     static const char *const kBlueStacksPaths[] = {
         "/system/lib/libbstfolder_jni.so",
         "/data/bluestacks.prop",
@@ -1022,6 +1017,1227 @@ jobjectArray nativeDetectEmulator(JNIEnv *env, jclass /*clazz*/) {
     return toStringArray(env, findings);
 }
 
+}
+
+static void detectVpnPropertiesAll(std::vector<std::string> &findings);
+static void detectVpnFiles(std::vector<std::string> &findings);
+static void detectVpnInterfaces(std::vector<std::string> &findings);
+static void detectVpnRoutes(std::vector<std::string> &findings);
+static void detectArpNeighbors(std::vector<std::string> &findings);
+static void detectSysctl(std::vector<std::string> &findings);
+static void detectEstablishedVpn(std::vector<std::string> &findings);
+static void detectQdisc(std::vector<std::string> &findings);
+static void detectMssAnomaly(std::vector<std::string> &findings);
+static void detectBpfMaps(std::vector<std::string> &findings);
+static void detectLoopbackConflicts(std::vector<std::string> &findings);
+static void detectSocketLeaks(std::vector<std::string> &findings);
+static void detectIpRecvErr(std::vector<std::string> &findings);
+static jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/, jobject cancellationSignal);
+static void detectSysfsLeak(std::vector<std::string> &findings);
+static void detectGetifaddrsVpn(std::vector<std::string> &findings);
+static void detectSysclassnetVpn(std::vector<std::string> &findings);
+static void detectRtmGetlinkVpn(std::vector<std::string> &findings);
+static void detectProcIfInet6(std::vector<std::string> &findings);
+static void detectProcIpv6RouteVpn(std::vector<std::string> &findings);
+static void detectProcNetDevVpn(std::vector<std::string> &findings);
+static void detectFibTrieAccess(std::vector<std::string> &findings);
+static void detectSetsockoptBindToDevice(std::vector<std::string> &findings);
+static void detectInetDiagAccess(std::vector<std::string> &findings);
+static void detectGetsocknameLeak(std::vector<std::string> &findings);
+static void detectVpnPolicyRules(std::vector<std::string> &findings);
+static void detectRouteCount(std::vector<std::string> &findings);
+static void detectUdpPortConflictPhysicalIp(std::vector<std::string> &findings);
+static void detectTrimOracle(std::vector<std::string> &findings);
+static void detectIfindexnameVpn(std::vector<std::string> &findings);
+static void detectPmtuMssCombined(std::vector<std::string> &findings);
+static void detectUdpPmtu(std::vector<std::string> &findings);
+static void detectNormalPmtu(std::vector<std::string> &findings);
+static void detectTraceroute(std::vector<std::string> &findings);
+static void detectTimingOracle(std::vector<std::string> &findings);
+static void detectBackpressure(
+    JNIEnv *env,
+    jobject cancellationSignal,
+    jmethodID isCancelledMethod,
+    std::vector<std::string> &findings
+);
+static void detectGsoLargeSend(std::vector<std::string> &findings);
+static void detectHwTimestamp(std::vector<std::string> &findings);
+
+jobjectArray nativeDetectVpnProperties(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    detectVpnPropertiesAll(findings);
+    detectVpnFiles(findings);
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnLeaks(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    detectVpnInterfaces(findings);
+    detectVpnRoutes(findings);
+    detectArpNeighbors(findings);
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnAdvanced(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    detectSysctl(findings);
+    detectEstablishedVpn(findings);
+    detectQdisc(findings);
+    detectMssAnomaly(findings);
+    detectBpfMaps(findings);
+
+    return toStringArray(env, findings);
+}
+
+jobjectArray nativeDetectVpnSyscalls(JNIEnv *env, jclass /*clazz*/) {
+    std::vector<std::string> findings;
+
+    detectLoopbackConflicts(findings);
+    detectSocketLeaks(findings);
+    detectIpRecvErr(findings);
+
+    return toStringArray(env, findings);
+}
+
+static void detectVpnPropertiesAll(std::vector<std::string> &findings) {
+    const std::vector<std::string> vpnProps = {
+        "net.vpn.dns1", "net.vpn.dns2",
+        "dhcp.tun0.dns1", "dhcp.tun0.dns2",
+        "net.interfaces.default.type", "net.interfaces.default.name",
+        "net.vpn.dns3", "net.vpn.dns4",
+    };
+    for (const auto &prop : vpnProps) {
+        char value[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop.c_str(), value) > 0 && value[0] != '\0') {
+            findings.emplace_back("vpn_prop|" + prop + "=" + value);
+        }
+    }
+    char devType[PROP_VALUE_MAX] = {0};
+    if (__system_property_get("net.interfaces.default.type", devType) > 0) {
+        std::string lower = devType;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower.find("tun") != std::string::npos || lower.find("vpn") != std::string::npos) {
+            findings.emplace_back("vpn_prop|net.interfaces.default.type contains tun/vpn");
+        }
+    }
+}
+
+static void detectVpnFiles(std::vector<std::string> &findings) {
+    const std::vector<std::pair<std::string, std::string>> pathGroups = {
+        {"vpnhide", "/data/local/tmp/vpnhide"},
+        {"vpnhide", "/data/data/com.vpnhide"},
+        {"vpnhide", "/data/local/tmp/.vpnhide"},
+        {"vpnhide", "/data/data/com.vpn.hide"},
+        {"lsposed", "/data/adb/lspd"},
+        {"lsposed", "/data/adb/modules/lsposed"},
+        {"lsposed", "/data/misc/lspd"},
+        {"lsposed", "/data/data/org.lsposed.manager"},
+        {"zygisk", "/data/adb/modules/zygisk"},
+        {"zygisk", "/data/adb/zygisk"},
+        {"zygisk", "/data/local/tmp/zygisk"},
+    };
+    for (const auto &[prefix, path] : pathGroups) {
+        struct stat st;
+        if (stat(path.c_str(), &st) == 0) {
+            findings.emplace_back(prefix + "|" + path);
+        }
+    }
+    const std::vector<std::string> hookPropNames = {
+        "persist.sys.lspd.hook", "ro.magisk.version",
+        "init.svc.zygote_restart",
+    };
+    for (const auto &prop : hookPropNames) {
+        char value[PROP_VALUE_MAX] = {0};
+        if (__system_property_get(prop.c_str(), value) > 0 && value[0] != '\0') {
+            findings.emplace_back("hook_prop|" + prop + "=" + value);
+        }
+    }
+}
+
+static bool ifaceExists(const char *name) {
+    struct ifreq ifr{};
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return false;
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", name);
+    bool exists = (ioctl(fd, SIOCGIFFLAGS, &ifr) == 0);
+    close(fd);
+    return exists;
+}
+
+static void detectVpnInterfaces(std::vector<std::string> &findings) {
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "utun1", "wg0", "wg1", "ppp0", "xfrm0"};
+    for (const auto &name : tunNames) {
+        if (!ifaceExists(name.c_str())) continue;
+        struct ifreq ifr{};
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd < 0) continue;
+        snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", name.c_str());
+        if (ioctl(fd, SIOCGIFFLAGS, &ifr) == 0) {
+            findings.emplace_back("inet6_vpn_iface|" + name + "|flags=0x" + std::to_string(ifr.ifr_flags));
+        }
+        close(fd);
+    }
+}
+
+static bool isVpnIface(const char *iface) {
+    static const std::vector<std::string> vpnIfaces = {"tun0", "tun1", "utun0", "ppp0", "wg0", "wg1"};
+    for (const auto &v : vpnIfaces) {
+        if (v == iface) return true;
+    }
+    return false;
+}
+
+static void detectVpnRoutes(std::vector<std::string> &findings) {
+    std::ifstream f("/proc/net/route");
+    if (!f.is_open()) return;
+    std::string line;
+    int vpnRouteCount = 0;
+    std::getline(f, line);
+    while (std::getline(f, line)) {
+        std::istringstream iss(line);
+        std::string ifaceBuf;
+        unsigned long dest = 0;
+        unsigned long gateway = 0;
+        if (!(iss >> ifaceBuf >> std::hex >> dest >> gateway)) continue;
+        if (!isVpnIface(ifaceBuf.c_str())) continue;
+        vpnRouteCount++;
+        if (dest == 0 || dest == 0xFFFFFFFF) continue;
+        std::ostringstream oss;
+        oss << std::hex << std::setw(8) << std::setfill('0') << dest;
+        findings.emplace_back("vpn_policy_rules|iface=" + ifaceBuf + " dest=" + oss.str());
+    }
+    if (vpnRouteCount > 0) {
+        findings.emplace_back("route_vpn_iface|vpn_routes=" + std::to_string(vpnRouteCount));
+    }
+}
+
+static void detectArpNeighbors(std::vector<std::string> &findings) {
+    std::ifstream f("/proc/net/arp");
+    if (!f.is_open()) return;
+    std::string line;
+    std::getline(f, line);
+    int totalEntries = 0;
+    int hiddenEntries = 0;
+    while (std::getline(f, line)) {
+        std::istringstream iss(line);
+        std::string ip, hwType, flags, mac, mask, iface;
+        if (!(iss >> ip >> hwType >> flags >> mac >> mask >> iface)) continue;
+        totalEntries++;
+        if (mac == "00:00:00:00:00:00" || mac.find("ff:ff:ff:ff:ff:ff") != std::string::npos) {
+            hiddenEntries++;
+        }
+    }
+    if (hiddenEntries > 0) {
+        findings.emplace_back("hidden_mac_neighbors|hidden=" + std::to_string(hiddenEntries) + " total=" + std::to_string(totalEntries));
+    }
+}
+
+static void detectSysctl(std::vector<std::string> &findings) {
+    auto readInt = [](const char *path) -> std::optional<int> {
+        FILE *f = fopen(path, "r");
+        if (!f) return std::nullopt;
+        int val = 0;
+        bool ok = (fscanf(f, "%d", &val) == 1);
+        fclose(f);
+        return ok ? std::optional(val) : std::nullopt;
+    };
+    if (auto val = readInt("/proc/sys/net/ipv4/ip_forward"); val && *val != 0) {
+        findings.emplace_back("sysctl_forwarding|ip_forward=1");
+    }
+    if (auto val = readInt("/proc/sys/net/ipv4/conf/all/rp_filter"); val && *val == 0) {
+        findings.emplace_back("sysctl_rp_filter|rp_filter=0");
+    }
+}
+
+static bool isVpnPort(int port) {
+    return port == 51820 || port == 1194 || port == 1195 || port == 443 || port == 8443;
+}
+
+static void detectEstablishedVpn(std::vector<std::string> &findings) {
+    std::ifstream f("/proc/net/tcp");
+    if (!f.is_open()) return;
+    std::string line;
+    std::getline(f, line);
+    while (std::getline(f, line)) {
+        unsigned long localAddr = 0;
+        unsigned long remoteAddr = 0;
+        int localPort = 0;
+        int remotePort = 0;
+        int state = 0;
+        if (sscanf(line.c_str(), " %lx:%x %lx:%x %x", &localAddr, &localPort, &remoteAddr, &remotePort, &state) < 5) continue;
+        if (state != 1) continue;
+        if (!isVpnPort(remotePort)) continue;
+        findings.emplace_back("established_vpn|remote_port=" + std::to_string(remotePort));
+    }
+}
+
+static void detectQdisc(std::vector<std::string> &findings) {
+    std::ifstream f("/proc/net/dev");
+    if (!f.is_open()) return;
+    std::string line;
+    std::getline(f, line);
+    std::getline(f, line);
+    while (std::getline(f, line)) {
+        std::istringstream iss(line);
+        std::string iface;
+        std::getline(iss >> std::ws, iface, ':');
+        unsigned long rxBytes = 0;
+        unsigned long rxPackets = 0;
+        iss >> rxBytes >> rxPackets;
+        for (int i = 0; i < 6; ++i) { unsigned long tmp = 0; iss >> tmp; }
+        unsigned long txBytes = 0;
+        unsigned long txPackets = 0;
+        iss >> txBytes >> txPackets;
+        if (iface != "tun0" && iface != "wg0") continue;
+        findings.emplace_back("vpn_qdisc|iface=" + iface + " rx=" + std::to_string(rxBytes) + " tx=" + std::to_string(txBytes));
+    }
+}
+
+static void detectMssAnomaly(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return;
+    struct sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(443);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (connect(fd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0) { close(fd); return; }
+    struct tcp_info info{};
+    socklen_t infoLen = sizeof(info);
+    if (getsockopt(fd, IPPROTO_TCP, TCP_INFO, &info, &infoLen) == 0 && info.tcpi_snd_mss > 0 && info.tcpi_snd_mss < 500) {
+        findings.emplace_back("tcp_mss_low|snd_mss=" + std::to_string(info.tcpi_snd_mss) + "|rcv_mss=" + std::to_string(info.tcpi_rcv_mss));
+    }
+    close(fd);
+}
+
+static void detectBpfMaps(std::vector<std::string> &findings) {
+    const std::vector<std::string> paths = {
+        "/sys/fs/bpf/map_netd_iface_index_name_map",
+        "/sys/fs/bpf/netd_shared/map_netd_iface_index_name_map",
+        "/sys/fs/bpf/netd_iface_index_name_map",
+    };
+    for (const auto &path : paths) {
+        int fd = open(path.c_str(), O_RDONLY);
+        if (fd < 0) continue;
+        close(fd);
+        findings.emplace_back("bpf_map_accessible|" + path);
+    }
+}
+
+static void detectIpRecvErr(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    int opt = 1;
+    if (setsockopt(fd, IPPROTO_IP, IP_RECVERR, &opt, sizeof(opt)) < 0) {
+        if (errno == EACCES || errno == EPERM) {
+            findings.emplace_back("unavailable|ip_recverr|denied");
+        } else if (errno == ENOPROTOOPT) {
+            findings.emplace_back("unavailable|ip_recverr|not_supported");
+        }
+    }
+    close(fd);
+}
+
+// --- n08/n04/n30: sysfs VPN interface leak ---
+static void detectSysfsLeak(std::vector<std::string> &findings) {
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    const std::vector<std::string> sysfsBases = {"/sys/class/net", "/sys/devices/virtual/net"};
+    std::vector<std::string> leaked;
+    for (const auto &base : sysfsBases) {
+        for (const auto &name : tunNames) {
+            std::string path = base + "/" + name;
+            struct stat st;
+            if (stat(path.c_str(), &st) == 0) {
+                leaked.emplace_back(base + ": leaked " + name);
+            }
+        }
+    }
+    const std::vector<std::string> procSysBases = {
+        "/proc/sys/net/ipv4/conf", "/proc/sys/net/ipv6/conf",
+        "/proc/sys/net/ipv4/neigh", "/proc/sys/net/ipv6/neigh",
+    };
+    for (const auto &base : procSysBases) {
+        for (const auto &name : tunNames) {
+            std::string path = base + "/" + name;
+            struct stat st;
+            if (stat(path.c_str(), &st) == 0) {
+                leaked.emplace_back(base + ": leaked " + name);
+            }
+        }
+    }
+    if (!leaked.empty()) {
+        std::string r = "sysfs_vpn_leak|";
+        for (size_t i = 0; i < leaked.size(); ++i) {
+            if (i > 0) r += ", ";
+            r += leaked[i];
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n03: getifaddrs VPN interfaces ---
+static void detectGetifaddrsVpn(std::vector<std::string> &findings) {
+    struct ifaddrs *head = nullptr;
+    if (getifaddrs(&head) != 0 || head == nullptr) return;
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    std::vector<std::string> found;
+    for (struct ifaddrs *cur = head; cur != nullptr; cur = cur->ifa_next) {
+        if (cur->ifa_name == nullptr) continue;
+        for (const auto &name : tunNames) {
+            if (cur->ifa_name == name) {
+                found.push_back(name);
+                break;
+            }
+        }
+    }
+    freeifaddrs(head);
+    if (!found.empty()) {
+        std::string r = "getifaddrs_vpn|";
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (i > 0) r += ", ";
+            r += found[i];
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n04: /sys/class/net VPN interfaces ---
+static void detectSysclassnetVpn(std::vector<std::string> &findings) {
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    std::vector<std::string> found;
+    for (const auto &name : tunNames) {
+        std::string path = std::string("/sys/class/net/") + name;
+        struct stat st;
+        if (stat(path.c_str(), &st) == 0) {
+            found.push_back(name);
+        }
+    }
+    if (!found.empty()) {
+        std::string r = "sysclassnet_vpn|";
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (i > 0) r += ", ";
+            r += found[i];
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n05: RTM_GETLINK VPN interfaces ---
+static std::string extractRtattrString(const struct rtattr *attr) {
+    auto *data = reinterpret_cast<char *>(RTA_DATA(attr));
+    if (data == nullptr || data[0] == '\0') return {};
+    return {data};
+}
+
+static bool isVpnName(const std::string &name, const std::vector<std::string> &tunNames) {
+    for (const auto &t : tunNames) {
+        if (t == name) return true;
+    }
+    return false;
+}
+
+static void processNetlinkMsg(
+    const struct nlmsghdr *nh,
+    const std::vector<std::string> &tunNames,
+    std::vector<std::string> &found
+) {
+    if (nh->nlmsg_type != RTM_NEWLINK) return;
+    auto *ifi = reinterpret_cast<struct ifinfomsg *>(NLMSG_DATA(nh));
+    int rtaLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(*ifi));
+    auto *attr = reinterpret_cast<struct rtattr *>(ifi + 1);
+    std::string ifname;
+    for (; RTA_OK(attr, rtaLen); attr = RTA_NEXT(attr, rtaLen)) {
+        if (attr->rta_type == IFLA_IFNAME) {
+            ifname = extractRtattrString(attr);
+            break;
+        }
+    }
+    if (!ifname.empty() && isVpnName(ifname, tunNames)) {
+        found.push_back(ifname);
+    }
+}
+
+static void detectRtmGetlinkVpn(std::vector<std::string> &findings) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+    if (fd < 0) return;
+
+    struct {
+        struct nlmsghdr nlh;
+        struct ifinfomsg ifi;
+    } req{};
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+    req.nlh.nlmsg_type = RTM_GETLINK;
+    req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.nlh.nlmsg_seq = 1;
+
+    struct sockaddr_nl kernel{};
+    kernel.nl_family = AF_NETLINK;
+
+    if (sendto(fd, &req, req.nlh.nlmsg_len, 0,
+               reinterpret_cast<struct sockaddr *>(&kernel), sizeof(kernel)) < 0) {
+        close(fd);
+        return;
+    }
+
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    std::vector<std::string> found;
+    char buf[8192];
+    bool done = false;
+    while (!done) {
+        struct pollfd pfd = {fd, POLLIN, 0};
+        if (poll(&pfd, 1, 2000) <= 0) break;
+        ssize_t len = recv(fd, buf, sizeof(buf), 0);
+        if (len <= 0) break;
+        for (auto *nh = reinterpret_cast<struct nlmsghdr *>(buf);
+             NLMSG_OK(nh, static_cast<unsigned int>(len));
+             nh = NLMSG_NEXT(nh, len)) {
+            if (nh->nlmsg_type == NLMSG_DONE || nh->nlmsg_type == NLMSG_ERROR) {
+                done = true;
+                break;
+            }
+            processNetlinkMsg(nh, tunNames, found);
+        }
+    }
+    close(fd);
+    if (!found.empty()) {
+        std::string r = "rtm_getlink_vpn|";
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (i > 0) r += ", ";
+            r += found[i];
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n10: /proc/net/if_inet6 VPN entries ---
+static void detectProcIfInet6(std::vector<std::string> &findings) {
+    const std::vector<std::string> paths = {"/proc/net/if_inet6", "/proc/self/net/if_inet6"};
+    const std::vector<std::string> vpnIfaces = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    for (const auto &path : paths) {
+        std::ifstream f(path);
+        if (!f) continue;
+        int vpnCount = 0;
+        std::string vpnIfacesStr;
+        std::string line;
+        while (std::getline(f, line)) {
+            std::istringstream iss(line);
+            std::string tokens[6];
+            for (int i = 0; i < 6 && iss >> tokens[i]; ++i) {}
+            if (tokens[5].empty()) continue;
+            const auto &iface = tokens[5];
+            bool match = false;
+            for (const auto &v : vpnIfaces) { if (v == iface) { match = true; break; } }
+            if (!match) continue;
+            vpnCount++;
+            if (!vpnIfacesStr.empty()) vpnIfacesStr += ", ";
+            vpnIfacesStr += iface;
+        }
+        if (vpnCount > 0) {
+            findings.emplace_back("proc_if_inet6_vpn|count=" + std::to_string(vpnCount) + " ifaces=" + vpnIfacesStr);
+            return;
+        }
+    }
+}
+
+// --- n11: /proc/net/ipv6_route VPN entries ---
+static void detectProcIpv6RouteVpn(std::vector<std::string> &findings) {
+    const std::vector<std::string> paths = {"/proc/net/ipv6_route", "/proc/self/net/ipv6_route"};
+    const std::vector<std::string> vpnIfaces = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    for (const auto &path : paths) {
+        std::ifstream f(path);
+        if (!f) continue;
+        int vpnCount = 0;
+        std::string line;
+        while (std::getline(f, line)) {
+            std::istringstream iss(line);
+            std::string tokens[10];
+            for (int i = 0; i < 10 && iss >> tokens[i]; ++i) {}
+            if (tokens[9].empty()) continue;
+            const auto &iface = tokens[9];
+            bool match = false;
+            for (const auto &v : vpnIfaces) { if (v == iface) { match = true; break; } }
+            if (match) vpnCount++;
+        }
+        if (vpnCount > 0) {
+            findings.emplace_back("proc_ipv6_route_vpn|count=" + std::to_string(vpnCount));
+            return;
+        }
+    }
+}
+
+// --- n16: /proc/net/dev VPN interface traffic ---
+static void detectProcNetDevVpn(std::vector<std::string> &findings) {
+    const std::vector<std::string> paths = {"/proc/net/dev", "/proc/self/net/dev"};
+    const std::vector<std::string> vpnIfaces = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    for (const auto &path : paths) {
+        std::ifstream f(path);
+        if (!f) continue;
+        std::string line;
+        std::getline(f, line); // skip header 1
+        std::getline(f, line); // skip header 2
+        while (std::getline(f, line)) {
+            auto colon = line.find(':');
+            if (colon == std::string::npos) continue;
+            std::string iface = line.substr(0, colon);
+            // trim leading whitespace
+            auto start = iface.find_first_not_of(" \t");
+            if (start != std::string::npos) iface = iface.substr(start);
+            bool match = false;
+            for (const auto &v : vpnIfaces) { if (v == iface) { match = true; break; } }
+            if (!match) continue;
+            std::istringstream iss(line.substr(colon + 1));
+            unsigned long rxBytes = 0, rxPackets = 0, txBytes = 0, txPackets = 0;
+            iss >> rxBytes >> rxPackets;
+            for (int i = 0; i < 6; ++i) { unsigned long tmp; iss >> tmp; }
+            iss >> txBytes >> txPackets;
+            findings.emplace_back("proc_net_dev_vpn|iface=" + iface + " rx=" + std::to_string(rxBytes) + " tx=" + std::to_string(txBytes));
+            return;
+        }
+    }
+}
+
+// --- n17: /proc/net/fib_trie SELinux access check ---
+static void detectFibTrieAccess(std::vector<std::string> &findings) {
+    FILE *f = fopen("/proc/net/fib_trie", "re");
+    if (f) {
+        fclose(f);
+    } else {
+        if (errno == EACCES || errno == EPERM) {
+            findings.push_back("fib_trie_denied|SELinux denies /proc/net/fib_trie");
+        } else if (errno == ENOENT) {
+            // not available on this kernel, neutral
+        } else {
+            std::string r = "fib_trie_denied|errno=" + std::to_string(errno);
+            findings.push_back(r);
+        }
+    }
+}
+
+// --- n18: SO_BINDTODEVICE setsockopt ---
+static void detectSetsockoptBindToDevice(std::vector<std::string> &findings) {
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0"};
+    for (const auto &name : tunNames) {
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd < 0) continue;
+        int rc = setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, name.c_str(), static_cast<socklen_t>(name.size() + 1));
+        if (rc == 0) {
+            char devName[256] = {0};
+            socklen_t devLen = sizeof(devName);
+            if (getsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, devName, &devLen) == 0) {
+                std::string devStr(devName);
+                if (devStr.find(name) != std::string::npos) {
+                    findings.emplace_back("bindtodevice_leak|setsockopt(" + name + ") succeeded, getsockopt confirmed");
+                }
+            }
+        }
+        close(fd);
+    }
+}
+
+// --- n19: inet_diag netlink access check ---
+static void detectInetDiagAccess(std::vector<std::string> &findings) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_SOCK_DIAG);
+    if (fd < 0) {
+        if (errno == EACCES || errno == EPERM) {
+            findings.push_back("inet_diag_denied|SELinux denies inet_diag netlink");
+        }
+        return;
+    }
+    close(fd);
+}
+
+// --- n20: getsockname() VPN IP leak ---
+static void detectGetsocknameLeak(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    struct sockaddr_in localAddr;
+    socklen_t addrLen = sizeof(localAddr);
+    std::memset(&localAddr, 0, sizeof(localAddr));
+    if (getsockname(fd, reinterpret_cast<struct sockaddr *>(&localAddr), &addrLen) == 0) {
+        if (localAddr.sin_addr.s_addr != 0) {
+            char ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &localAddr.sin_addr, ip, sizeof(ip));
+            // Check if it's a private IP that could be VPN
+            unsigned int addr = ntohl(localAddr.sin_addr.s_addr);
+            bool isPrivate = ((addr >> 24) == 10) ||
+                             ((addr >> 20) == 0xAC1) || // 172.16.0.0/12
+                             ((addr >> 16) == 0xC0A8);  // 192.168.0.0/16
+            if (isPrivate) {
+                std::string r = "getsockname_leak|local_ip=" + std::string(ip);
+                findings.push_back(r);
+            }
+        }
+    }
+    close(fd);
+}
+
+// --- n21: VPN routing policy rules via netlink ---
+static void detectVpnPolicyRules(std::vector<std::string> &findings) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+    if (fd < 0) return;
+
+    struct {
+        struct nlmsghdr nlh;
+        struct rtmsg rtm;
+    } req;
+    std::memset(&req, 0, sizeof(req));
+    req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+    req.nlh.nlmsg_type = RTM_GETRULE;
+    req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.nlh.nlmsg_seq = 1;
+    req.rtm.rtm_family = AF_INET;
+
+    struct sockaddr_nl kernel;
+    std::memset(&kernel, 0, sizeof(kernel));
+    kernel.nl_family = AF_NETLINK;
+
+    if (sendto(fd, &req, req.nlh.nlmsg_len, 0,
+               reinterpret_cast<struct sockaddr *>(&kernel), sizeof(kernel)) < 0) {
+        close(fd);
+        return;
+    }
+
+    int vpnRuleCount = 0;
+    std::string ruleSummary;
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+
+    char buf[8192];
+    while (true) {
+        struct pollfd pfd = {fd, POLLIN, 0};
+        int pr = poll(&pfd, 1, 2000);
+        if (pr <= 0) break;
+        ssize_t len = recv(fd, buf, sizeof(buf), 0);
+        if (len <= 0) break;
+        bool done = false;
+        for (auto *nh = reinterpret_cast<struct nlmsghdr *>(buf);
+             NLMSG_OK(nh, static_cast<unsigned int>(len));
+             nh = NLMSG_NEXT(nh, len)) {
+            if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
+            if (nh->nlmsg_type == NLMSG_ERROR) { done = true; break; }
+            if (nh->nlmsg_type != RTM_NEWRULE) continue;
+
+            auto *rtm = reinterpret_cast<struct rtmsg *>(NLMSG_DATA(nh));
+            int rtaLen = nh->nlmsg_len - NLMSG_LENGTH(sizeof(*rtm));
+            auto *attr = reinterpret_cast<struct rtattr *>(rtm + 1);
+
+            int table = rtm->rtm_table;
+            unsigned int fwMark = 0;
+            int oif = 0;
+            char iface[IF_NAMESIZE] = {0};
+
+            for (; RTA_OK(attr, rtaLen); attr = RTA_NEXT(attr, rtaLen)) {
+                auto *data = RTA_DATA(attr);
+                int alen = RTA_PAYLOAD(attr);
+                switch (attr->rta_type) {
+                    case RTA_TABLE: {
+                        if (alen >= static_cast<int>(sizeof(int))) {
+                            table = *reinterpret_cast<int *>(data);
+                        }
+                        break;
+                    }
+                    case RTA_OIF: {
+                        if (alen >= static_cast<int>(sizeof(int))) {
+                            oif = *reinterpret_cast<int *>(data);
+                            if_indextoname(oif, iface);
+                        }
+                        break;
+                    }
+                    case RTA_FLOW: {
+                        if (alen >= static_cast<int>(sizeof(unsigned int))) {
+                            fwMark = *reinterpret_cast<unsigned int *>(data);
+                        }
+                        break;
+                    }
+                    default: break;
+                }
+            }
+
+            if (table >= 100 && table <= 200) {
+                // High table numbers are often VPN policy routing tables
+                bool isVpnIface = false;
+                for (const auto &name : tunNames) {
+                    if (iface[0] && name == iface) {
+                        isVpnIface = true;
+                        break;
+                    }
+                }
+                if (isVpnIface || (table >= 100 && table <= 110)) {
+                    vpnRuleCount++;
+                    if (!ruleSummary.empty()) ruleSummary += "; ";
+                    ruleSummary += "table=" + std::to_string(table);
+                    if (iface[0]) ruleSummary += " iface=" + std::string(iface);
+                    if (fwMark) ruleSummary += " fwmark=0x" + std::to_string(fwMark);
+                }
+            }
+
+        }
+        if (done) break;
+    }
+    close(fd);
+
+    if (vpnRuleCount > 0) {
+        std::string r = "vpn_policy_rules_netlink|count=" + std::to_string(vpnRuleCount);
+        if (!ruleSummary.empty()) r += " " + ruleSummary;
+        findings.push_back(r);
+    }
+}
+
+// --- n07: Route count / anonymous interfaces ---
+static void detectRouteCount(std::vector<std::string> &findings) {
+    auto routes = netlinkRouteDump(0);
+    int totalRoutes = 0;
+    for (const auto &r : routes) {
+        if (r.find("route|") == 0) totalRoutes++;
+    }
+    // Count unique interfaces
+    std::map<std::string, int> ifaceCounts;
+    for (const auto &r : routes) {
+        auto devPos = r.find("|dev=");
+        if (devPos != std::string::npos) {
+            auto devEnd = r.find('|', devPos + 5);
+            std::string dev = (devEnd != std::string::npos)
+                ? r.substr(devPos + 5, devEnd - devPos - 5)
+                : r.substr(devPos + 5);
+            ifaceCounts[dev]++;
+        }
+    }
+    std::string r = "route_count|total=" + std::to_string(totalRoutes);
+    r += " interfaces=" + std::to_string(ifaceCounts.size());
+    findings.push_back(r);
+}
+
+// --- n41: UDP port conflict on physical interface IP ---
+static void detectUdpPortConflictPhysicalIp(std::vector<std::string> &findings) {
+    // Get physical interface IP via getifaddrs
+    struct ifaddrs *head = nullptr;
+    if (getifaddrs(&head) != 0 || head == nullptr) return;
+
+    std::string physicalIp;
+    for (struct ifaddrs *cur = head; cur != nullptr; cur = cur->ifa_next) {
+        if (cur->ifa_name == nullptr || cur->ifa_addr == nullptr) continue;
+        if (cur->ifa_addr->sa_family != AF_INET) continue;
+        const char *name = cur->ifa_name;
+        // Skip tunnel/VPN interfaces
+        if (strstr(name, "tun") || strstr(name, "wg") || strstr(name, "ppp") ||
+            strstr(name, "xfrm") || strstr(name, "utun")) continue;
+        if (strcmp(name, "lo") == 0) continue;
+        char ip[INET_ADDRSTRLEN];
+        auto *in4 = reinterpret_cast<sockaddr_in *>(cur->ifa_addr);
+        inet_ntop(AF_INET, &in4->sin_addr, ip, sizeof(ip));
+        physicalIp = ip;
+        break; // take the first physical IP
+    }
+    freeifaddrs(head);
+
+    if (physicalIp.empty()) return;
+
+    static const int kVpnPorts[] = {500, 4500, 1194, 1701, 51820};
+    std::vector<int> conflicts;
+    for (int port : kVpnPorts) {
+        int testFd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (testFd < 0) continue;
+        int opt = 1;
+        setsockopt(testFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(static_cast<uint16_t>(port));
+        inet_pton(AF_INET, physicalIp.c_str(), &addr.sin_addr);
+        if (bind(testFd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0) {
+            if (errno == EADDRINUSE) {
+                conflicts.push_back(port);
+            }
+        }
+        close(testFd);
+    }
+    if (!conflicts.empty()) {
+        std::string r = "udp_port_conflict_physical|ip=" + physicalIp + " ports=";
+        for (size_t i = 0; i < conflicts.size(); ++i) {
+            if (i > 0) r += ",";
+            r += std::to_string(conflicts[i]);
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n42: Trim oracle (bind probe vs RTM_GETLINK) ---
+static void detectTrimOracle(std::vector<std::string> &findings) {
+    // Count interfaces via bind probe
+    int bindCount = 0;
+    for (int ifindex = 1; ifindex < 128; ++ifindex) {
+        char name[IF_NAMESIZE] = {0};
+        if (if_indextoname(static_cast<unsigned int>(ifindex), name) != nullptr) {
+            bindCount++;
+        }
+    }
+    // Count interfaces via RTM_GETLINK
+    int rtmCount = 0;
+    {
+        int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+        if (fd >= 0) {
+            struct {
+                struct nlmsghdr nlh;
+                struct ifinfomsg ifi;
+            } req;
+            std::memset(&req, 0, sizeof(req));
+            req.nlh.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+            req.nlh.nlmsg_type = RTM_GETLINK;
+            req.nlh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+            req.nlh.nlmsg_seq = 1;
+            struct sockaddr_nl kernel;
+            std::memset(&kernel, 0, sizeof(kernel));
+            kernel.nl_family = AF_NETLINK;
+            if (sendto(fd, &req, req.nlh.nlmsg_len, 0,
+                       reinterpret_cast<struct sockaddr *>(&kernel), sizeof(kernel)) >= 0) {
+                char buf[8192];
+                while (true) {
+                    struct pollfd pfd = {fd, POLLIN, 0};
+                    int pr = poll(&pfd, 1, 2000);
+                    if (pr <= 0) break;
+                    ssize_t len = recv(fd, buf, sizeof(buf), 0);
+                    if (len <= 0) break;
+                    bool done = false;
+                    for (auto *nh = reinterpret_cast<struct nlmsghdr *>(buf);
+                         NLMSG_OK(nh, static_cast<unsigned int>(len));
+                         nh = NLMSG_NEXT(nh, len)) {
+                        if (nh->nlmsg_type == NLMSG_DONE) { done = true; break; }
+                        if (nh->nlmsg_type == NLMSG_ERROR) { done = true; break; }
+                        if (nh->nlmsg_type == RTM_NEWLINK) rtmCount++;
+                    }
+                    if (done) break;
+                }
+            }
+            close(fd);
+        }
+    }
+    if (bindCount != rtmCount) {
+        std::string r = "trim_oracle|bind_probe=" + std::to_string(bindCount) +
+                        " rtm_getlink=" + std::to_string(rtmCount) + " MISMATCH";
+        findings.push_back(r);
+    }
+}
+
+// --- n38: if_indexname VPN leak ---
+static void detectIfindexnameVpn(std::vector<std::string> &findings) {
+    const std::vector<std::string> tunNames = {"tun0", "tun1", "utun0", "wg0", "ppp0", "xfrm0"};
+    std::vector<std::string> found;
+    for (int ifindex = 1; ifindex < 128; ++ifindex) {
+        char name[IF_NAMESIZE] = {0};
+        if (if_indextoname(static_cast<unsigned int>(ifindex), name) == nullptr) continue;
+        for (const auto &tun : tunNames) {
+            if (tun == name) {
+                found.push_back(std::string(name) + "(idx=" + std::to_string(ifindex) + ")");
+                break;
+            }
+        }
+    }
+    if (!found.empty()) {
+        std::string r = "ifindexname_vpn|";
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (i > 0) r += ", ";
+            r += found[i];
+        }
+        findings.push_back(r);
+    }
+}
+
+// --- n22: UDP PMTU + TCP MSS combined ---
+static void detectPmtuMssCombined(std::vector<std::string> &findings) {
+    // Check TCP MSS
+    int tcpFd = socket(AF_INET, SOCK_STREAM, 0);
+    if (tcpFd >= 0) {
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(443);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (connect(tcpFd, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) == 0) {
+            struct tcp_info info;
+            socklen_t infoLen = sizeof(info);
+            if (getsockopt(tcpFd, IPPROTO_TCP, TCP_INFO, &info, &infoLen) == 0) {
+                unsigned int sndMss = info.tcpi_snd_mss;
+                unsigned int rcvMss = info.tcpi_rcv_mss;
+                std::string r = "pmtu_mss_combined|tcp_snd_mss=" + std::to_string(sndMss) +
+                                " tcp_rcv_mss=" + std::to_string(rcvMss);
+                findings.push_back(r);
+            }
+        }
+        close(tcpFd);
+    }
+}
+
+// --- n24: UDP send PMTU ---
+static void detectUdpPmtu(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(53);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    // Try sending 1500 bytes (typical MTU)
+    char buf[1500];
+    std::memset(buf, 0, sizeof(buf));
+    ssize_t sent = sendto(fd, buf, sizeof(buf), 0,
+                          reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
+    if (sent > 0) {
+        std::string r = "udp_pmtu_ok|sent=" + std::to_string(sent) + " bytes";
+        findings.push_back(r);
+    } else {
+        std::string r = "udp_pmtu_fail|errno=" + std::to_string(errno);
+        findings.push_back(r);
+    }
+    close(fd);
+}
+
+// --- n40: Normal path MTU ---
+static void detectNormalPmtu(std::vector<std::string> &findings) {
+    // Get MTU from primary interface
+    struct ifaddrs *head = nullptr;
+    if (getifaddrs(&head) != 0 || head == nullptr) return;
+    for (struct ifaddrs *cur = head; cur != nullptr; cur = cur->ifa_next) {
+        if (cur->ifa_name == nullptr) continue;
+        if (strcmp(cur->ifa_name, "lo") == 0) continue;
+        if (strstr(cur->ifa_name, "tun") || strstr(cur->ifa_name, "wg") ||
+            strstr(cur->ifa_name, "ppp")) continue;
+        int mtu = fetchMtu(cur->ifa_name);
+        if (mtu > 0) {
+            std::string r = "normal_pmtu|iface=" + std::string(cur->ifa_name) +
+                            " mtu=" + std::to_string(mtu);
+            findings.push_back(r);
+            break;
+        }
+    }
+    freeifaddrs(head);
+}
+
+// --- n33: Traceroute probe ---
+static void detectTraceroute(std::vector<std::string> &findings) {
+    // Try a raw UDP traceroute-like probe to detect VPN encapsulation
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    // Set low TTL
+    int ttl = 1;
+    setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+    struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(33434); // standard traceroute port
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    char buf[64];
+    std::memset(buf, 0, sizeof(buf));
+    // Non-blocking send to detect errors
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000; // 100ms
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    ssize_t sent = sendto(fd, buf, sizeof(buf), 0,
+                          reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
+    if (sent < 0 && errno == EACCES) {
+        findings.push_back("traceroute_denied|sendto denied");
+    }
+    close(fd);
+}
+
+// --- n34: Timing oracle (CNTVCT) ---
+static void detectTimingOracle(std::vector<std::string> &findings) {
+#if defined(__aarch64__)
+    // Measure ARM cycle counter for socket operations
+    auto readCycleCounter = []() -> uint64_t {
+        uint64_t val;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(val));
+        return val;
+    };
+    const int iterations = 10;
+    uint64_t totalCycles = 0;
+    uint64_t minCycles = UINT64_MAX;
+    uint64_t maxCycles = 0;
+    for (int i = 0; i < iterations; ++i) {
+        uint64_t start = readCycleCounter();
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd >= 0) {
+            struct sockaddr_in addr;
+            std::memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(53);
+            addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            char buf[64] = {0};
+            sendto(fd, buf, sizeof(buf), 0, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
+            close(fd);
+        }
+        uint64_t end = readCycleCounter();
+        uint64_t elapsed = end - start;
+        totalCycles += elapsed;
+        if (elapsed < minCycles) minCycles = elapsed;
+        if (elapsed > maxCycles) maxCycles = elapsed;
+    }
+    uint64_t avgCycles = totalCycles / static_cast<uint64_t>(iterations);
+    std::string r = "timing_oracle|min=" + std::to_string(minCycles) +
+                    " max=" + std::to_string(maxCycles) +
+                    " avg=" + std::to_string(avgCycles);
+    findings.push_back(r);
+#else
+    findings.push_back("timing_oracle|not_arm64");
+#endif
+}
+
+// --- n35: Backpressure flood test ---
+static bool isScanCancelled(JNIEnv *env, jobject cancellationSignal, jmethodID isCancelledMethod) {
+    if (cancellationSignal == nullptr || isCancelledMethod == nullptr) return true;
+    jboolean cancelled = env->CallBooleanMethod(cancellationSignal, isCancelledMethod);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return true;
+    }
+    return cancelled == JNI_TRUE;
+}
+
+static void detectBackpressure(
+    JNIEnv *env,
+    jobject cancellationSignal,
+    jmethodID isCancelledMethod,
+    std::vector<std::string> &findings
+) {
+    if (isScanCancelled(env, cancellationSignal, isCancelledMethod)) return;
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(53);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const int pktCount = 50000;
+    const int pktSize = 1400;
+    char buf[pktSize];
+    std::memset(buf, 0, sizeof(buf));
+    int sent = 0;
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < pktCount; ++i) {
+        if ((i & 63) == 0 && isScanCancelled(env, cancellationSignal, isCancelledMethod)) {
+            close(fd);
+            return;
+        }
+        ssize_t rc = sendto(fd, buf, sizeof(buf), MSG_DONTWAIT,
+                            reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
+        if (rc < 0) break;
+        sent++;
+    }
+    auto end = std::chrono::steady_clock::now();
+    close(fd);
+    if (isScanCancelled(env, cancellationSignal, isCancelledMethod)) return;
+    double elapsedMs = std::chrono::duration<double, std::milli>(end - start).count();
+    double throughputMB = (static_cast<double>(sent) * pktSize) / (1024.0 * 1024.0) / (elapsedMs / 1000.0);
+    std::string r = "backpressure|" + std::to_string(sent) + "/" + std::to_string(pktCount) +
+                    " pkts sent in " + std::to_string(static_cast<int>(elapsedMs)) + "ms (" +
+                    std::to_string(static_cast<int>(throughputMB)) + " MB/s)";
+    findings.push_back(r);
+}
+
+// --- n36: GSO large send test ---
+static void detectGsoLargeSend(std::vector<std::string> &findings) {
+#if defined(__linux__)
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    // Use a segment size that fits a normal path MTU. GSO availability is
+    // diagnostic only; lack of support is not VPN evidence.
+    int gsoSize = 1200;
+    int rc = setsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &gsoSize, sizeof(gsoSize));
+    if (rc < 0) {
+        std::string r = "gso_failed|errno=" + std::to_string(errno);
+        findings.push_back(r);
+    } else {
+        // GSO accepted, try sending
+        struct sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(53);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        char buf[4800];
+        std::memset(buf, 0, sizeof(buf));
+        ssize_t sent = sendto(fd, buf, sizeof(buf), 0,
+                              reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr));
+        if (sent < 0) {
+            std::string r = "gso_send_failed|errno=" + std::to_string(errno);
+            findings.push_back(r);
+        } else {
+            findings.push_back("gso_ok");
+        }
+    }
+    close(fd);
+#endif
+}
+
+// --- n37: Hardware timestamping check ---
+static void detectHwTimestamp(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+    struct hwtstamp_config hwconfig;
+    std::memset(&hwconfig, 0, sizeof(hwconfig));
+    hwconfig.tx_type = HWTSTAMP_TX_ON;
+    struct ifreq ifr;
+    std::memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+    ifr.ifr_data = reinterpret_cast<caddr_t>(&hwconfig);
+    int rc = ioctl(fd, SIOCSHWTSTAMP, &ifr);
+    if (rc == 0) {
+        findings.push_back("hw_timestamp|lo configured");
+    }
+    // Also check for SCM_TIMESTAMPING
+    int tsFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (tsFd >= 0) {
+        int tsFlags = SOF_TIMESTAMPING_SOFTWARE;
+        setsockopt(tsFd, SOL_SOCKET, SO_TIMESTAMPING, &tsFlags, sizeof(tsFlags));
+        close(tsFd);
+    }
+    close(fd);
+}
+
+// --- n33: Traceroute (already defined above, skipping duplicate) ---
+
+static void detectLoopbackConflicts(std::vector<std::string> &findings) {
+    static const int kVpnPorts[] = {51820, 1194, 443, 8443};
+    for (int port : kVpnPorts) {
+        int testFd = socket(AF_INET, SOCK_STREAM, 0);
+        if (testFd < 0) continue;
+        int opt = 1;
+        setsockopt(testFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (bind(testFd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+            if (errno == EADDRINUSE) {
+                std::string r = "loopback_port_conflict|port="; r.append(std::to_string(port));
+                findings.push_back(r);
+            }
+        }
+        close(testFd);
+    }
+}
+
+static void detectSocketLeaks(std::vector<std::string> &findings) {
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd >= 0) {
+        struct sockaddr_in localAddr;
+        socklen_t addrLen = sizeof(localAddr);
+        memset(&localAddr, 0, sizeof(localAddr));
+        if (getsockname(fd, (struct sockaddr *)&localAddr, &addrLen) == 0) {
+            if (localAddr.sin_addr.s_addr != 0) {
+                char ip[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &localAddr.sin_addr, ip, sizeof(ip));
+                std::string r = "so_bindtodevice|local_ip="; r.append(ip);
+                findings.push_back(r);
+            }
+        }
+        close(fd);
+    }
+}
+
 const JNINativeMethod kMethods[] = {
     {"nativeGetIfAddrs", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeGetIfAddrs)},
     {"nativeIfNameToIndex", "(Ljava/lang/String;)I", reinterpret_cast<void *>(nativeIfNameToIndex)},
@@ -1034,9 +2250,62 @@ const JNINativeMethod kMethods[] = {
     {"nativeNetlinkSockDiag", "(II)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkSockDiag)},
     {"nativeDetectRoot", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectRoot)},
     {"nativeDetectEmulator", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectEmulator)},
+    {"nativeDetectVpnProperties", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnProperties)},
+    {"nativeDetectVpnLeaks", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnLeaks)},
+    {"nativeDetectVpnAdvanced", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnAdvanced)},
+    {"nativeDetectVpnSyscalls", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnSyscalls)},
+    {"nativeDetectVpnDetector", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnDetector)},
 };
 
-} // namespace
+// New consolidated VPN detector: returns ONLY the new deep checks (prefixed
+// with "vdet|") so they can live in their own UI category, separate from the
+// legacy NativeSignsChecker output.
+jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/, jobject cancellationSignal) {
+    std::vector<std::string> raw;
+    jmethodID isCancelledMethod = nullptr;
+    if (cancellationSignal != nullptr) {
+        jclass cancellationClass = env->GetObjectClass(cancellationSignal);
+        if (cancellationClass != nullptr) {
+            isCancelledMethod = env->GetMethodID(cancellationClass, "isCancelled", "()Z");
+            env->DeleteLocalRef(cancellationClass);
+        }
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            isCancelledMethod = nullptr;
+        }
+    }
+    detectSysfsLeak(raw);
+    detectGetifaddrsVpn(raw);
+    detectSysclassnetVpn(raw);
+    detectRtmGetlinkVpn(raw);
+    detectProcIfInet6(raw);
+    detectProcIpv6RouteVpn(raw);
+    detectProcNetDevVpn(raw);
+    detectIfindexnameVpn(raw);
+    detectRouteCount(raw);
+    detectNormalPmtu(raw);
+    detectFibTrieAccess(raw);
+    detectInetDiagAccess(raw);
+    detectVpnPolicyRules(raw);
+    detectTrimOracle(raw);
+    detectPmtuMssCombined(raw);
+    detectUdpPmtu(raw);
+    detectTraceroute(raw);
+    detectTimingOracle(raw);
+    detectBackpressure(env, cancellationSignal, isCancelledMethod, raw);
+    detectGsoLargeSend(raw);
+    detectHwTimestamp(raw);
+    detectSetsockoptBindToDevice(raw);
+    detectGetsocknameLeak(raw);
+    detectUdpPortConflictPhysicalIp(raw);
+
+    std::vector<std::string> prefixed;
+    prefixed.reserve(raw.size());
+    for (const auto &line : raw) {
+        prefixed.push_back("vdet|" + line);
+    }
+    return toStringArray(env, prefixed);
+}
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void * /*reserved*/) {
     JNIEnv *env = nullptr;

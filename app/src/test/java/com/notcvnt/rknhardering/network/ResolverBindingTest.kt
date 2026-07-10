@@ -6,8 +6,11 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.DatagramSocket
+import java.net.Socket
 
 class ResolverBindingTest {
 
@@ -29,6 +32,24 @@ class ResolverBindingTest {
         }
 
         assertEquals(listOf("tun0"), boundInterfaces)
+    }
+
+    @Test
+    fun `socket binding infrastructure failure is propagated`() {
+        Socket().use { socket ->
+            assertThrows(RuntimeException::class.java) {
+                ResolverSocketBinder.bind(socket, ResolverBinding.OsDeviceBinding("missing0"))
+            }
+        }
+    }
+
+    @Test
+    fun `datagram binding infrastructure failure is propagated`() {
+        DatagramSocket().use { socket ->
+            assertThrows(RuntimeException::class.java) {
+                ResolverSocketBinder.bind(socket, ResolverBinding.OsDeviceBinding("missing0"))
+            }
+        }
     }
 
     @Test

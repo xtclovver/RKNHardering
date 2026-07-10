@@ -546,6 +546,110 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 Любой из сигналов даёт `needsReview = true` (`EvidenceSource.SANDBOX_ISOLATION`), **никогда** `detected`.
 
+#### 12.5 VPN-сигналы (`evaluateVpnSignals`)
+
+Комплексная проверка VPN через нативные JNI-вызовы. Все проверки работают на **нерутованных** устройствах — при отсутствии прав (SELinux/capabilities) проверка помечается как `unavailable` и не крашится.
+
+**Свойства и файлы (`nativeDetectVpnProperties`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| DNS-свойства | `net.dns1-4`, `net.vpn.dns1-2`, `dhcp.tun0.dns1-2` | `__system_property_get` |
+| VPN-свойства | `net.vpn.default_iface`, `vpn.enable`, `net.tun0.dns1-2`, `net.ppp0.dns1-2` | `__system_property_get` |
+| vpnhide файлы | `/data/local/vpnhide`, `/data/adb/vpnhide`, `/data/local/bypass` и др. | `access(F_OK)` |
+| LSPosed/Xposed | `/data/adb/lspd`, `/data/adb/modules/lsposed`, `/data/adb/ksu/modules/lsposed` | `access(F_OK)` |
+| Hook-свойства | `persist.sys.lspd`, `persist.sys.lsposed`, `ro.lsposed.hidden` | `__system_property_get` |
+
+Высокая уверенность: `vpn_prop`, `vpnhide`, `hook_prop`. Средняя: остальные.
+
+**Утечки через /proc (`nativeDetectVpnLeaks`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| TCP VPN-порты | Соединения на портах 443, 1194, 51820, 8443, 1723, 500, 4500 | `/proc/net/tcp[6]` |
+| UDP VPN-порты | Сокеты на портах 51820 (WireGuard), 1194 (OpenVPN), 500, 4500 | `/proc/net/udp[6]` |
+| if_inet6 | Интерфейсы tun/wg/ppp/tap в `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| Route VPN | Маршруты через tun/wg/ppp/tap | `/proc/net/route` |
+| FIB trie | `/32 host` записи (не LOCAL) — хост-маршруты VPN | `/proc/net/fib_trie` |
+
+Высокая уверенность: `udp_vpn_port`, `route_vpn_iface`, `arp_vpn_iface`, `inet6_vpn_iface`.
+
+**Продвинутые проверки (`nativeDetectVpnAdvanced`):**
+
+| Проверка | Что ищем | Источник |
+|----------|----------|----------|
+| ARP VPN | Записи на tun/wg/ppp интерфейсах | `/proc/net/arp` |
+| Sysctl | `rp_filter=0`, `ip_forward=1`, `forwarding=1` | `/proc/sys/net/ipv4/conf/*/rp_filter` и др. |
+| ESTABLISHED VPN | Соединения к приватным IP на VPN-портах | `/proc/net/tcp` |
+
+**Нетрадиционные syscall-проверки (`nativeDetectVpnSyscalls`):**
+
+Проверки через прямые netlink-запросы и пробные соединения. При отсутствии прав возвращают `unavailable`:
+
+| Проверка | Метод | Что обнаруживает |
+|----------|-------|-------------------|
+| RTM_GETRULE | Netlink dump роутинг-правил | VPN policy routing rules |
+| RTM_GETQDISC | Netlink dump queueing discipline | VPN qdisc туннели |
+| RTM_GETNEIGH | Netlink dump таблицы соседей | Скрытые MAC-адреса (нулевые LLADDR) |
+| TCP_INFO MSS | Connect к 8.8.8.8:443, чтение `snd_mss` | Снижение MSS (признак туннеля) |
+| SO_BINDTODEVICE | Пробный bind на несуществующий интерфейс | Перехват setsockopt VPN-хуком |
+| Loopback port bind | Попытка занять порты 51820/1194/443/8443 | Конфликты портов (VPN listener) |
+| BPF OBJ GET | Попытка открыть `/sys/fs/bpf/` карты | Доступ к BPF-картам netd |
+| IP_RECVERR | Пробный setsockopt IP_RECVERR | Перехват IP_RECVERR VPN-хуком |
+
+Высокая уверенность: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
+
+#### 12.6 Deep VPN Detector (`VpnNativeDetectorChecker`)
+
+
+Новые детекты вынесены в отдельную секцию внутри категории Native и сгруппированы по 4 подкатегориям. Данные приходят из нового JNI-метода `nativeDetectVpnDetector(cancellationSignal)`, строки имеют префикс `vdet|`.
+
+**Прямые признаки (Direct signs) — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `sysfs_vpn_leak` | Утечка tun/wg/ppp/xfrm через sysfs | `/sys/class/net`, `/sys/devices/virtual/net`, `/proc/sys/net/ipv4|6/conf|neigh` |
+| `getifaddrs_vpn` | VPN-интерфейсы в списке `getifaddrs()` | `getifaddrs()` |
+| `sysclassnet_vpn` | VPN-интерфейсы в `/sys/class/net` | `stat("/sys/class/net/<if>")` |
+| `rtm_getlink_vpn` | VPN-интерфейсы через netlink RTM_GETLINK | Netlink `RTM_GETLINK` dump |
+| `proc_if_inet6_vpn` | VPN-интерфейсы в `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| `proc_ipv6_route_vpn` | VPN-маршруты в `/proc/net/ipv6_route` | `/proc/net/ipv6_route` |
+| `proc_net_dev_vpn` | VPN-трафик (RX/TX) в `/proc/net/dev` | `/proc/net/dev` |
+| `ifindexname_vpn` | VPN-интерфейсы через `if_indextoname()` | `if_indextoname()` перебор ifindex |
+| `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
+
+**Сетевые признаки (Network signs) — `EvidenceSource.NATIVE_SOCKET`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `fib_trie_denied` | `/proc/net/fib_trie` недоступен (SELinux EACCES) | `fopen("/proc/net/fib_trie")` |
+| `inet_diag_denied` | inet_diag netlink запрещён (SELinux) | `socket(NETLINK_SOCK_DIAG)` |
+| `bindtodevice_leak` | `SO_BINDTODEVICE` к tun + подтверждение `getsockopt` | `setsockopt(SO_BINDTODEVICE)` |
+| `getsockname_leak` | `getsockname()` возвращает приватный VPN-IP | `getsockname()` на UDP-сокете |
+| `udp_port_conflict_physical` | Конфликт UDP-портов (500/4500/1194/1701/51820) на физическом IP | `bind()` на физический IP |
+| `route_count` | Число маршрутов и уникальных интерфейсов | Netlink `RTM_GETROUTE` dump |
+| `trim_oracle` | Расхождение bind-probe vs RTM_GETLINK по числу iface | `if_indextoname()` vs `RTM_GETLINK` |
+
+**Косвенные признаки (Indirect signs) — `EvidenceSource.NATIVE_ROUTE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `pmtu_mss_combined` | UDP PMTU + TCP MSS (tcpi_snd_mss/rcv_mss) | `connect()` + `getsockopt(TCP_INFO)` |
+| `udp_pmtu_ok` / `udp_pmtu_fail` | Успех/неудача отправки 1500 байт по UDP | `sendto()` 1500 байт |
+| `normal_pmtu` | Path MTU основного физического интерфейса | `fetchMtu()` через `getifaddrs()` |
+| `timing_oracle` | ARM CNTVCT циклы для `sendto()` (мин/макс/сред) | `mrs cntvct_el0` (aarch64) |
+| `backpressure` | Пропускная способность при 50000 UDP-пакетах с отменой скана | Неблокирующий `sendto()` burst + проверка cancellation каждые 64 пакета |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | Диагностика поддержки UDP GSO; результат не является признаком VPN | `UDP_SEGMENT=1200` + отправка 4800 байт |
+| `hw_timestamp` | Аппаратный таймстампинг (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
+
+**Пробы окружения (Environment probes) — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Проверка (kind) | Что ищем | Источник |
+|-----------------|----------|----------|
+| `traceroute_denied` | Traceroute-проба (TTL=1 UDP) заблокирована | `setsockopt(IP_TTL=1)` + `sendto()` |
+
+Высокая уверенность (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`. Сырые измерения и GSO-результаты информационные; остальные аномалии → `needsReview`.
+
 ---
 
 ## Вердикт (`VerdictEngine`)
@@ -571,7 +675,7 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 - `geoHit` = `GeoIP.outsideRu == true` (кроме роуминга)
 - `directHit` = detected-evidence из `DIRECT_NETWORK_CAPABILITIES` или `SYSTEM_PROXY`
-- `indirectHit` = detected-evidence из `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`
+- `indirectHit` = detected-evidence из `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH` либо high-confidence `NATIVE_SOCKET`
 
 | Geo | Direct | Indirect | Вердикт |
 |-----|--------|----------|---------|

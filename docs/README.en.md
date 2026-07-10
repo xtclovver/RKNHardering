@@ -519,6 +519,109 @@ Identifies contexts where another user's or profile's VPN is invisible to networ
 
 Any of these signals yields `needsReview = true` (`EvidenceSource.SANDBOX_ISOLATION`), never `detected`.
 
+#### 12.5 VPN Signals (`evaluateVpnSignals`)
+
+Comprehensive VPN detection via native JNI calls. All checks work on **non-rooted** devices — when permissions are missing (SELinux/capabilities), the check is marked as `unavailable` and does not crash.
+
+**Properties and files (`nativeDetectVpnProperties`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| DNS properties | `net.dns1-4`, `net.vpn.dns1-2`, `dhcp.tun0.dns1-2` | `__system_property_get` |
+| VPN properties | `net.vpn.default_iface`, `vpn.enable`, `net.tun0.dns1-2`, `net.ppp0.dns1-2` | `__system_property_get` |
+| vpnhide files | `/data/local/vpnhide`, `/data/adb/vpnhide`, `/data/local/bypass` etc. | `access(F_OK)` |
+| LSPosed/Xposed | `/data/adb/lspd`, `/data/adb/modules/lsposed`, `/data/adb/ksu/modules/lsposed` | `access(F_OK)` |
+| Hook properties | `persist.sys.lspd`, `persist.sys.lsposed`, `ro.lsposed.hidden` | `__system_property_get` |
+
+High confidence: `vpn_prop`, `vpnhide`, `hook_prop`. Medium: others.
+
+**Leaks via /proc (`nativeDetectVpnLeaks`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| TCP VPN ports | Connections on ports 443, 1194, 51820, 8443, 1723, 500, 4500 | `/proc/net/tcp[6]` |
+| UDP VPN ports | Sockets on ports 51820 (WireGuard), 1194 (OpenVPN), 500, 4500 | `/proc/net/udp[6]` |
+| if_inet6 | tun/wg/ppp/tap interfaces in `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| Route VPN | Routes via tun/wg/ppp/tap | `/proc/net/route` |
+| FIB trie | `/32 host` entries (non-LOCAL) — VPN host routes | `/proc/net/fib_trie` |
+
+High confidence: `udp_vpn_port`, `route_vpn_iface`, `arp_vpn_iface`, `inet6_vpn_iface`.
+
+**Advanced checks (`nativeDetectVpnAdvanced`):**
+
+| Check | What we look for | Source |
+|-------|------------------|--------|
+| ARP VPN | Entries on tun/wg/ppp interfaces | `/proc/net/arp` |
+| Sysctl | `rp_filter=0`, `ip_forward=1`, `forwarding=1` | `/proc/sys/net/ipv4/conf/*/rp_filter` etc. |
+| ESTABLISHED VPN | Connections to private IPs on VPN ports | `/proc/net/tcp` |
+
+**Non-traditional syscall checks (`nativeDetectVpnSyscalls`):**
+
+Checks via direct netlink requests and probe connections. Returns `unavailable` when permissions are missing:
+
+| Check | Method | What it detects |
+|-------|--------|-----------------|
+| RTM_GETRULE | Netlink dump of routing policy rules | VPN policy routing rules |
+| RTM_GETQDISC | Netlink dump of queueing disciplines | VPN qdisc tunnels |
+| RTM_GETNEIGH | Netlink dump of neighbor table | Hidden MAC addresses (zero LLADDR) |
+| TCP_INFO MSS | Connect to 8.8.8.8:443, read `snd_mss` | MSS reduction (tunnel indicator) |
+| SO_BINDTODEVICE | Probe bind to non-existent interface | VPN hook intercepting setsockopt |
+| Loopback port bind | Try to claim ports 51820/1194/443/8443 | Port conflicts (VPN listener) |
+| BPF OBJ GET | Try to open `/sys/fs/bpf/` maps | Access to netd BPF maps |
+| IP_RECVERR | Probe setsockopt IP_RECVERR | VPN hook intercepting IP_RECVERR |
+
+High confidence: `vpn_policy_rules`, `hidden_mac_neighbors`, `tcp_mss_low`, `loopback_port_conflict`, `bpf_map_accessible`.
+
+#### 12.6 Deep VPN Detector (`VpnNativeDetectorChecker`)
+
+The new detectors live in a dedicated sub-section inside the Native category, grouped into 4 sub-categories. Data comes from the new JNI method `nativeDetectVpnDetector()`, with lines prefixed `vdet|`.
+
+**Direct signs — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `sysfs_vpn_leak` | tun/wg/ppp/xfrm leak via sysfs | `/sys/class/net`, `/sys/devices/virtual/net`, `/proc/sys/net/ipv4|6/conf|neigh` |
+| `getifaddrs_vpn` | VPN interfaces in `getifaddrs()` list | `getifaddrs()` |
+| `sysclassnet_vpn` | VPN interfaces in `/sys/class/net` | `stat("/sys/class/net/<if>")` |
+| `rtm_getlink_vpn` | VPN interfaces via netlink RTM_GETLINK | Netlink `RTM_GETLINK` dump |
+| `proc_if_inet6_vpn` | VPN interfaces in `/proc/net/if_inet6` | `/proc/net/if_inet6` |
+| `proc_ipv6_route_vpn` | VPN routes in `/proc/net/ipv6_route` | `/proc/net/ipv6_route` |
+| `proc_net_dev_vpn` | VPN traffic (RX/TX) in `/proc/net/dev` | `/proc/net/dev` |
+| `ifindexname_vpn` | VPN interfaces via `if_indextoname()` | `if_indextoname()` ifindex sweep |
+| `vpn_policy_rules_netlink` | VPN policy routing rules (table 100–200, oif=tun) | Netlink `RTM_GETRULE` dump |
+
+**Network signs — `EvidenceSource.NATIVE_SOCKET`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `fib_trie_denied` | `/proc/net/fib_trie` unavailable (SELinux EACCES) | `fopen("/proc/net/fib_trie")` |
+| `inet_diag_denied` | inet_diag netlink denied (SELinux) | `socket(NETLINK_SOCK_DIAG)` |
+| `bindtodevice_leak` | `SO_BINDTODEVICE` to tun + `getsockopt` confirm | `setsockopt(SO_BINDTODEVICE)` |
+| `getsockname_leak` | `getsockname()` returns private VPN IP | `getsockname()` on UDP socket |
+| `udp_port_conflict_physical` | UDP port conflict (500/4500/1194/1701/51820) on physical IP | `bind()` on physical IP |
+| `route_count` | Route count and unique interface count | Netlink `RTM_GETROUTE` dump |
+| `trim_oracle` | bind-probe vs RTM_GETLINK iface count mismatch | `if_indextoname()` vs `RTM_GETLINK` |
+
+**Indirect signs — `EvidenceSource.NATIVE_ROUTE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `pmtu_mss_combined` | UDP PMTU + TCP MSS (tcpi_snd_mss/rcv_mss) | `connect()` + `getsockopt(TCP_INFO)` |
+| `udp_pmtu_ok` / `udp_pmtu_fail` | Success/failure sending 1500 bytes over UDP | `sendto()` 1500 bytes |
+| `normal_pmtu` | Path MTU of primary physical interface | `fetchMtu()` via `getifaddrs()` |
+| `timing_oracle` | ARM CNTVCT cycles for `sendto()` (min/max/avg) | `mrs cntvct_el0` (aarch64) |
+| `backpressure` | Throughput under 50000 UDP packets with scan cancellation | Non-blocking `sendto()` burst + cancellation check every 64 packets |
+| `gso_failed` / `gso_send_failed` / `gso_ok` | UDP GSO capability diagnostics; the result is not VPN evidence | `UDP_SEGMENT=1200` + 4800-byte send |
+| `hw_timestamp` | Hardware timestamping (`SIOCSHWTSTAMP`, `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
+
+**Environment probes — `EvidenceSource.NATIVE_INTERFACE`:**
+
+| Check (kind) | What it looks for | Source |
+|--------------|-------------------|--------|
+| `traceroute_denied` | Traceroute probe (TTL=1 UDP) blocked | `setsockopt(IP_TTL=1)` + `sendto()` |
+
+High confidence (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sysclassnet_vpn`, `rtm_getlink_vpn`, `proc_if_inet6_vpn`, `proc_ipv6_route_vpn`, `proc_net_dev_vpn`, `ifindexname_vpn`, `vpn_policy_rules_netlink`, `bindtodevice_leak`, `getsockname_leak`, `udp_port_conflict_physical`. Raw measurements and GSO results are informational; other anomalies → `needsReview`.
+
 ---
 
 ## Verdict (`VerdictEngine`)
@@ -544,7 +647,7 @@ The `expectedRoamingExit` flag (resolved by `HomeNetworkCatalog` from SIM MCC/MN
 
 - `geoHit` = `GeoIP.outsideRu == true` (excluding roaming)
 - `directHit` = detected evidence from `DIRECT_NETWORK_CAPABILITIES` or `SYSTEM_PROXY`
-- `indirectHit` = detected evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`
+- `indirectHit` = detected evidence from `INDIRECT_NETWORK_CAPABILITIES`, `ACTIVE_VPN`, `NETWORK_INTERFACE`, `ROUTING`, `DNS`, `PROXY_TECHNICAL_SIGNAL`, `NATIVE_INTERFACE`, `NATIVE_ROUTE`, `NATIVE_JVM_MISMATCH`, or high-confidence `NATIVE_SOCKET`
 
 | Geo | Direct | Indirect | Verdict |
 |-----|--------|----------|---------|

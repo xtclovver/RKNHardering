@@ -5,6 +5,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.export.CheckResultMarkdownExportFormatter
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
+import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.EvidenceConfidence
+import com.notcvnt.rknhardering.model.EvidenceItem
+import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.UnparsedIp
@@ -43,6 +47,54 @@ class CheckResultMarkdownExportFormatterTest {
         assertTrue(markdown.contains("## ${context.getString(R.string.main_card_icmp_spoofing)}"))
         assertTrue(markdown.contains("## ${context.getString(R.string.settings_split_tunnel)}"))
         assertTrue(markdown.contains("## Footer"))
+    }
+
+    @Test
+    fun `markdown export includes deep native detector findings and evidence`() {
+        val result = exportRichCheckResult().copy(
+            nativeSigns = CategoryResult(
+                name = "Native signs",
+                detected = true,
+                findings = listOf(
+                    Finding(
+                        description = "backpressure: 50000 packets",
+                        isInformational = true,
+                        source = EvidenceSource.NATIVE_ROUTE,
+                        confidence = EvidenceConfidence.LOW,
+                    ),
+                    Finding(
+                        description = "bindtodevice_leak: tun0",
+                        detected = true,
+                        source = EvidenceSource.NATIVE_SOCKET,
+                        confidence = EvidenceConfidence.HIGH,
+                    ),
+                ),
+                evidence = listOf(
+                    EvidenceItem(
+                        source = EvidenceSource.NATIVE_SOCKET,
+                        detected = true,
+                        confidence = EvidenceConfidence.HIGH,
+                        description = "bindtodevice_leak: tun0",
+                    ),
+                ),
+            ),
+        )
+
+        val markdown = CheckResultMarkdownExportFormatter.format(
+            context = context,
+            snapshot = createCompletedExportSnapshot(
+                result = result,
+                privacyMode = false,
+                finishedAtMillis = 0L,
+            ),
+            appVersionName = "1.0",
+            buildType = "debug",
+        )
+
+        assertTrue(markdown.contains("backpressure: 50000 packets | informational=true"))
+        assertTrue(markdown.contains("bindtodevice_leak: tun0 | detected=true | source=NATIVE_SOCKET"))
+        assertTrue(markdown.contains("source=NATIVE_SOCKET | detected=true | confidence=HIGH"))
+        assertTrue(markdown.contains("description=bindtodevice_leak: tun0"))
     }
 
     @Test

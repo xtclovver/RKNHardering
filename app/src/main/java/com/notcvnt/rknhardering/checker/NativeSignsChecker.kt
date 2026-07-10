@@ -2,6 +2,7 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -152,6 +153,31 @@ object NativeSignsChecker {
         findings += isolationOutcome.findings
         evidence += isolationOutcome.evidence
         needsReview = needsReview || isolationOutcome.needsReview
+
+        val vpnProps = runCatching { NativeInterfaceProbe.collectVpnPropertyFindings() }.getOrDefault(emptyList())
+        val vpnLeaks = runCatching { NativeInterfaceProbe.collectVpnLeakFindings() }.getOrDefault(emptyList())
+        val vpnAdvanced = runCatching { NativeInterfaceProbe.collectVpnAdvancedFindings() }.getOrDefault(emptyList())
+        val vpnSyscalls = runCatching { NativeInterfaceProbe.collectVpnSyscallFindings() }.getOrDefault(emptyList())
+        val vpnOutcome = evaluateVpnSignals(context, vpnProps, vpnLeaks, vpnAdvanced, vpnSyscalls)
+        findings += vpnOutcome.findings
+        evidence += vpnOutcome.evidence
+        detected = detected || vpnOutcome.detected
+        needsReview = needsReview || vpnOutcome.needsReview
+
+        // Deep VPN detector (ported from reference APK) — kept as its own
+        // sub-section inside the Native category for clarity.
+        val detectorOutcome = try {
+            VpnNativeDetectorChecker.check(context)
+        } catch (error: Throwable) {
+            rethrowIfCancellation(error)
+            null
+        }
+        if (detectorOutcome != null) {
+            findings += detectorOutcome.findings
+            evidence += detectorOutcome.evidence
+            detected = detected || detectorOutcome.detected
+            needsReview = needsReview || detectorOutcome.needsReview
+        }
 
         if (findings.isEmpty()) {
             findings += Finding(
@@ -938,11 +964,163 @@ object NativeSignsChecker {
         }.getOrDefault(false)
     }
 
+    internal fun evaluateVpnSignals(
+        context: Context,
+        props: List<com.notcvnt.rknhardering.probe.NativeVpnPropertyFinding>,
+        leaks: List<com.notcvnt.rknhardering.probe.NativeVpnLeakFinding>,
+        advanced: List<com.notcvnt.rknhardering.probe.NativeVpnAdvancedFinding>,
+        syscalls: List<com.notcvnt.rknhardering.probe.NativeVpnSyscallFinding>,
+    ): PartialOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var detected = false
+        var needsReview = false
+
+        val propsByKind = props.groupBy { it.kind }
+        val leaksByKind = leaks.groupBy { it.kind }
+        val advancedByKind = advanced.groupBy { it.kind }
+        val syscallsByKind = syscalls.filter { !it.kind.startsWith("unavailable") }.groupBy { it.kind }
+
+        val allKinds = listOf(
+            "vpn_prop", "dns_prop", "vpn_file", "vpnhide", "lsposed", "hook_prop",
+            "tcp_vpn_port", "udp_vpn_port", "inet6_vpn_iface", "route_vpn_iface",
+            "arp_vpn_iface", "sysctl_forwarding", "sysctl_rp_filter", "established_vpn",
+            "vpn_policy_rules", "vpn_qdisc", "hidden_mac_neighbors", "tcp_mss_low",
+            "so_bindtodevice", "loopback_port_conflict", "bpf_map_accessible", "ip_recverr",
+        )
+
+        val unavailableSyscalls = syscalls.filter { it.kind.startsWith("unavailable") }
+
+        for (kind in allKinds) {
+            val items = propsByKind[kind]
+                ?: leaksByKind[kind]
+                ?: advancedByKind[kind]
+                ?: syscallsByKind[kind]
+
+            val isHigh = kind == "vpn_prop" || kind == "vpnhide" || kind == "hook_prop" ||
+                kind == "udp_vpn_port" || kind == "route_vpn_iface" ||
+                kind == "arp_vpn_iface" || kind == "inet6_vpn_iface" ||
+                kind == "vpn_policy_rules" || kind == "hidden_mac_neighbors" ||
+                kind == "tcp_mss_low" || kind == "loopback_port_conflict" ||
+                kind == "bpf_map_accessible"
+
+            val source = when {
+                kind.contains("hook") || kind.contains("lsposed") || kind.contains("vpnhide") -> EvidenceSource.NATIVE_HOOK_MARKERS
+                kind.contains("route") || kind.contains("policy") || kind.contains("sysctl") ||
+                    kind.contains("qdisc") -> EvidenceSource.NATIVE_ROUTE
+                kind.contains("inet6") || kind.contains("neigh") || kind.contains("mac") ||
+                    kind.contains("arp") -> EvidenceSource.NATIVE_INTERFACE
+                else -> EvidenceSource.NATIVE_SOCKET
+            }
+
+            if (items.isNullOrEmpty()) {
+                findings += Finding(
+                    description = context.getString(R.string.checker_native_vpn_signal, "${context.getString(getVpnDescResId(kind))} — ${context.getString(R.string.vpn_status_not_found)}"),
+                    detected = false,
+                    isInformational = true,
+                    source = source,
+                    confidence = EvidenceConfidence.LOW,
+                )
+            } else {
+                for (item in items) {
+                    val detail = when (item) {
+                        is com.notcvnt.rknhardering.probe.NativeVpnPropertyFinding ->
+                            if (item.value != null) "${item.prop}=${item.value}" else (item.prop ?: item.kind)
+                        is com.notcvnt.rknhardering.probe.NativeVpnLeakFinding ->
+                            if (item.count > 0) "${item.detail} (×${item.count})" else (item.detail ?: item.kind)
+                        is com.notcvnt.rknhardering.probe.NativeVpnAdvancedFinding ->
+                            if (item.count > 0) "${item.detail} (×${item.count})" else (item.detail ?: item.kind)
+                        is com.notcvnt.rknhardering.probe.NativeVpnSyscallFinding ->
+                            item.detail ?: item.kind
+                        else -> kind
+                    }
+                    findings += Finding(
+                        description = context.getString(R.string.checker_native_vpn_signal, describeVpnFinding(context, kind, detail)),
+                        detected = isHigh,
+                        needsReview = !isHigh,
+                        source = source,
+                        confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM,
+                    )
+                    evidence += EvidenceItem(source = source, detected = true, confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM, description = describeVpnFinding(context, kind, detail))
+                    detected = detected || isHigh
+                    needsReview = needsReview || !isHigh
+                }
+            }
+        }
+
+        for (item in unavailableSyscalls) {
+            val reason = item.detail ?: item.kind.removePrefix("unavailable|")
+            findings += Finding(
+                description = context.getString(R.string.checker_native_vpn_signal, "${reason} — ${context.getString(R.string.vpn_status_unavailable)}"),
+                detected = false,
+                isInformational = true,
+                source = EvidenceSource.NATIVE_SOCKET,
+                confidence = EvidenceConfidence.LOW,
+            )
+        }
+
+        return PartialOutcome(findings, evidence, detected = detected, needsReview = needsReview)
+    }
+
+    private fun getVpnDescResId(kind: String): Int = when (kind) {
+        "vpn_prop" -> R.string.vpn_desc_prop
+        "vpnhide" -> R.string.vpn_desc_vpnhide
+        "hook_prop" -> R.string.vpn_desc_hook
+        "dns_prop" -> R.string.vpn_desc_dns
+        "vpn_file" -> R.string.vpn_desc_file
+        "lsposed" -> R.string.vpn_desc_lsposed
+        "tcp_vpn_port" -> R.string.vpn_desc_tcp_port
+        "udp_vpn_port" -> R.string.vpn_desc_udp_port
+        "inet6_vpn_iface" -> R.string.vpn_desc_inet6
+        "route_vpn_iface" -> R.string.vpn_desc_route
+        "arp_vpn_iface" -> R.string.vpn_desc_arp
+        "sysctl_forwarding" -> R.string.vpn_desc_forwarding
+        "sysctl_rp_filter" -> R.string.vpn_desc_rpfilter
+        "established_vpn" -> R.string.vpn_desc_established
+        "vpn_policy_rules" -> R.string.vpn_desc_policy_rules
+        "vpn_qdisc" -> R.string.vpn_desc_qdisc
+        "hidden_mac_neighbors" -> R.string.vpn_desc_hidden_mac
+        "tcp_mss_low" -> R.string.vpn_desc_mss
+        "so_bindtodevice" -> R.string.vpn_desc_bindtodevice
+        "loopback_port_conflict" -> R.string.vpn_desc_port_conflict
+        "bpf_map_accessible" -> R.string.vpn_desc_bpf
+        "ip_recverr" -> R.string.vpn_desc_recverr
+        else -> R.string.checker_native_vpn_signal
+    }
+
     internal fun containsHighConfidenceRootMountMarker(detail: String): Boolean {
         val normalized = detail.lowercase()
         return HIGH_CONFIDENCE_ROOT_MOUNT_MARKERS.any { marker ->
             normalized.contains(marker)
         }
     }
-}
 
+    private fun describeVpnFinding(context: Context, kind: String, detail: String): String {
+        val resId = when (kind) {
+            "vpn_prop" -> R.string.vpn_desc_prop
+            "vpnhide" -> R.string.vpn_desc_vpnhide
+            "hook_prop" -> R.string.vpn_desc_hook
+            "dns_prop" -> R.string.vpn_desc_dns
+            "vpn_file" -> R.string.vpn_desc_file
+            "lsposed" -> R.string.vpn_desc_lsposed
+            "tcp_vpn_port" -> R.string.vpn_desc_tcp_port
+            "udp_vpn_port" -> R.string.vpn_desc_udp_port
+            "inet6_vpn_iface" -> R.string.vpn_desc_inet6
+            "route_vpn_iface" -> R.string.vpn_desc_route
+            "arp_vpn_iface" -> R.string.vpn_desc_arp
+            "sysctl_forwarding" -> R.string.vpn_desc_forwarding
+            "sysctl_rp_filter" -> R.string.vpn_desc_rpfilter
+            "established_vpn" -> R.string.vpn_desc_established
+            "vpn_policy_rules" -> R.string.vpn_desc_policy_rules
+            "vpn_qdisc" -> R.string.vpn_desc_qdisc
+            "hidden_mac_neighbors" -> R.string.vpn_desc_hidden_mac
+            "tcp_mss_low" -> R.string.vpn_desc_mss
+            "so_bindtodevice" -> R.string.vpn_desc_bindtodevice
+            "loopback_port_conflict" -> R.string.vpn_desc_port_conflict
+            "bpf_map_accessible" -> R.string.vpn_desc_bpf
+            "ip_recverr" -> R.string.vpn_desc_recverr
+            else -> return "$kind: $detail"
+        }
+        return "$detail — ${context.getString(resId)}"
+    }
+}
