@@ -1,0 +1,5 @@
+1. Added a deep native VPN detector with interface, routing, socket, sysfs, /proc, netlink, PMTU/MSS and environment probes. Permission-limited probes are reported as unavailable instead of crashing.
+2. Added Simple, Normal and Advanced result display modes. Advanced mode records bounded, sanitized technical diagnostics in memory and keeps them out of JSON/Markdown exports.
+3. Improved verdict handling and diagnostics with new native evidence categories, structured trace capture, safer cancellation, and expanded tests.
+4. Fixed false positives from carrier service routes on modem interfaces such as ccmni*, rmnet*, pdp* and seth*, while preserving static global host-route detection.
+5. Improved IPv4/IPv6 address handling and the presentation of detailed and plain-language scan results.
