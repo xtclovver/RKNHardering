@@ -44,6 +44,7 @@ object StunBindingClient {
         timeoutMs: Int = 3_000,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<BindingResult> {
+        val startedAt = System.nanoTime()
         return runCatching {
             executionContext.throwIfCancelled()
             val resolvedAddresses = ResolverNetworkStack.lookup(
@@ -75,6 +76,8 @@ object StunBindingClient {
                 }
             }
             throw lastError ?: IOException("No STUN response from $host:$port")
+        }.also { result ->
+            recordDiagnostic(executionContext, host, port, startedAt, listOf(result))
         }
     }
 
@@ -86,6 +89,7 @@ object StunBindingClient {
         timeoutMs: Int = 3_000,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): DualStackBindingResult {
+        val startedAt = System.nanoTime()
         executionContext.throwIfCancelled()
         val allAddresses = runCatching {
             ResolverNetworkStack.lookup(
@@ -94,7 +98,17 @@ object StunBindingClient {
                 binding = binding,
                 cancellationSignal = executionContext.cancellationSignal,
             ).distinctBy { it.hostAddress }
-        }.getOrElse { return DualStackBindingResult(null, null) }
+        }.getOrElse { error ->
+            executionContext.diagnosticCollector?.record(
+                category = "stn",
+                source = "STUN",
+                target = "$host:$port",
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = error.message.orEmpty(),
+            )
+            return DualStackBindingResult(null, null)
+        }
 
         val ipv4Addresses = allAddresses.filterIsInstance<Inet4Address>()
         val ipv6Addresses = allAddresses.filterIsInstance<Inet6Address>()
@@ -126,7 +140,15 @@ object StunBindingClient {
         return DualStackBindingResult(
             ipv4Result = probeFamily(ipv4Addresses),
             ipv6Result = probeFamily(ipv6Addresses),
-        )
+        ).also { result ->
+            recordDiagnostic(
+                executionContext,
+                host,
+                port,
+                startedAt,
+                listOfNotNull(result.ipv4Result, result.ipv6Result),
+            )
+        }
     }
 
     internal fun probeWithDatagramExchange(
@@ -136,6 +158,7 @@ object StunBindingClient {
         exchange: (ByteArray) -> Socks5UdpAssociateClient.UdpDatagram,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<BindingResult> {
+        val startedAt = System.nanoTime()
         return runCatching {
             executionContext.throwIfCancelled()
             val transactionId = Random.nextBytes(12)
@@ -156,7 +179,38 @@ object StunBindingClient {
             if (error is Exception) {
                 rethrowIfCancellation(error, executionContext)
             }
+        }.also { result ->
+            recordDiagnostic(executionContext, host, port, startedAt, listOf(result))
         }
+    }
+
+    private fun recordDiagnostic(
+        executionContext: ScanExecutionContext,
+        host: String,
+        port: Int,
+        startedAt: Long,
+        results: List<Result<BindingResult>>,
+    ) {
+        executionContext.diagnosticCollector?.record(
+            category = "stn",
+            source = "STUN",
+            target = "$host:$port",
+            status = when {
+                results.isEmpty() -> "unavailable"
+                results.any { it.isSuccess } -> "completed"
+                else -> "error"
+            },
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            body = results.joinToString("\n") { result ->
+                result.fold(
+                    onSuccess = { value ->
+                        "resolved=${value.resolvedIps},remote=${value.remoteIp}:${value.remotePort}," +
+                            "mapped=${value.mappedIp}:${value.mappedPort}"
+                    },
+                    onFailure = { error -> "error=${error.message}" },
+                )
+            },
+        )
     }
 
     private fun sendBindingRequest(

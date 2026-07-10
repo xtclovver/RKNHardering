@@ -688,6 +688,12 @@ Requirements: JDK 17+, Android SDK with Build Tools for API 36.
 ./gradlew assembleDebug
 ```
 
+## Result detail modes
+
+Settings → Appearance provides three modes. Simple shows plain-language outcomes without low-level strings, Normal preserves the standard presentation, and Advanced adds collapsed technical data to each result card. The selection is captured when a scan starts, so changing it affects only the next scan and never redraws a running or completed scan. The mode does not change checks, verdicts, timeouts, or network behavior.
+
+The technical snapshot is created only for scans started in Advanced mode. It exists only in process memory, is cleared on cancellation or a new scan, and is not included in JSON/Markdown exports. Each entry is limited to 64 KiB and a scan to 512 KiB; truncation is shown explicitly. Authorization and cookie headers, passwords, tokens, UUIDs, keys, URI userinfo, and sensitive query parameters are removed before storage. Privacy mode additionally masks every IPv4/IPv6 address. Full Clash `/configs`, `/connections`, `/proxies` responses, Xray UUIDs/public keys, BSSIDs, and cell identifiers are never stored.
+
 ---
 
 ## Acknowledgements

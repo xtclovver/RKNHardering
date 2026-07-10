@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.checker
 import android.content.Context
 import android.os.Build
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.ActiveVpnApp
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
@@ -11,6 +12,7 @@ import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.vpn.VpnAppCatalog
 import com.notcvnt.rknhardering.vpn.VpnAppMetadataScanner
 import com.notcvnt.rknhardering.vpn.VpnDumpsysParser
+import kotlin.concurrent.thread
 
 internal fun checkDumpsysVpn(
     context: Context,
@@ -20,9 +22,7 @@ internal fun checkDumpsysVpn(
 ): SignalOutcome {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return SignalOutcome()
     return try {
-        val process = Runtime.getRuntime().exec(arrayOf("dumpsys", "vpn_management"))
-        val output = process.inputStream.bufferedReader().readText()
-        process.waitFor()
+        val output = executeDumpsys(listOf("dumpsys", "vpn_management"))
 
         if (VpnDumpsysParser.isUnavailable(output)) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_vpn_unavailable)))
@@ -108,9 +108,7 @@ internal fun checkDumpsysVpnService(
     activeApps: MutableList<ActiveVpnApp>,
 ): SignalOutcome {
     return try {
-        val process = Runtime.getRuntime().exec(arrayOf("dumpsys", "activity", "services", "android.net.VpnService"))
-        val output = process.inputStream.bufferedReader().readText()
-        process.waitFor()
+        val output = executeDumpsys(listOf("dumpsys", "activity", "services", "android.net.VpnService"))
 
         if (VpnDumpsysParser.isUnavailable(output)) {
             findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_service_unavailable)))
@@ -190,5 +188,57 @@ internal fun checkDumpsysVpnService(
     } catch (e: Exception) {
         findings.add(Finding(context.getString(R.string.checker_indirect_dumpsys_service_error, e.message)))
         SignalOutcome()
+    }
+}
+
+private fun executeDumpsys(command: List<String>): String {
+    val executionContext = ScanExecutionContext.currentOrDefault()
+    val startedAt = System.nanoTime()
+    val process = ProcessBuilder(command).start()
+    val registration = executionContext.cancellationSignal.register {
+        runCatching { process.destroyForcibly() }
+    }
+    return try {
+        var stdout = ""
+        var stderr = ""
+        val stdoutReader = thread(name = "rkn-dumpsys-stdout") {
+            stdout = runCatching { process.inputStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+        }
+        val stderrReader = thread(name = "rkn-dumpsys-stderr") {
+            stderr = runCatching { process.errorStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+        }
+        val exitCode = process.waitFor()
+        stdoutReader.join()
+        stderrReader.join()
+        executionContext.throwIfCancelled()
+        executionContext.diagnosticCollector?.record(
+            category = "ind",
+            source = "dumpsys",
+            target = command.drop(1).joinToString(" "),
+            status = "exit $exitCode",
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            body = buildString {
+                appendLine("command=${command.joinToString(" ")}")
+                appendLine("exitCode=$exitCode")
+                appendLine("stdout:")
+                appendLine(stdout)
+                appendLine("stderr:")
+                append(stderr)
+            },
+        )
+        stdout
+    } catch (error: Exception) {
+        executionContext.diagnosticCollector?.record(
+            category = "ind",
+            source = "dumpsys",
+            target = command.drop(1).joinToString(" "),
+            status = "error",
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            body = error.message.orEmpty(),
+        )
+        throw error
+    } finally {
+        registration.dispose()
+        runCatching { process.destroy() }
     }
 }

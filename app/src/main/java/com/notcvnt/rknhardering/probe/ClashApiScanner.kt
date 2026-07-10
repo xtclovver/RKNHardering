@@ -56,9 +56,21 @@ class ClashApiScanner(
 
     private suspend fun probeApi(host: String, port: Int): ClashApiScanResult? {
         probeApiOverride?.let { return it(host, port) }
+        val executionContext = ScanExecutionContext.currentOrDefault()
+        val startedAt = System.nanoTime()
         val client = clients.getValue(host)
         val configs = client.fetchConfigs(port)
-        if (!ClashApiClient.isConfigResponseAlive(configs)) return null
+        if (!ClashApiClient.isConfigResponseAlive(configs)) {
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Clash API",
+                target = "$host:$port",
+                status = "unavailable",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = "configAvailable=false",
+            )
+            return null
+        }
         val connections = client.fetchConnections(port)
         val proxies = client.fetchProxies(port)
         return ClashApiScanResult(
@@ -66,7 +78,21 @@ class ClashApiScanner(
             leakedDestIps = ClashApiClient.parseConnectionsDestinationIps(connections),
             proxyNodes = ClashApiClient.parseProxyNodes(proxies),
             configAvailable = true,
-        )
+        ).also { result ->
+            // Never retain the full /configs, /connections or /proxies bodies.
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Clash API",
+                target = "$host:$port",
+                status = "available",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = buildString {
+                    appendLine("configAvailable=true")
+                    appendLine("destinationIpCount=${result.leakedDestIps.size}")
+                    appendLine("proxyNodeCount=${result.proxyNodes.size}")
+                },
+            )
+        }
     }
 
     private fun isTcpPortOpen(host: String, port: Int): Boolean {

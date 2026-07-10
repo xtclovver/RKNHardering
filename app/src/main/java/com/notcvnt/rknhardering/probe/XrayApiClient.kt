@@ -26,6 +26,7 @@ class XrayApiClient(
         deadlineMs: Long = 600,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<XrayApiScanResult> = withContext(Dispatchers.IO) {
+        val startedAt = System.nanoTime()
         val channel = OkHttpChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .build()
@@ -69,15 +70,40 @@ class XrayApiClient(
                     )
                 }
 
-            Result.success(
-                XrayApiScanResult(
-                    endpoint = XrayApiEndpoint(host = host, port = port),
-                    outbounds = outbounds,
-                    handlerAvailable = true,
-                ),
+            val scanResult = XrayApiScanResult(
+                endpoint = XrayApiEndpoint(host = host, port = port),
+                outbounds = outbounds,
+                handlerAvailable = true,
             )
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Xray gRPC API",
+                target = "$host:$port",
+                status = "available",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = buildString {
+                    appendLine("outboundCount=${outbounds.size}")
+                    outbounds.forEachIndexed { index, outbound ->
+                        appendLine(
+                            "outbound[$index]=tag:${outbound.tag},protocol:${outbound.protocolName}," +
+                                "address:${outbound.address},port:${outbound.port},sni:${outbound.sni}," +
+                                "uuidPresent:${!outbound.uuid.isNullOrBlank()}," +
+                                "publicKeyPresent:${!outbound.publicKey.isNullOrBlank()}",
+                        )
+                    }
+                },
+            )
+            Result.success(scanResult)
         } catch (e: Exception) {
             rethrowIfCancellation(e, executionContext)
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Xray gRPC API",
+                target = "$host:$port",
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = e.message.orEmpty(),
+            )
             Result.failure(e)
         } finally {
             registration.dispose()
@@ -91,6 +117,7 @@ class XrayApiClient(
         deadlineMs: Long = 600,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): Result<XrayStatsSummary> = withContext(Dispatchers.IO) {
+        val startedAt = System.nanoTime()
         val channel = OkHttpChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .build()
@@ -108,18 +135,33 @@ class XrayApiClient(
 
                 stub.queryStats(QueryStatsRequest.getDefaultInstance())
             }
-            Result.success(
-                XrayStatsSummary(
-                    statCount = response.statCount,
-                    sampleNames = response.statList
-                        .asSequence()
-                        .mapNotNull { stat -> stat.name.takeIf { it.isNotBlank() } }
-                        .take(8)
-                        .toList(),
-                ),
+            val summary = XrayStatsSummary(
+                statCount = response.statCount,
+                sampleNames = response.statList
+                    .asSequence()
+                    .mapNotNull { stat -> stat.name.takeIf { it.isNotBlank() } }
+                    .take(8)
+                    .toList(),
             )
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Xray stats API",
+                target = "$host:$port",
+                status = "available",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = "statCount=${summary.statCount}",
+            )
+            Result.success(summary)
         } catch (e: Exception) {
             rethrowIfCancellation(e, executionContext)
+            executionContext.diagnosticCollector?.record(
+                category = "byp",
+                source = "Xray stats API",
+                target = "$host:$port",
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = e.message.orEmpty(),
+            )
             Result.failure(e)
         } finally {
             registration.dispose()

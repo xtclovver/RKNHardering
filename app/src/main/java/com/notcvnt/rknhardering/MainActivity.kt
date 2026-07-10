@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -53,11 +54,15 @@ import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.ObservedIp
 import com.notcvnt.rknhardering.model.StunProbeGroupResult
+import com.notcvnt.rknhardering.model.VerdictRuleCode
 import com.notcvnt.rknhardering.export.CompletedExportSnapshot
 import com.notcvnt.rknhardering.export.createCompletedExportSnapshot
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.ui.main.CategoryTiles
 import com.notcvnt.rknhardering.ui.main.MainExportController
+import com.notcvnt.rknhardering.ui.main.SimpleCardModel
+import com.notcvnt.rknhardering.ui.main.SimpleResultModels
+import com.notcvnt.rknhardering.ui.main.SimpleResultStatus
 import com.notcvnt.rknhardering.ui.main.TileSpec
 import com.notcvnt.rknhardering.ui.main.render.BypassRenderer
 import com.notcvnt.rknhardering.ui.main.render.CallTransportRenderer
@@ -68,6 +73,8 @@ import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
 import com.notcvnt.rknhardering.ui.main.render.IpChannelsRenderer
 import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
+import com.notcvnt.rknhardering.ui.main.render.SimpleResultRenderer
+import com.notcvnt.rknhardering.ui.main.render.TechnicalDataRenderer
 import com.notcvnt.rknhardering.ui.main.render.VerdictRenderer
 import com.notcvnt.rknhardering.ui.main.render.VerdictViews
 import kotlinx.coroutines.Job
@@ -199,6 +206,7 @@ class MainActivity : AppCompatActivity() {
     private var userTouchScrollInProgress = false
     private var isAutoScrollInProgress = false
     private var activeCheckPrivacyMode = false
+    private var activeResultDisplayMode = ResultDisplayMode.NORMAL
     private var activeCheckSettings: CheckSettings? = null
     private var retainedDiagnosticsSnapshot: RetainedDiagnosticsSnapshot? = null
     private var completedExportSnapshot: CompletedExportSnapshot? = null
@@ -267,6 +275,8 @@ class MainActivity : AppCompatActivity() {
     private val ipChannelsRenderer by lazy { IpChannelsRenderer(renderEnv) }
     private val domainReachabilityRenderer by lazy { DomainReachabilityRenderer(renderEnv) }
     private val verdictRenderer by lazy { VerdictRenderer(renderEnv, findingViews) }
+    private val simpleResultRenderer by lazy { SimpleResultRenderer(renderEnv) }
+    private val technicalDataRenderer by lazy { TechnicalDataRenderer(renderEnv) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppUiSettings.applySavedTheme(this)
@@ -652,7 +662,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun onRunCheckClicked() {
         if (viewModel.isRunning.value) return
-        runCheck()
+        val resultDisplayMode = ResultDisplayMode.fromPrefs(prefs)
+        runCheck(resultDisplayMode)
     }
 
     private fun isDebugClipboardExportEnabled(): Boolean {
@@ -749,7 +760,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.main_diagnostics_copied, Toast.LENGTH_SHORT).show()
     }
 
-    private fun runCheck() {
+    private fun runCheck(resultDisplayMode: ResultDisplayMode) {
         val splitTunnelEnabled = prefs.getBoolean(SettingsActivity.PREF_SPLIT_TUNNEL_ENABLED, true)
         val proxyScanEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_SCAN_ENABLED, true)
         val proxyAuthProbeEnabled = prefs.getBoolean(SettingsActivity.PREF_PROXY_AUTH_PROBE_ENABLED, false)
@@ -803,7 +814,7 @@ class MainActivity : AppCompatActivity() {
         val activeProfile = if (customEnabled) com.notcvnt.rknhardering.customcheck.CustomCheckRunner.getActiveProfile(this) else null
         val effectiveSettings = activeProfile?.let { com.notcvnt.rknhardering.customcheck.CustomCheckRunner.toCheckSettings(it, baseSettings) } ?: baseSettings
 
-        viewModel.startScan(effectiveSettings, privacyMode)
+        viewModel.startScan(effectiveSettings, privacyMode, resultDisplayMode)
     }
 
     private fun observeScanEvents() {
@@ -825,6 +836,7 @@ class MainActivity : AppCompatActivity() {
                         prepareCheckSessionUi(
                             firstEvent.settings,
                             firstEvent.privacyMode,
+                            firstEvent.resultDisplayMode,
                         )
                         processedEventCount = 1
                         while (processedEventCount < events.size) {
@@ -850,7 +862,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepareCheckSessionUi(settings: CheckSettings, privacyMode: Boolean) {
+        prepareCheckSessionUi(settings, privacyMode, ResultDisplayMode.NORMAL)
+    }
+
+    private fun prepareCheckSessionUi(
+        settings: CheckSettings,
+        privacyMode: Boolean,
+        resultDisplayMode: ResultDisplayMode,
+    ) {
+        simpleResultRenderer.clear()
+        technicalDataRenderer.clear()
         activeCheckPrivacyMode = privacyMode
+        activeResultDisplayMode = resultDisplayMode
         activeCheckSettings = settings
         retainedDiagnosticsSnapshot = null
         completedExportSnapshot = null
@@ -864,12 +887,18 @@ class MainActivity : AppCompatActivity() {
         resetBypassProgress()
         clearStageContent()
         resetAllTiles()
+        applyResultDisplayTitles()
         applyTileVisibilityFromSettings(settings)
         if (settings.callTransportProbeEnabled) {
             setTileStatus(CATEGORY_STN, TILE_STATUS_NEUTRAL, getString(R.string.tile_hint_loading))
         }
         bindVerdictHeroRunning()
         showAllLoadingCardsNow(settings)
+        if (activeResultDisplayMode == ResultDisplayMode.SIMPLE) {
+            tiles.filterValues { it.card.isVisible }.keys.forEach { id ->
+                renderSimpleCard(id, SimpleCardModel(SimpleResultStatus.RUNNING))
+            }
+        }
         updateResultActionButtonsVisibility()
     }
 
@@ -892,8 +921,12 @@ class MainActivity : AppCompatActivity() {
             is ScanEvent.Started -> Unit
             is ScanEvent.Update -> {
                 handleCheckUpdate(event.update, animate = animate)
+                if (activeResultDisplayMode == ResultDisplayMode.SIMPLE) {
+                    renderSimpleUpdate(event.update)
+                }
             }
             is ScanEvent.Completed -> {
+                activeResultDisplayMode = event.resultDisplayMode
                 retainedDiagnosticsSnapshot = if (viewModel.canRetainCompletedDiagnostics()) {
                     retainCompletedDiagnosticsSnapshot(
                         result = event.result,
@@ -911,11 +944,17 @@ class MainActivity : AppCompatActivity() {
                 refreshCompletedCategoryViews(event.result, event.privacyMode)
                 displayVerdict(event.result, event.privacyMode)
                 bindVerdictHero(event.result)
+                when (activeResultDisplayMode) {
+                    ResultDisplayMode.SIMPLE -> renderSimpleCompletedResult(event.result)
+                    ResultDisplayMode.ADVANCED -> renderTechnicalData(event.result)
+                    ResultDisplayMode.NORMAL -> Unit
+                }
                 if (animate) animateContentReveal(verdictHero)
                 stopLoadingStatusAnimation()
                 updateResultActionButtonsVisibility()
             }
             is ScanEvent.Cancelled -> {
+                technicalDataRenderer.clear()
                 activeCheckSettings = null
                 resetBypassProgress()
                 statusBypass.text = getString(R.string.main_status_cancelled)
@@ -939,6 +978,167 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun applyResultDisplayTitles() {
+        CategoryTiles.ALL.forEach { spec ->
+            tiles[spec.id]?.title?.setText(
+                if (activeResultDisplayMode == ResultDisplayMode.SIMPLE) {
+                    simpleTitleForCategory(spec.id)
+                } else {
+                    spec.titleRes
+                },
+            )
+        }
+    }
+
+    private fun renderSimpleUpdate(update: CheckUpdate) {
+        when (update) {
+            is CheckUpdate.GeoIpReady -> renderSimpleCard(CATEGORY_GEO, SimpleResultModels.category(update.result))
+            is CheckUpdate.IpComparisonReady -> renderSimpleCard(CATEGORY_IPC, SimpleResultModels.ipComparison(update.result))
+            is CheckUpdate.CdnPullingReady -> renderSimpleCard(CATEGORY_CDN, SimpleResultModels.cdn(update.result))
+            is CheckUpdate.IcmpSpoofingReady -> renderSimpleCard(CATEGORY_ICM, SimpleResultModels.category(update.result))
+            is CheckUpdate.RttTriangulationReady -> renderSimpleCard(
+                CATEGORY_RTT,
+                SimpleResultModels.category(update.result, extraInformation = true),
+            )
+            is CheckUpdate.DirectSignsReady -> renderSimpleCard(CATEGORY_DIR, SimpleResultModels.category(update.result))
+            is CheckUpdate.IndirectSignsReady -> {
+                renderSimpleCard(CATEGORY_IND, SimpleResultModels.category(update.result))
+                if (tiles[CATEGORY_STN]?.card?.isVisible == true) {
+                    renderSimpleCard(
+                        CATEGORY_STN,
+                        SimpleResultModels.callTransport(update.result.callTransportLeaks, update.result.stunProbeGroups),
+                    )
+                }
+            }
+            is CheckUpdate.LocationSignalsReady -> renderSimpleCard(CATEGORY_LOC, SimpleResultModels.category(update.result))
+            is CheckUpdate.NativeSignsReady -> renderSimpleCard(CATEGORY_NAT, SimpleResultModels.category(update.result))
+            is CheckUpdate.BypassReady -> renderSimpleCard(CATEGORY_BYP, SimpleResultModels.bypass(update.result))
+            is CheckUpdate.DomainReachabilityReady -> renderSimpleCard(
+                CATEGORY_REA,
+                SimpleResultModels.domainReachability(update.result),
+            )
+            is CheckUpdate.BypassProgress,
+            is CheckUpdate.IpConsensusReady,
+            is CheckUpdate.VerdictReady,
+            -> Unit
+        }
+    }
+
+    private fun renderSimpleCompletedResult(result: CheckResult) {
+        renderSimpleCard(CATEGORY_GEO, SimpleResultModels.category(result.geoIp))
+        renderSimpleCard(CATEGORY_IPC, SimpleResultModels.ipComparison(result.ipComparison))
+        renderSimpleCard(CATEGORY_CDN, SimpleResultModels.cdn(result.cdnPulling))
+        renderSimpleCard(CATEGORY_DIR, SimpleResultModels.category(result.directSigns))
+        renderSimpleCard(CATEGORY_IND, SimpleResultModels.category(result.indirectSigns))
+        renderSimpleCard(CATEGORY_NAT, SimpleResultModels.category(result.nativeSigns))
+        renderSimpleCard(
+            CATEGORY_STN,
+            SimpleResultModels.callTransport(
+                result.indirectSigns.callTransportLeaks,
+                result.indirectSigns.stunProbeGroups,
+            ),
+        )
+        renderSimpleCard(CATEGORY_ICM, SimpleResultModels.category(result.icmpSpoofing))
+        renderSimpleCard(
+            CATEGORY_RTT,
+            SimpleResultModels.category(result.rttTriangulation, extraInformation = true),
+        )
+        renderSimpleCard(CATEGORY_LOC, SimpleResultModels.category(result.locationSignals))
+        renderSimpleCard(CATEGORY_BYP, SimpleResultModels.bypass(result.bypassResult))
+        renderSimpleCard(CATEGORY_REA, SimpleResultModels.domainReachability(result.domainReachability))
+        verdictSubtitle.text = simpleVerdictExplanation(result.verdictDecision.rule)
+        textVerdictExplanation.text = simpleVerdictExplanation(result.verdictDecision.rule)
+    }
+
+    private fun renderSimpleCard(id: String, model: SimpleCardModel) {
+        val holder = tiles[id] ?: return
+        simpleResultRenderer.render(holder.body as ViewGroup, simpleCheckDescription(id), model)
+        setTileStatus(id, tileStatus(model.status), simpleStatusText(model.status))
+    }
+
+    private fun renderTechnicalData(result: CheckResult) {
+        technicalDataRenderer.clear()
+        val snapshot = result.diagnosticSnapshot
+        val entries = snapshot?.entries.orEmpty()
+        tiles.values.filter { it.card.isVisible }.forEach { holder ->
+            technicalDataRenderer.render(
+                holder.body as ViewGroup,
+                entries.filter { it.category == holder.id },
+                runTruncated = snapshot?.truncated == true,
+            )
+        }
+    }
+
+    private fun tileStatus(status: SimpleResultStatus): Int = when (status) {
+        SimpleResultStatus.RUNNING,
+        SimpleResultStatus.DISABLED,
+        -> TILE_STATUS_NEUTRAL
+        SimpleResultStatus.CLEAN -> TILE_STATUS_CLEAN
+        SimpleResultStatus.REVIEW -> TILE_STATUS_REVIEW
+        SimpleResultStatus.DETECTED -> TILE_STATUS_DETECTED
+        SimpleResultStatus.ERROR -> TILE_STATUS_ERROR
+    }
+
+    private fun simpleStatusText(status: SimpleResultStatus): String = getString(
+        when (status) {
+            SimpleResultStatus.RUNNING -> R.string.simple_result_running
+            SimpleResultStatus.CLEAN -> R.string.simple_result_clean
+            SimpleResultStatus.REVIEW -> R.string.simple_result_review
+            SimpleResultStatus.DETECTED -> R.string.simple_result_detected
+            SimpleResultStatus.ERROR -> R.string.simple_result_error
+            SimpleResultStatus.DISABLED -> R.string.simple_result_disabled
+        },
+    )
+
+    private fun simpleTitleForCategory(id: String): Int = when (id) {
+        CATEGORY_GEO -> R.string.simple_title_geo
+        CATEGORY_IPC -> R.string.simple_title_ip_comparison
+        CATEGORY_CDN -> R.string.simple_title_cdn
+        CATEGORY_DIR -> R.string.simple_title_direct
+        CATEGORY_IND -> R.string.simple_title_indirect
+        CATEGORY_NAT -> R.string.simple_title_native
+        CATEGORY_STN -> R.string.simple_title_call_transport
+        CATEGORY_ICM -> R.string.simple_title_icmp
+        CATEGORY_RTT -> R.string.simple_title_rtt
+        CATEGORY_LOC -> R.string.simple_title_location
+        CATEGORY_BYP -> R.string.simple_title_bypass
+        CATEGORY_REA -> R.string.simple_title_reachability
+        else -> R.string.section_check_details
+    }
+
+    private fun simpleCheckDescription(id: String): String = getString(
+        when (id) {
+            CATEGORY_GEO -> R.string.simple_checked_geo
+            CATEGORY_IPC -> R.string.simple_checked_ip_comparison
+            CATEGORY_CDN -> R.string.simple_checked_cdn
+            CATEGORY_DIR -> R.string.simple_checked_direct
+            CATEGORY_IND -> R.string.simple_checked_indirect
+            CATEGORY_NAT -> R.string.simple_checked_native
+            CATEGORY_STN -> R.string.simple_checked_call_transport
+            CATEGORY_ICM -> R.string.simple_checked_icmp
+            CATEGORY_RTT -> R.string.simple_checked_rtt
+            CATEGORY_LOC -> R.string.simple_checked_location
+            CATEGORY_BYP -> R.string.simple_checked_bypass
+            CATEGORY_REA -> R.string.simple_checked_reachability
+            else -> R.string.section_check_details
+        },
+    )
+
+    private fun simpleVerdictExplanation(rule: VerdictRuleCode): String = getString(
+        when (rule) {
+            VerdictRuleCode.R1_HARD_BYPASS -> R.string.simple_verdict_hard_bypass
+            VerdictRuleCode.R3_PROBE_TARGET_DIVERGENCE,
+            VerdictRuleCode.R3_PROBE_TARGET_DIRECT_DIVERGENCE,
+            VerdictRuleCode.R3_CROSS_CHANNEL_MISMATCH,
+            -> R.string.simple_verdict_address_conflict
+            VerdictRuleCode.R4_LOCATION_GEO_CONFLICT -> R.string.simple_verdict_location_conflict
+            VerdictRuleCode.R4_HOSTING_REVIEW -> R.string.simple_verdict_hosting_review
+            VerdictRuleCode.R5_MATRIX -> R.string.simple_verdict_combined_signals
+            VerdictRuleCode.R6_FALLBACK -> R.string.simple_verdict_review_signals
+            VerdictRuleCode.UNSPECIFIED -> R.string.simple_verdict_general
+        },
+    )
 
     private fun refreshCompletedCategoryViews(result: CheckResult, privacyMode: Boolean) {
         if (cardCdnPulling.isVisible || result.cdnPulling != CdnPullingResult.empty()) {

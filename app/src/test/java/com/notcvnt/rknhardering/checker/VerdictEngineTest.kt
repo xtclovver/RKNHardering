@@ -16,10 +16,80 @@ import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.LocationSignalsFacts
 import com.notcvnt.rknhardering.model.Verdict
+import com.notcvnt.rknhardering.model.VerdictRuleCode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VerdictEngineTest {
+
+    @Test
+    fun `detailed R1 keeps legacy verdict and reports sources`() {
+        val argsBypass = bypass(
+            evidence = listOf(evidence(EvidenceSource.PROXY_AUTH_BYPASS, EvidenceConfidence.HIGH)),
+        )
+        val detailed = VerdictEngine.evaluateDetailed(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = argsBypass,
+            ipConsensus = IpConsensusResult.empty(),
+        )
+
+        assertEquals(
+            VerdictEngine.evaluate(
+                category(), category(), category(), category(), argsBypass, IpConsensusResult.empty(),
+            ),
+            detailed.verdict,
+        )
+        assertEquals(VerdictRuleCode.R1_HARD_BYPASS, detailed.rule)
+        assertEquals(setOf(EvidenceSource.PROXY_AUTH_BYPASS), detailed.participants.single().evidenceSources)
+    }
+
+    @Test
+    fun `detailed R3 and R6 identify the deciding rule`() {
+        val r3 = VerdictEngine.evaluateDetailed(
+            geoIp = category(),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult(crossChannelMismatch = true, geoCountryMismatch = true),
+        )
+        val r6 = VerdictEngine.evaluateDetailed(
+            geoIp = category(),
+            directSigns = category(needsReview = true),
+            indirectSigns = category(),
+            locationSignals = category(),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+
+        assertEquals(VerdictRuleCode.R3_CROSS_CHANNEL_MISMATCH, r3.rule)
+        assertEquals(Verdict.DETECTED, r3.verdict)
+        assertEquals(VerdictRuleCode.R6_FALLBACK, r6.rule)
+        assertEquals(Verdict.NEEDS_REVIEW, r6.verdict)
+    }
+
+    @Test
+    fun `detailed roaming suppression remains R5 not detected`() {
+        val detailed = VerdictEngine.evaluateDetailed(
+            geoIp = category(geoFacts = GeoIpFacts(outsideRu = true, expectedRoamingExit = true)),
+            directSigns = category(),
+            indirectSigns = category(),
+            locationSignals = category(
+                findings = listOf(Finding("network_mcc_ru:true")),
+                locationFacts = LocationSignalsFacts(homeRoutedRoaming = true),
+            ),
+            bypassResult = bypass(),
+            ipConsensus = IpConsensusResult.empty(),
+        )
+
+        assertEquals(Verdict.NOT_DETECTED, detailed.verdict)
+        assertEquals(VerdictRuleCode.R5_MATRIX, detailed.rule)
+        assertTrue(detailed.participants.any { it.factor == "expected_roaming_exit=true" })
+    }
 
     @Test
     fun `R1 split tunnel evidence yields detected`() {

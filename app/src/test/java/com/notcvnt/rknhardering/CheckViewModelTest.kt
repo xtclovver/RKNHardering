@@ -13,6 +13,7 @@ import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.Verdict
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -96,6 +97,63 @@ class CheckViewModelTest {
         assertEquals(2, events.size)
         assertTrue(events[0] is ScanEvent.Started)
         assertTrue(events[1] is ScanEvent.Cancelled)
+    }
+
+    @Test
+    fun `scan timeline keeps captured display mode and next scan uses changed preference`() {
+        val firstScanMayComplete = CompletableDeferred<Unit>()
+        val capturedContexts = mutableListOf<ScanExecutionContext>()
+        val app: Application = ApplicationProvider.getApplicationContext()
+        val prefs = AppUiSettings.prefs(app)
+        prefs.edit().clear().putString(
+            SettingsPrefs.PREF_RESULT_DISPLAY_MODE,
+            ResultDisplayMode.SIMPLE.prefValue,
+        ).commit()
+        val viewModel = CheckViewModel(app)
+
+        CheckViewModel.runScanOverride = { _, _, executionContext, _ ->
+            capturedContexts += executionContext
+            if (capturedContexts.size == 1) firstScanMayComplete.await()
+            completedResult()
+        }
+
+        viewModel.startScan(
+            settings = CheckSettings(
+                splitTunnelEnabled = false,
+                networkRequestsEnabled = false,
+            ),
+            privacyMode = true,
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val started = viewModel.scanEvents.value.events.single() as ScanEvent.Started
+        assertEquals(ResultDisplayMode.SIMPLE, started.resultDisplayMode)
+        assertEquals(ResultDisplayMode.SIMPLE, capturedContexts.single().resultDisplayMode)
+        assertEquals(null, capturedContexts.single().diagnosticCollector)
+
+        prefs.edit().putString(
+            SettingsPrefs.PREF_RESULT_DISPLAY_MODE,
+            ResultDisplayMode.ADVANCED.prefValue,
+        ).commit()
+        assertEquals(ResultDisplayMode.SIMPLE, started.resultDisplayMode)
+
+        firstScanMayComplete.complete(Unit)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val firstCompleted = viewModel.scanEvents.value.events.last() as ScanEvent.Completed
+        assertEquals(ResultDisplayMode.SIMPLE, firstCompleted.resultDisplayMode)
+
+        viewModel.startScan(
+            settings = started.settings,
+            privacyMode = true,
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val secondEvents = viewModel.scanEvents.value.events
+        assertEquals(ResultDisplayMode.ADVANCED, (secondEvents.first() as ScanEvent.Started).resultDisplayMode)
+        assertEquals(ResultDisplayMode.ADVANCED, (secondEvents.last() as ScanEvent.Completed).resultDisplayMode)
+        assertEquals(ResultDisplayMode.ADVANCED, capturedContexts.last().resultDisplayMode)
+        assertTrue(capturedContexts.last().diagnosticCollector != null)
     }
 
     private fun category(name: String): CategoryResult = CategoryResult(

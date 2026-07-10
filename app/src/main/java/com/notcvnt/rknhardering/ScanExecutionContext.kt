@@ -1,5 +1,6 @@
 package com.notcvnt.rknhardering
 
+import com.notcvnt.rknhardering.diagnostics.DiagnosticTraceCollector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asContextElement
 import java.net.DatagramSocket
@@ -14,6 +15,8 @@ private val scanExecutionContextThreadLocal = ThreadLocal<ScanExecutionContext?>
 data class ScanExecutionContext(
     val scanId: Long = 0L,
     val cancellationSignal: ScanCancellationSignal = ScanCancellationSignal(),
+    val resultDisplayMode: ResultDisplayMode = ResultDisplayMode.NORMAL,
+    val diagnosticCollector: DiagnosticTraceCollector? = null,
 ) {
     fun asCoroutineContext(): CoroutineContext = scanExecutionContextThreadLocal.asContextElement(this)
 

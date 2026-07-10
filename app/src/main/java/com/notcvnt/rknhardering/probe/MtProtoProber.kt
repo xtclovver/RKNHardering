@@ -45,6 +45,7 @@ object MtProtoProber {
         readTimeoutMs: Int = 3000,
         executionContext: ScanExecutionContext = ScanExecutionContext.currentOrDefault(),
     ): ProbeResult = withContext(Dispatchers.IO) {
+        val startedAt = System.nanoTime()
         for (target in TELEGRAM_DC_TARGETS) {
             val reachable = trySocks5Connect(
                 proxyHost = proxyHost,
@@ -56,10 +57,31 @@ object MtProtoProber {
                 executionContext = executionContext,
             )
             if (reachable) {
-                return@withContext ProbeResult(reachable = true, targetAddress = target)
+                return@withContext ProbeResult(reachable = true, targetAddress = target).also { result ->
+                    recordDiagnostic(executionContext, proxyHost, proxyPort, startedAt, result)
+                }
             }
         }
-        ProbeResult(reachable = false, targetAddress = null)
+        ProbeResult(reachable = false, targetAddress = null).also { result ->
+            recordDiagnostic(executionContext, proxyHost, proxyPort, startedAt, result)
+        }
+    }
+
+    private fun recordDiagnostic(
+        executionContext: ScanExecutionContext,
+        proxyHost: String,
+        proxyPort: Int,
+        startedAt: Long,
+        result: ProbeResult,
+    ) {
+        executionContext.diagnosticCollector?.record(
+            category = "byp",
+            source = "MTProto proxy probe",
+            target = "$proxyHost:$proxyPort",
+            status = if (result.reachable) "reachable" else "unreachable",
+            durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+            body = "target=${result.targetAddress}",
+        )
     }
 
     /**

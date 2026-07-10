@@ -24,6 +24,7 @@ internal object SettingsPrefs {
     const val PREF_DNS_RESOLVER_DOH_URL = "pref_dns_resolver_doh_url"
     const val PREF_DNS_RESOLVER_DOH_BOOTSTRAP = "pref_dns_resolver_doh_bootstrap"
     const val PREF_PRIVACY_MODE = "pref_privacy_mode"
+    const val PREF_RESULT_DISPLAY_MODE = "pref_result_display_mode"
     const val PREF_THEME = "pref_theme"
     const val PREF_LANGUAGE = "pref_language"
     const val PREF_COLOR_VISION_MODE = "pref_color_vision_mode"

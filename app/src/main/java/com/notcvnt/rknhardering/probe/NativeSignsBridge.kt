@@ -1,6 +1,7 @@
 package com.notcvnt.rknhardering.probe
 
 import com.notcvnt.rknhardering.ScanCancellationSignal
+import com.notcvnt.rknhardering.ScanExecutionContext
 
 object NativeSignsBridge {
     private const val LIBRARY_NAME = "native_signs_probe"
@@ -93,99 +94,159 @@ object NativeSignsBridge {
     }
 
     fun getIfAddrs(): Array<String> {
-        getIfAddrsOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeGetIfAddrs() }.getOrDefault(emptyArray())
+        return traceArray("getifaddrs") {
+            getIfAddrsOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeGetIfAddrs() }.getOrDefault(emptyArray())
+        }
     }
 
     fun ifNameToIndex(name: String): Int {
-        ifNameToIndexOverride?.let { return it.invoke(name) }
-        if (!isLibraryLoaded() || name.isBlank()) return 0
-        return runCatching { nativeIfNameToIndex(name) }.getOrDefault(0)
+        return traceValue("if_nametoindex", name, {
+            ifNameToIndexOverride?.invoke(name)
+                ?: if (!isLibraryLoaded() || name.isBlank()) 0 else runCatching { nativeIfNameToIndex(name) }.getOrDefault(0)
+        }) { it.toString() }
     }
 
     fun readProcFile(path: String, maxBytes: Int = 262_144): String? {
-        readProcFileOverride?.let { return it.invoke(path, maxBytes) }
-        if (!isLibraryLoaded()) return null
-        return runCatching { nativeReadProcFile(path, maxBytes) }.getOrNull()
+        return traceValue("readProcFile", path, {
+            val override = readProcFileOverride
+            if (override != null) {
+                override.invoke(path, maxBytes)
+            } else if (!isLibraryLoaded()) {
+                null
+            } else {
+                runCatching { nativeReadProcFile(path, maxBytes) }.getOrNull()
+            }
+        }) { it.orEmpty() }
     }
 
     fun readSelfMapsSummary(): Array<String> {
-        readSelfMapsSummaryOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeReadSelfMapsSummary() }.getOrDefault(emptyArray())
+        return traceArray("readSelfMapsSummary") {
+            readSelfMapsSummaryOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeReadSelfMapsSummary() }.getOrDefault(emptyArray())
+        }
     }
 
     fun probeFeatureFlags(): Array<String> {
-        probeFeatureFlagsOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeProbeFeatureFlags() }.getOrDefault(emptyArray())
+        return traceArray("probeFeatureFlags") {
+            probeFeatureFlagsOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeProbeFeatureFlags() }.getOrDefault(emptyArray())
+        }
     }
 
     fun libraryIntegrity(): Array<String> {
-        libraryIntegrityOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeLibraryIntegrity() }.getOrDefault(emptyArray())
+        return traceArray("libraryIntegrity") {
+            libraryIntegrityOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeLibraryIntegrity() }.getOrDefault(emptyArray())
+        }
     }
 
     fun interfaceDump(): Array<String> {
-        interfaceDumpOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeInterfaceDump() }.getOrDefault(emptyArray())
+        return traceArray("interfaceDump") {
+            interfaceDumpOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeInterfaceDump() }.getOrDefault(emptyArray())
+        }
     }
 
     fun netlinkRouteDump(family: Int = 0): Array<String> {
-        netlinkRouteDumpOverride?.let { return it.invoke(family) }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeNetlinkRouteDump(family) }.getOrDefault(emptyArray())
+        return traceArray("netlinkRouteDump", "family=$family") {
+            netlinkRouteDumpOverride?.invoke(family)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeNetlinkRouteDump(family) }.getOrDefault(emptyArray())
+        }
     }
 
     fun netlinkSockDiag(family: Int, protocol: Int): Array<String> {
-        netlinkSockDiagOverride?.let { return it.invoke(family, protocol) }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeNetlinkSockDiag(family, protocol) }.getOrDefault(emptyArray())
+        return traceArray("netlinkSockDiag", "family=$family,protocol=$protocol") {
+            netlinkSockDiagOverride?.invoke(family, protocol)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeNetlinkSockDiag(family, protocol) }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectRoot(): Array<String> {
-        detectRootOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectRoot() }.getOrDefault(emptyArray())
+        return traceArray("detectRoot") {
+            detectRootOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectRoot() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectEmulator(): Array<String> {
-        detectEmulatorOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectEmulator() }.getOrDefault(emptyArray())
+        return traceArray("detectEmulator") {
+            detectEmulatorOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectEmulator() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectVpnProperties(): Array<String> {
-        detectVpnPropertiesOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnProperties() }.getOrDefault(emptyArray())
+        return traceArray("detectVpnProperties") {
+            detectVpnPropertiesOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectVpnProperties() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectVpnLeaks(): Array<String> {
-        detectVpnLeaksOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnLeaks() }.getOrDefault(emptyArray())
+        return traceArray("detectVpnLeaks") {
+            detectVpnLeaksOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectVpnLeaks() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectVpnAdvanced(): Array<String> {
-        detectVpnAdvancedOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnAdvanced() }.getOrDefault(emptyArray())
+        return traceArray("detectVpnAdvanced") {
+            detectVpnAdvancedOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectVpnAdvanced() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectVpnSyscalls(): Array<String> {
-        detectVpnSyscallsOverride?.let { return it.invoke() }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnSyscalls() }.getOrDefault(emptyArray())
+        return traceArray("detectVpnSyscalls") {
+            detectVpnSyscallsOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectVpnSyscalls() }.getOrDefault(emptyArray())
+        }
     }
 
     fun detectVpnDetector(cancellationSignal: ScanCancellationSignal? = null): Array<String> {
-        detectVpnDetectorOverride?.let { return it.invoke(cancellationSignal) }
-        if (!isLibraryLoaded()) return emptyArray()
-        return runCatching { nativeDetectVpnDetector(cancellationSignal) }.getOrDefault(emptyArray())
+        return traceArray("detectVpnDetector") {
+            detectVpnDetectorOverride?.invoke(cancellationSignal)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeDetectVpnDetector(cancellationSignal) }.getOrDefault(emptyArray())
+        }
+    }
+
+    private fun traceArray(
+        source: String,
+        target: String? = null,
+        block: () -> Array<String>,
+    ): Array<String> = traceValue(source, target, block) { it.joinToString("\n") }
+
+    private fun <T> traceValue(
+        source: String,
+        target: String? = null,
+        block: () -> T,
+        render: (T) -> String,
+    ): T {
+        val executionContext = ScanExecutionContext.currentOrDefault()
+        val startedAt = System.nanoTime()
+        return try {
+            block().also { result ->
+                executionContext.diagnosticCollector?.record(
+                    category = "nat",
+                    source = source,
+                    target = target,
+                    status = "completed",
+                    durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                    body = render(result),
+                )
+            }
+        } catch (error: Throwable) {
+            executionContext.diagnosticCollector?.record(
+                category = "nat",
+                source = source,
+                target = target,
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = error.message.orEmpty(),
+            )
+            throw error
+        }
     }
 
     internal fun resetForTests() {

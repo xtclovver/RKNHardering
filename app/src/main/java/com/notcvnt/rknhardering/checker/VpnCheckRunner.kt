@@ -25,6 +25,7 @@ import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
+import com.notcvnt.rknhardering.diagnostics.DiagnosticResultRecorder
 import com.notcvnt.rknhardering.model.DomainReachabilityResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
@@ -669,7 +670,7 @@ object VpnCheckRunner {
         onUpdate?.invoke(CheckUpdate.IpConsensusReady(ipConsensus))
 
         executionContext.throwIfCancelled()
-        val verdict = VerdictEngine.evaluate(
+        val verdictDecision = VerdictEngine.evaluateDetailed(
             geoIp = geoIp,
             directSigns = directSigns,
             indirectSigns = indirectSigns,
@@ -680,10 +681,49 @@ object VpnCheckRunner {
             icmpSpoofing = icmpSpoofing,
             geoCheckAvailable = settings.networkRequestsEnabled,
         )
+        val verdict = verdictDecision.verdict
         executionContext.throwIfCancelled()
         onUpdate?.invoke(CheckUpdate.VerdictReady(verdict))
 
         val operatorWhitelistResult = operatorWhitelistDeferred?.await()
+
+        val diagnosticCollector = executionContext.diagnosticCollector
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "geo", "GeoIpChecker", geoIp)
+        DiagnosticResultRecorder.recordIpComparison(diagnosticCollector, ipComparison)
+        DiagnosticResultRecorder.recordCdn(diagnosticCollector, cdnPulling)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "dir", "DirectSignsChecker", directSigns)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "ind", "IndirectSignsChecker", indirectSigns)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "loc", "LocationSignalsChecker", locationSignals)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "nat", "NativeSignsChecker", nativeSigns)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "icmp", "IcmpSpoofingChecker", icmpSpoofing)
+        DiagnosticResultRecorder.recordCategory(diagnosticCollector, "rtt", "RttTriangulationChecker", rttTriangulation)
+        DiagnosticResultRecorder.recordBypass(diagnosticCollector, bypassResult)
+        tunProbeResult?.let { probe ->
+            diagnosticCollector?.record(
+                category = "byp",
+                source = "UnderlyingNetworkProber",
+                status = when {
+                    probe.underlyingReachable -> "reachable"
+                    probe.vpnError != null || probe.underlyingError != null -> "error"
+                    else -> "completed"
+                },
+                body = buildString {
+                    appendLine("vpnActive=${probe.vpnActive}")
+                    appendLine("activeNetworkIsVpn=${probe.activeNetworkIsVpn}")
+                    appendLine("underlyingReachable=${probe.underlyingReachable}")
+                    appendLine("dnsPathMismatch=${probe.dnsPathMismatch}")
+                    appendLine("vpnError=${probe.vpnError}")
+                    appendLine("underlyingError=${probe.underlyingError}")
+                    appendLine("ruTarget=${probe.ruTarget}")
+                    appendLine("nonRuTarget=${probe.nonRuTarget}")
+                    appendLine("tunProbeDiagnostics=${probe.tunProbeDiagnostics}")
+                },
+            )
+        }
+        DiagnosticResultRecorder.recordDomainReachability(diagnosticCollector, domainReachability)
+        DiagnosticResultRecorder.recordConsensus(diagnosticCollector, ipConsensus)
+        DiagnosticResultRecorder.recordVerdict(diagnosticCollector, verdictDecision)
+        val diagnosticSnapshot = diagnosticCollector?.snapshot()
 
         CheckResult(
             geoIp = geoIp,
@@ -701,6 +741,8 @@ object VpnCheckRunner {
             ipConsensus = ipConsensus,
             operatorWhitelistProbe = operatorWhitelistResult,
             domainReachability = domainReachability,
+            verdictDecision = verdictDecision,
+            diagnosticSnapshot = diagnosticSnapshot,
         )
     }
 }

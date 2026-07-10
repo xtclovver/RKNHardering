@@ -73,8 +73,33 @@ object ResolverNetworkStack {
         cancellationSignal: ScanCancellationSignal? = null,
     ): List<InetAddress> {
         literalToInetAddress(hostname)?.let { return listOf(it) }
+        val startedAt = System.nanoTime()
+        val executionContext = cancellationSignal?.let { signal ->
+            ScanExecutionContext.currentOrDefault().takeIf { it.cancellationSignal === signal }
+        } ?: ScanExecutionContext.currentOrDefault()
         cancellationSignal?.throwIfCancelled()
-        return dns(config, binding, cancellationSignal).lookup(hostname)
+        return try {
+            dns(config, binding, cancellationSignal).lookup(hostname).also { addresses ->
+                executionContext.diagnosticCollector?.record(
+                    category = "ind",
+                    source = "DNS",
+                    target = hostname,
+                    status = "resolved",
+                    durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                    body = addresses.mapNotNull { it.hostAddress }.distinct().joinToString("\n"),
+                )
+            }
+        } catch (error: Exception) {
+            executionContext.diagnosticCollector?.record(
+                category = "ind",
+                source = "DNS",
+                target = hostname,
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = error.message.orEmpty(),
+            )
+            throw error
+        }
     }
 
     internal fun resetForTests() {
@@ -118,7 +143,47 @@ object ResolverNetworkStack {
             nativeCurlRetryCount = nativeCurlRetryCount,
             cancellationSignal = cancellationSignal,
         )
-        return executeWithFallback(request)
+        val startedAt = System.nanoTime()
+        return try {
+            executeWithFallback(request).also { response ->
+                currentExecutionContext(request).diagnosticCollector?.record(
+                    category = diagnosticCategoryForUrl(url),
+                    source = "${method.uppercase()} HTTP",
+                    target = url,
+                    status = "HTTP ${response.code}",
+                    durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                    body = response.body,
+                )
+            }
+        } catch (error: Exception) {
+            currentExecutionContext(request).diagnosticCollector?.record(
+                category = diagnosticCategoryForUrl(url),
+                source = "${method.uppercase()} HTTP",
+                target = url,
+                status = "error",
+                durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                body = error.message.orEmpty(),
+            )
+            throw error
+        }
+    }
+
+    private fun diagnosticCategoryForUrl(url: String): String {
+        val normalized = url.lowercase()
+        return when {
+            normalized.contains("googlevideo.com") ||
+                normalized.contains("cloudflare.com") ||
+                normalized.contains("one.one.one.one") ||
+                normalized.contains("rutracker.org") ||
+                normalized.contains("meduza.io") -> "cdn"
+            normalized.contains("ifconfig") ||
+                normalized.contains("ipify") ||
+                normalized.contains("ip.sb") ||
+                normalized.contains("checkip.amazonaws") ||
+                normalized.contains("ip.mail.ru") ||
+                normalized.contains("internet.yandex") -> "ipc"
+            else -> "geo"
+        }
     }
 
     private fun executeWithFallback(request: ResolverHttpRequest): ResolverHttpResponse {

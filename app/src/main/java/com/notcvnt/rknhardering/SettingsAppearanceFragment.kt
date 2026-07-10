@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import androidx.core.content.edit
 import androidx.fragment.app.Fragment
 import com.google.android.material.chip.ChipGroup
@@ -11,6 +12,8 @@ import com.google.android.material.snackbar.Snackbar
 internal class SettingsAppearanceFragment : Fragment(R.layout.fragment_settings_appearance) {
 
     private lateinit var prefs: SharedPreferences
+    private lateinit var chipGroupResultDisplayMode: ChipGroup
+    private lateinit var textResultDisplayModeDescription: TextView
     private lateinit var chipGroupTheme: ChipGroup
     private lateinit var chipGroupIconStyle: ChipGroup
     private lateinit var chipGroupLanguage: ChipGroup
@@ -18,6 +21,8 @@ internal class SettingsAppearanceFragment : Fragment(R.layout.fragment_settings_
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         prefs = AppUiSettings.prefs(requireContext())
+        chipGroupResultDisplayMode = view.findViewById(R.id.chipGroupResultDisplayMode)
+        textResultDisplayModeDescription = view.findViewById(R.id.textResultDisplayModeDescription)
         chipGroupTheme = view.findViewById(R.id.chipGroupTheme)
         chipGroupIconStyle = view.findViewById(R.id.chipGroupIconStyle)
         chipGroupLanguage = view.findViewById(R.id.chipGroupLanguage)
@@ -26,6 +31,16 @@ internal class SettingsAppearanceFragment : Fragment(R.layout.fragment_settings_
     }
 
     private fun loadSettings() {
+        val resultDisplayMode = ResultDisplayMode.fromPrefs(prefs)
+        chipGroupResultDisplayMode.check(
+            when (resultDisplayMode) {
+                ResultDisplayMode.SIMPLE -> R.id.chipResultDisplaySimple
+                ResultDisplayMode.NORMAL -> R.id.chipResultDisplayNormal
+                ResultDisplayMode.ADVANCED -> R.id.chipResultDisplayAdvanced
+            },
+        )
+        updateResultDisplayModeDescription(resultDisplayMode)
+
         val theme = prefs.getString(SettingsPrefs.PREF_THEME, "system") ?: "system"
         chipGroupTheme.check(
             when (theme) {
@@ -53,6 +68,17 @@ internal class SettingsAppearanceFragment : Fragment(R.layout.fragment_settings_
     }
 
     private fun setupListeners(view: View) {
+        chipGroupResultDisplayMode.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val mode = when (checkedIds.first()) {
+                R.id.chipResultDisplaySimple -> ResultDisplayMode.SIMPLE
+                R.id.chipResultDisplayAdvanced -> ResultDisplayMode.ADVANCED
+                else -> ResultDisplayMode.NORMAL
+            }
+            prefs.edit { putString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, mode.prefValue) }
+            updateResultDisplayModeDescription(mode)
+        }
+
         chipGroupTheme.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val value = when (checkedIds.first()) {
@@ -84,6 +110,16 @@ internal class SettingsAppearanceFragment : Fragment(R.layout.fragment_settings_
             prefs.edit { putString(SettingsPrefs.PREF_LANGUAGE, value) }
             AppUiSettings.applyLanguage(value)
         }
+    }
+
+    private fun updateResultDisplayModeDescription(mode: ResultDisplayMode) {
+        textResultDisplayModeDescription.setText(
+            when (mode) {
+                ResultDisplayMode.SIMPLE -> R.string.settings_result_display_mode_simple_desc
+                ResultDisplayMode.NORMAL -> R.string.settings_result_display_mode_normal_desc
+                ResultDisplayMode.ADVANCED -> R.string.settings_result_display_mode_advanced_desc
+            },
+        )
     }
 
     private fun applyIconStyle(view: View, isClassic: Boolean) {

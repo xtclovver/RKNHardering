@@ -61,6 +61,7 @@ class SettingsActivityTest {
             putBoolean(SettingsPrefs.PREF_PRIVACY_MODE, true)
             putString(SettingsPrefs.PREF_THEME, "system")
             putString(SettingsPrefs.PREF_LANGUAGE, "ru")
+            putString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, ResultDisplayMode.ADVANCED.prefValue)
             putString(SettingsPrefs.PREF_COLOR_VISION_MODE, ColorVisionMode.BLUE_YELLOW.prefValue)
         }
 
@@ -90,6 +91,7 @@ class SettingsActivityTest {
                 R.string.settings_value_appearance_format,
                 activity.getString(R.string.settings_theme_system),
                 "RU",
+                activity.getString(R.string.settings_result_display_mode_advanced),
             ),
             rowValue(root, R.id.rowAppearance),
         )
@@ -98,6 +100,37 @@ class SettingsActivityTest {
             rowValue(root, R.id.rowAccessibility),
         )
         assertEquals("v${BuildConfig.VERSION_NAME}", rowValue(root, R.id.rowAbout))
+    }
+
+    @Test
+    fun `appearance fragment defaults unknown result mode to normal and saves every mode`() {
+        AppUiSettings.prefs(context).edit {
+            putString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, "unexpected")
+        }
+        val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
+        activity.supportFragmentManager.beginTransaction()
+            .replace(R.id.settingsFragmentContainer, SettingsAppearanceFragment())
+            .commitNow()
+        val root = activity.supportFragmentManager
+            .findFragmentById(R.id.settingsFragmentContainer)!!
+            .requireView()
+        val prefs = AppUiSettings.prefs(activity)
+        val normal = root.findViewById<Chip>(R.id.chipResultDisplayNormal)
+        val simple = root.findViewById<Chip>(R.id.chipResultDisplaySimple)
+        val advanced = root.findViewById<Chip>(R.id.chipResultDisplayAdvanced)
+
+        assertTrue(normal.isChecked)
+
+        simple.performClick()
+        assertEquals(ResultDisplayMode.SIMPLE.prefValue, prefs.getString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, null))
+        normal.performClick()
+        assertEquals(ResultDisplayMode.NORMAL.prefValue, prefs.getString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, null))
+        advanced.performClick()
+        assertEquals(ResultDisplayMode.ADVANCED.prefValue, prefs.getString(SettingsPrefs.PREF_RESULT_DISPLAY_MODE, null))
+        assertEquals(
+            activity.getString(R.string.settings_result_display_mode_advanced_desc),
+            root.findViewById<TextView>(R.id.textResultDisplayModeDescription).text.toString(),
+        )
     }
 
     @Test

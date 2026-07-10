@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import kotlin.math.roundToInt
+import kotlin.concurrent.thread
 
 object SystemPingProber {
     private const val DEFAULT_COUNT = 3
@@ -20,6 +21,7 @@ object SystemPingProber {
     internal data class CommandResult(
         val exitCode: Int,
         val output: String,
+        val stderr: String = "",
     )
 
     data class PingResult(
@@ -66,7 +68,23 @@ object SystemPingProber {
         for (command in commands) {
             executionContext.throwIfCancelled()
             try {
+                val startedAt = System.nanoTime()
                 val commandResult = runCommand(command, executionContext)
+                executionContext.diagnosticCollector?.record(
+                    category = "icmp",
+                    source = "ping",
+                    target = address,
+                    status = "exit ${commandResult.exitCode}",
+                    durationMs = (System.nanoTime() - startedAt) / 1_000_000,
+                    body = buildString {
+                        appendLine("command=${command.joinToString(" ")}")
+                        appendLine("exitCode=${commandResult.exitCode}")
+                        appendLine("stdout:")
+                        appendLine(commandResult.output)
+                        appendLine("stderr:")
+                        append(commandResult.stderr)
+                    },
+                )
                 return@withContext try {
                     parse(address, commandResult)
                 } catch (error: IOException) {
@@ -131,20 +149,27 @@ object SystemPingProber {
     ): CommandResult {
         runCommandOverride?.let { return it(command) }
 
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .start()
+        val process = ProcessBuilder(command).start()
         val registration = executionContext.cancellationSignal.register {
             runCatching { process.destroyForcibly() }
         }
         try {
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            executionContext.throwIfCancelled()
+            var output = ""
+            var stderr = ""
+            val stdoutReader = thread(name = "rkn-ping-stdout") {
+                output = runCatching { process.inputStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+            }
+            val stderrReader = thread(name = "rkn-ping-stderr") {
+                stderr = runCatching { process.errorStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+            }
             val exitCode = process.waitFor()
+            stdoutReader.join()
+            stderrReader.join()
             executionContext.throwIfCancelled()
             return CommandResult(
                 exitCode = exitCode,
                 output = output,
+                stderr = stderr,
             )
         } finally {
             registration.dispose()

@@ -141,6 +141,11 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
     }
 
     private fun appearanceValue(): String {
+        val resultDisplayMode = when (ResultDisplayMode.fromPrefs(prefs)) {
+            ResultDisplayMode.SIMPLE -> getString(R.string.settings_result_display_mode_simple)
+            ResultDisplayMode.NORMAL -> getString(R.string.settings_result_display_mode_normal)
+            ResultDisplayMode.ADVANCED -> getString(R.string.settings_result_display_mode_advanced)
+        }
         val theme = when (prefs.getString(SettingsPrefs.PREF_THEME, "system")) {
             "light" -> getString(R.string.settings_theme_light)
             "dark" -> getString(R.string.settings_theme_dark)
@@ -153,7 +158,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
             "zh-CN" -> "ZH"
             else -> currentLocaleCode()
         }
-        return getString(R.string.settings_value_appearance_format, theme, language)
+        return getString(R.string.settings_value_appearance_format, theme, language, resultDisplayMode)
     }
 
     private fun colorVisionValue(): String {

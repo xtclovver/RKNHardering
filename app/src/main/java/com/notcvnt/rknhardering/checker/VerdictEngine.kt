@@ -8,6 +8,9 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.Verdict
+import com.notcvnt.rknhardering.model.VerdictDecision
+import com.notcvnt.rknhardering.model.VerdictParticipant
+import com.notcvnt.rknhardering.model.VerdictRuleCode
 
 object VerdictEngine {
 
@@ -54,10 +57,39 @@ object VerdictEngine {
         nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         geoCheckAvailable: Boolean = true,
-    ): Verdict {
+    ): Verdict = evaluateDetailed(
+        geoIp = geoIp,
+        directSigns = directSigns,
+        indirectSigns = indirectSigns,
+        locationSignals = locationSignals,
+        bypassResult = bypassResult,
+        ipConsensus = ipConsensus,
+        nativeSigns = nativeSigns,
+        icmpSpoofing = icmpSpoofing,
+        geoCheckAvailable = geoCheckAvailable,
+    ).verdict
+
+    fun evaluateDetailed(
+        geoIp: CategoryResult,
+        directSigns: CategoryResult,
+        indirectSigns: CategoryResult,
+        locationSignals: CategoryResult,
+        bypassResult: BypassResult,
+        ipConsensus: IpConsensusResult,
+        nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        geoCheckAvailable: Boolean = true,
+    ): VerdictDecision {
         // R1
-        if (bypassResult.evidence.any { it.detected && it.source in HARD_DETECT_BYPASS }) {
-            return Verdict.DETECTED
+        val hardBypassSources = bypassResult.evidence
+            .filter { it.detected && it.source in HARD_DETECT_BYPASS }
+            .mapTo(linkedSetOf()) { it.source }
+        if (hardBypassSources.isNotEmpty()) {
+            return decision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R1_HARD_BYPASS,
+                participant("hard_bypass", hardBypassSources),
+            )
         }
 
         val geoAxis = ipConsensus.foreignIps.isNotEmpty() ||
@@ -65,13 +97,28 @@ object VerdictEngine {
             ipConsensus.warpLikeIndicator
         // R3
         if (ipConsensus.probeTargetDivergence && geoAxis) {
-            return Verdict.DETECTED
+            return decision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R3_PROBE_TARGET_DIVERGENCE,
+                participant("probe_target_divergence"),
+                participant("geo_axis"),
+            )
         }
         if (ipConsensus.probeTargetDirectDivergence && geoAxis) {
-            return Verdict.DETECTED
+            return decision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R3_PROBE_TARGET_DIRECT_DIVERGENCE,
+                participant("probe_target_direct_divergence"),
+                participant("geo_axis"),
+            )
         }
         if (ipConsensus.crossChannelMismatch && geoAxis) {
-            return Verdict.DETECTED
+            return decision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R3_CROSS_CHANNEL_MISMATCH,
+                participant("cross_channel_mismatch"),
+                participant("geo_axis"),
+            )
         }
 
         // R4
@@ -93,14 +140,24 @@ object VerdictEngine {
             ipConsensus.probeTargetDivergence ||
             ipConsensus.probeTargetDirectDivergence
         if (locationConfirmsRussia && geo?.outsideRu == true && !expectedRoamingExit) {
-            return Verdict.DETECTED
+            return decision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R4_LOCATION_GEO_CONFLICT,
+                participant("location_confirms_russia", setOf(EvidenceSource.LOCATION_SIGNALS)),
+                participant("geo_outside_russia", setOf(EvidenceSource.GEO_IP)),
+            )
         }
         if (locationConfirmsRussia &&
             (geo?.hosting == true || geo?.proxyDb == true) &&
             geo.outsideRu != true &&
             !anyOtherSignal
         ) {
-            return Verdict.NEEDS_REVIEW
+            return decision(
+                Verdict.NEEDS_REVIEW,
+                VerdictRuleCode.R4_HOSTING_REVIEW,
+                participant("location_confirms_russia", setOf(EvidenceSource.LOCATION_SIGNALS)),
+                participant("hosting_or_proxy_database", setOf(EvidenceSource.GEO_IP)),
+            )
         }
 
         // R5 — 3-bit matrix (geo x direct x indirect)
@@ -155,9 +212,53 @@ object VerdictEngine {
                     tunProbeReview
                 )
         ) {
-            return Verdict.NEEDS_REVIEW
+            val participants = buildList {
+                if (bypassResult.needsReview) add(participant("bypass_needs_review", bypassResult.evidence.mapTo(linkedSetOf()) { it.source }))
+                if (directSigns.needsReview) add(participant("direct_needs_review", directSigns.evidence.mapTo(linkedSetOf()) { it.source }))
+                if (indirectSigns.needsReview) add(participant("indirect_needs_review", indirectSigns.evidence.mapTo(linkedSetOf()) { it.source }))
+                if (locationSignalHit) add(participant("location_signal", setOf(EvidenceSource.LOCATION_SIGNALS)))
+                if (hasActionableCallTransportLeak) add(participant("call_transport_leak"))
+                if (icmpSpoofing.needsReview) add(participant("icmp_needs_review", setOf(EvidenceSource.ICMP_SPOOFING)))
+                if (nativeReviewHit) add(participant("native_needs_review", nativeSigns.evidence.mapTo(linkedSetOf()) { it.source }))
+                if (ipConsensus.needsReview) add(participant("ip_consensus_needs_review"))
+                if (ipConsensus.channelConflict.isNotEmpty()) add(participant("ip_channel_conflict"))
+                if (ipConsensus.probeTargetDivergence) add(participant("probe_target_divergence"))
+                if (tunProbeReview) add(participant("tun_probe_review", setOf(EvidenceSource.TUN_ACTIVE_PROBE)))
+            }
+            return decision(Verdict.NEEDS_REVIEW, VerdictRuleCode.R6_FALLBACK, *participants.toTypedArray())
         }
 
-        return matrix
+        val matrixSources = buildSet {
+            if (directHit) addAll(directSigns.evidence.filter { it.detected && it.source in MATRIX_DIRECT_SOURCES }.map { it.source })
+            if (indirectHit) {
+                addAll(indirectSigns.evidence.filter { it.detected && it.source in MATRIX_INDIRECT_SOURCES }.map { it.source })
+                addAll(nativeSigns.evidence.filter { it.detected }.map { it.source })
+            }
+            if (geoHit) add(EvidenceSource.GEO_IP)
+        }
+        return decision(
+            matrix,
+            VerdictRuleCode.R5_MATRIX,
+            participant("geo=$geoHit"),
+            participant("direct=$directHit"),
+            participant("indirect=$indirectHit", matrixSources),
+            participant("geo_available=$geoAxisAvailable"),
+            participant("expected_roaming_exit=$expectedRoamingExit"),
+        )
     }
+
+    private fun participant(
+        factor: String,
+        sources: Set<EvidenceSource> = emptySet(),
+    ): VerdictParticipant = VerdictParticipant(factor = factor, evidenceSources = sources)
+
+    private fun decision(
+        verdict: Verdict,
+        rule: VerdictRuleCode,
+        vararg participants: VerdictParticipant,
+    ): VerdictDecision = VerdictDecision(
+        verdict = verdict,
+        rule = rule,
+        participants = participants.toList(),
+    )
 }

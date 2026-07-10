@@ -7,6 +7,7 @@ import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.VpnCheckRunner
 import com.notcvnt.rknhardering.customcheck.CustomCheckRunner
+import com.notcvnt.rknhardering.diagnostics.DiagnosticTraceCollector
 import com.notcvnt.rknhardering.model.CheckResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,9 +15,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 sealed interface ScanEvent {
-    data class Started(val settings: CheckSettings, val privacyMode: Boolean) : ScanEvent
+    data class Started(
+        val settings: CheckSettings,
+        val privacyMode: Boolean,
+        val resultDisplayMode: ResultDisplayMode = ResultDisplayMode.NORMAL,
+    ) : ScanEvent
     data class Update(val update: CheckUpdate) : ScanEvent
-    data class Completed(val result: CheckResult, val privacyMode: Boolean) : ScanEvent
+    data class Completed(
+        val result: CheckResult,
+        val privacyMode: Boolean,
+        val resultDisplayMode: ResultDisplayMode = ResultDisplayMode.NORMAL,
+    ) : ScanEvent
     data object Cancelled : ScanEvent
 }
 
@@ -46,14 +55,32 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
     private var completedDiagnosticsConsumed = false
 
     fun startScan(settings: CheckSettings, privacyMode: Boolean) {
+        val resultDisplayMode = ResultDisplayMode.fromPrefs(AppUiSettings.prefs(getApplication()))
+        startScan(settings, privacyMode, resultDisplayMode)
+    }
+
+    fun startScan(
+        settings: CheckSettings,
+        privacyMode: Boolean,
+        resultDisplayMode: ResultDisplayMode,
+    ) {
         if (scanJob?.isActive == true && activeExecutionContext?.cancellationSignal?.isCancelled() == false) return
 
         val scanId = nextScanId++
-        val executionContext = ScanExecutionContext(scanId = scanId)
+        val diagnosticCollector = if (resultDisplayMode == ResultDisplayMode.ADVANCED) {
+            DiagnosticTraceCollector(privacyMode)
+        } else {
+            null
+        }
+        val executionContext = ScanExecutionContext(
+            scanId = scanId,
+            resultDisplayMode = resultDisplayMode,
+            diagnosticCollector = diagnosticCollector,
+        )
         activeScanId = scanId
         activeExecutionContext = executionContext
         resetCompletedDiagnosticsRetention()
-        replaceScanEvents(scanId, ScanEvent.Started(settings, privacyMode))
+        replaceScanEvents(scanId, ScanEvent.Started(settings, privacyMode, resultDisplayMode))
         _isRunning.value = true
 
         lateinit var launchedJob: Job
@@ -82,7 +109,7 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 if (isCurrentScan(scanId, executionContext)) {
-                    val enrichedResult = try {
+                    val resultWithProfile = try {
                         val app: Application = getApplication()
                         val customEnabled = AppUiSettings.prefs(app)
                             .getBoolean(SettingsPrefs.PREF_CUSTOM_CHECKS_ENABLED, false)
@@ -94,9 +121,17 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
                     } catch (_: Exception) {
                         result
                     }
-                    appendScanEvent(scanId, ScanEvent.Completed(enrichedResult, privacyMode))
+                    val enrichedResult = if (resultWithProfile.diagnosticSnapshot == null) {
+                        resultWithProfile.copy(
+                            diagnosticSnapshot = executionContext.diagnosticCollector?.snapshot(),
+                        )
+                    } else {
+                        resultWithProfile
+                    }
+                    appendScanEvent(scanId, ScanEvent.Completed(enrichedResult, privacyMode, resultDisplayMode))
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
+                executionContext.diagnosticCollector?.clear()
                 if (isCurrentScan(scanId, executionContext)) {
                     appendScanEvent(scanId, ScanEvent.Cancelled)
                 }
@@ -124,6 +159,7 @@ class CheckViewModel(app: Application) : AndroidViewModel(app) {
         activeExecutionContext = null
         activeScanId = null
         _isRunning.value = false
+        executionContext.diagnosticCollector?.clear()
         executionContext.cancellationSignal.cancel()
         scanJob?.cancel()
     }

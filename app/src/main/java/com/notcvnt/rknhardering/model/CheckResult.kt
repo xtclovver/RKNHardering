@@ -287,6 +287,31 @@ enum class Verdict {
     DETECTED,
 }
 
+enum class VerdictRuleCode(val code: String) {
+    R1_HARD_BYPASS("R1"),
+    R3_PROBE_TARGET_DIVERGENCE("R3"),
+    R3_PROBE_TARGET_DIRECT_DIVERGENCE("R3"),
+    R3_CROSS_CHANNEL_MISMATCH("R3"),
+    R4_LOCATION_GEO_CONFLICT("R4"),
+    R4_HOSTING_REVIEW("R4"),
+    R5_MATRIX("R5"),
+    R6_FALLBACK("R6"),
+    UNSPECIFIED("unknown"),
+}
+
+data class VerdictParticipant(
+    val factor: String,
+    val evidenceSources: Set<EvidenceSource> = emptySet(),
+)
+
+data class VerdictDecision(
+    val verdict: Verdict,
+    val rule: VerdictRuleCode,
+    val participants: List<VerdictParticipant>,
+) {
+    val ruleCode: String get() = rule.code
+}
+
 data class BypassResult(
     val proxyEndpoint: ProxyEndpoint?,
     val proxyOwner: LocalProxyOwner? = null,
@@ -472,4 +497,10 @@ data class CheckResult(
     val customProfileId: String? = null,
     val customProfileName: String? = null,
     val domainReachability: DomainReachabilityResult = DomainReachabilityResult.empty(),
+    val verdictDecision: VerdictDecision = VerdictDecision(
+        verdict = verdict,
+        rule = VerdictRuleCode.UNSPECIFIED,
+        participants = emptyList(),
+    ),
+    val diagnosticSnapshot: com.notcvnt.rknhardering.diagnostics.DiagnosticSnapshot? = null,
 )
