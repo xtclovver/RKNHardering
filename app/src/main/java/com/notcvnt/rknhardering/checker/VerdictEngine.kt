@@ -11,8 +11,10 @@ import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VerdictDecision
 import com.notcvnt.rknhardering.model.VerdictParticipant
 import com.notcvnt.rknhardering.model.VerdictRuleCode
+import android.util.Log
 
 object VerdictEngine {
+    private const val TAG = "VerdictEngine"
 
     private val HARD_DETECT_BYPASS = setOf(
         EvidenceSource.SPLIT_TUNNEL_BYPASS,
@@ -35,6 +37,8 @@ object VerdictEngine {
         EvidenceSource.ROUTING,
         EvidenceSource.DNS,
         EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+        EvidenceSource.IPTABLES_RULES,
+        EvidenceSource.MITM_PROXY_CERT,
         EvidenceSource.NATIVE_INTERFACE,
         EvidenceSource.NATIVE_ROUTE,
         EvidenceSource.NATIVE_JVM_MISMATCH,
@@ -79,6 +83,32 @@ object VerdictEngine {
         ipConsensus: IpConsensusResult,
         nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        geoCheckAvailable: Boolean = true,
+    ): VerdictDecision {
+        return try {
+            evaluateDetailedInternal(
+                geoIp, directSigns, indirectSigns, locationSignals,
+                bypassResult, ipConsensus, nativeSigns, icmpSpoofing, geoCheckAvailable,
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "evaluateDetailed failed", e)
+            decision(
+                Verdict.NEEDS_REVIEW,
+                VerdictRuleCode.R5_MATRIX_DEFAULT,
+                participant("evaluate_detailed_error", setOf(EvidenceSource.VERDICT_ENGINE)),
+            )
+        }
+    }
+
+    private fun evaluateDetailedInternal(
+        geoIp: CategoryResult,
+        directSigns: CategoryResult,
+        indirectSigns: CategoryResult,
+        locationSignals: CategoryResult,
+        bypassResult: BypassResult,
+        ipConsensus: IpConsensusResult,
+        nativeSigns: CategoryResult,
+        icmpSpoofing: CategoryResult,
         geoCheckAvailable: Boolean = true,
     ): VerdictDecision {
         // R1
@@ -150,7 +180,7 @@ object VerdictEngine {
         }
         if (locationConfirmsRussia &&
             (geo?.hosting == true || geo?.proxyDb == true) &&
-            geo.outsideRu != true &&
+            geo?.outsideRu != true &&
             !anyOtherSignal
         ) {
             return decision(
@@ -160,6 +190,8 @@ object VerdictEngine {
                 participant("hosting_or_proxy_database", setOf(EvidenceSource.GEO_IP)),
             )
         }
+
+        val whitelistEntry = geo?.let(CorporateVpnWhitelist::match)
 
         // R5 — 3-bit matrix (geo x direct x indirect)
         val geoHit = geo?.outsideRu == true && !expectedRoamingExit
@@ -237,15 +269,19 @@ object VerdictEngine {
             }
             if (geoHit) add(EvidenceSource.GEO_IP)
         }
-        return decision(
-            matrix,
-            VerdictRuleCode.R5_MATRIX,
+        val r5Participants = mutableListOf(
             participant("geo=$geoHit"),
             participant("direct=$directHit"),
             participant("indirect=$indirectHit", matrixSources),
             participant("geo_available=$geoAxisAvailable"),
             participant("expected_roaming_exit=$expectedRoamingExit"),
         )
+        if (whitelistEntry != null) {
+            r5Participants.add(
+                participant("corporate_vpn_whitelisted=${whitelistEntry.name}", setOf(EvidenceSource.CORPORATE_VPN_WHITELIST)),
+            )
+        }
+        return decision(matrix, VerdictRuleCode.R5_MATRIX, *r5Participants.toTypedArray())
     }
 
     private fun participant(

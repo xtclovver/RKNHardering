@@ -24,6 +24,8 @@ import java.net.NetworkInterface
 
 object NativeSignsChecker {
 
+    internal var jvmInterfacesOverride: (() -> List<JvmInterfaceSnapshot>)? = null
+
     private val HIGH_CONFIDENCE_HOOK_MARKERS = setOf(
         "frida-agent",
         "frida-gadget",
@@ -97,7 +99,7 @@ object NativeSignsChecker {
         var needsReview = false
 
         val nativeInterfaces = runCatching { NativeInterfaceProbe.collectInterfaces() }.getOrDefault(emptyList())
-        val jvmInterfaces = runCatching { collectJvmInterfaces() }.getOrDefault(emptyList())
+        val jvmInterfaces = runCatching { jvmInterfacesOverride?.invoke() ?: collectJvmInterfaces() }.getOrDefault(emptyList())
 
         val interfaceOutcome = evaluateInterfaces(context, nativeInterfaces)
         findings += interfaceOutcome.findings
@@ -765,19 +767,7 @@ object NativeSignsChecker {
                         EvidenceConfidence.HIGH,
                     )
                 }
-                "selinux" -> {
-                    if (detail == "permissive") {
-                        Pair(
-                            context.getString(R.string.checker_native_root_selinux_permissive),
-                            EvidenceConfidence.HIGH,
-                        )
-                    } else {
-                        Pair(
-                            context.getString(R.string.checker_native_root_selinux_absent),
-                            EvidenceConfidence.LOW,
-                        )
-                    }
-                }
+                "selinux" -> continue
                 "root_uid" -> Pair(
                     context.getString(R.string.checker_native_root_uid, detail),
                     EvidenceConfidence.HIGH,

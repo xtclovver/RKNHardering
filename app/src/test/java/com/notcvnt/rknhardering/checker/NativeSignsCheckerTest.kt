@@ -25,6 +25,7 @@ class NativeSignsCheckerTest {
     @Before
     fun setUp() {
         NativeSignsBridge.resetForTests()
+        NativeSignsChecker.jvmInterfacesOverride = null
         NativeSignsBridge.isLibraryLoadedOverride = { true }
         NativeSignsBridge.getIfAddrsOverride = { emptyArray() }
         NativeSignsBridge.ifNameToIndexOverride = { 0 }
@@ -38,6 +39,7 @@ class NativeSignsCheckerTest {
     @After
     fun tearDown() {
         NativeSignsBridge.resetForTests()
+        NativeSignsChecker.jvmInterfacesOverride = null
     }
 
     @Test
@@ -104,6 +106,18 @@ class NativeSignsCheckerTest {
     fun `clean native state produces ok result`() {
         NativeSignsBridge.getIfAddrsOverride = {
             arrayOf("wlan0|3|65|AF_INET|192.168.1.10|255.255.255.0|1500")
+        }
+        NativeSignsChecker.jvmInterfacesOverride = {
+            listOf(
+                NativeSignsChecker.JvmInterfaceSnapshot(
+                    name = "wlan0",
+                    canonicalName = "wlan0",
+                    index = 3,
+                    addresses = setOf("192.168.1.10"),
+                    mtu = 1500,
+                    isUp = true,
+                ),
+            )
         }
         NativeSignsBridge.libraryIntegrityOverride = {
             arrayOf(

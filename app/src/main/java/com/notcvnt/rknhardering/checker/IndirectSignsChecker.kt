@@ -24,6 +24,7 @@ import com.notcvnt.rknhardering.vpn.VpnAppCatalog
 import com.notcvnt.rknhardering.vpn.VpnAppMetadataScanner
 import com.notcvnt.rknhardering.vpn.VpnClientSignal
 import com.notcvnt.rknhardering.vpn.VpnDumpsysParser
+import android.util.Log
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
@@ -225,7 +226,13 @@ object IndirectSignsChecker {
 
         if (config.checkProxyTools) {
             val proxyTechnicalOutcome = IndirectCheckPerformanceSupport.measureStep("checkProxyTechnicalSignals", stepTimings) {
-                checkProxyTechnicalSignals(context, config.checkLocalListeners, config.listenerPortThreshold)
+                checkProxyTechnicalSignals(
+                    context = context,
+                    checkLocalListeners = config.checkLocalListeners,
+                    listenerPortThreshold = config.listenerPortThreshold,
+                    checkIptables = config.checkIptables,
+                    checkUserCerts = config.checkUserCerts,
+                )
             }
             findings += proxyTechnicalOutcome.findings
             evidence += proxyTechnicalOutcome.evidence
@@ -796,6 +803,8 @@ object IndirectSignsChecker {
         context: Context,
         checkLocalListeners: Boolean = true,
         listenerPortThreshold: Int = 5,
+        checkIptables: Boolean = true,
+        checkUserCerts: Boolean = true,
     ): ProxyTechnicalEvaluation {
         val installedProxyTools = detectInstalledProxyTools(context)
         val listeners = if (checkLocalListeners) collectLocalListeners(context) else emptyList()
@@ -898,7 +907,24 @@ object IndirectSignsChecker {
             }
         }
 
-        if (installedProxyTools.isEmpty() && listeners.isEmpty()) {
+        val iptablesOutcome = if (checkIptables) {
+            checkIptablesRules()
+        } else IptablesCheckOutcome(emptyList(), emptyList(), detected = false, needsReview = false)
+        findings += iptablesOutcome.findings
+        evidence += iptablesOutcome.evidence
+        detected = detected || iptablesOutcome.detected
+        needsReview = needsReview || iptablesOutcome.needsReview
+
+        val certOutcome = if (checkUserCerts) {
+            checkUserInstalledCertificates()
+        } else CertCheckOutcome(emptyList(), emptyList(), needsReview = false)
+        findings += certOutcome.findings
+        evidence += certOutcome.evidence
+        needsReview = needsReview || certOutcome.needsReview
+
+        if (installedProxyTools.isEmpty() && listeners.isEmpty() &&
+            iptablesOutcome.findings.isEmpty() && certOutcome.findings.isEmpty()
+        ) {
             findings.add(Finding(context.getString(R.string.checker_indirect_no_proxy_technical)))
         }
 
@@ -914,6 +940,176 @@ object IndirectSignsChecker {
             detected = detected,
             needsReview = needsReview,
         )
+    }
+
+    internal data class IptablesCheckOutcome(
+        val findings: List<Finding>,
+        val evidence: List<EvidenceItem>,
+        val detected: Boolean,
+        val needsReview: Boolean,
+    )
+
+    internal data class CertCheckOutcome(
+        val findings: List<Finding>,
+        val evidence: List<EvidenceItem>,
+        val needsReview: Boolean,
+    )
+
+    internal fun checkIptablesRules(): IptablesCheckOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var detected = false
+        var needsReview = false
+        val hasAccess = runCatching {
+            File("/proc/net/ip_tables_names").takeIf { it.exists() }
+                ?.readText()?.isNotBlank() == true
+        }.getOrDefault(false)
+
+        if (!hasAccess) {
+            return IptablesCheckOutcome(findings, evidence, detected = false, needsReview = false)
+        }
+
+        val iptablesOutput: String? = runCatching {
+            val process = Runtime.getRuntime().exec(arrayOf("iptables", "-L", "-n", "-t", "nat"))
+            process.inputStream.bufferedReader().readText().takeIf { it.isNotBlank() }
+                .also { process.waitFor() }
+        }.getOrNull()
+
+        if (iptablesOutput != null && (iptablesOutput.contains("REDIRECT") ||
+                iptablesOutput.contains("DNAT") ||
+                iptablesOutput.lowercase().contains("tproxy"))
+        ) {
+            findings.add(
+                Finding(
+                    description = "iptables NAT rules show REDIRECT/DNAT/TPROXY (possible local proxy)",
+                    detected = true,
+                    source = EvidenceSource.IPTABLES_RULES,
+                    confidence = EvidenceConfidence.MEDIUM,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.IPTABLES_RULES,
+                    detected = true,
+                    confidence = EvidenceConfidence.MEDIUM,
+                    description = "iptables NAT rules with REDIRECT/DNAT/TPROXY target",
+                ),
+            )
+            detected = true
+        } else if (iptablesOutput != null) {
+            findings.add(
+                Finding(
+                    description = "iptables accessible: nat table rules present",
+                    isInformational = true,
+                    source = EvidenceSource.IPTABLES_RULES,
+                    confidence = EvidenceConfidence.LOW,
+                ),
+            )
+        } else {
+            findings.add(
+                Finding(
+                    description = "iptables tables found but rules inaccessible (no root)",
+                    isInformational = true,
+                    source = EvidenceSource.IPTABLES_RULES,
+                ),
+            )
+        }
+
+        return IptablesCheckOutcome(findings, evidence, detected, needsReview)
+    }
+
+    @Suppress("BlockingMethodInNonBlockingContext")
+    internal fun checkUserInstalledCertificates(): CertCheckOutcome {
+        val findings = mutableListOf<Finding>()
+        val evidence = mutableListOf<EvidenceItem>()
+        var needsReview = false
+
+        var userCaCount = 0
+        val keyStoreResult = runCatching {
+            val ks = java.security.KeyStore.getInstance("AndroidCAStore")
+            ks.load(null, null)
+            userCaCount = ks.aliases().asSequence()
+                .filter { alias -> alias.startsWith("user:") }
+                .count()
+        }
+        if (keyStoreResult.isFailure) {
+            Log.w("IndirectSigns", "AndroidCAStore access failed: ${keyStoreResult.exceptionOrNull()?.message}")
+        }
+
+        if (userCaCount > 0) {
+            findings.add(
+                Finding(
+                    description = "User-installed CA certificates ($userCaCount found in AndroidCAStore) — possible MITM proxy",
+                    needsReview = true,
+                    source = EvidenceSource.MITM_PROXY_CERT,
+                    confidence = EvidenceConfidence.MEDIUM,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.MITM_PROXY_CERT,
+                    detected = true,
+                    confidence = EvidenceConfidence.MEDIUM,
+                    description = "$userCaCount user CA certificates installed in AndroidCAStore",
+                ),
+            )
+            needsReview = true
+        }
+
+        if (userCaCount == 0) {
+            val certFiles = runCatching {
+                File("/data/misc/user/0/cacerts-added/").takeIf { it.isDirectory }
+                    ?.listFiles()
+                    ?.filter { it.isFile && it.name.endsWith(".0") }
+                    .orEmpty()
+            }.getOrDefault(emptyList())
+
+            if (certFiles.isNotEmpty()) {
+                findings.add(
+                    Finding(
+                        description = "User CA certificates detected via filesystem (${certFiles.size} files in cacerts-added) — possible MITM proxy",
+                        needsReview = true,
+                        source = EvidenceSource.MITM_PROXY_CERT,
+                        confidence = EvidenceConfidence.MEDIUM,
+                    ),
+                )
+                evidence.add(
+                    EvidenceItem(
+                        source = EvidenceSource.MITM_PROXY_CERT,
+                        detected = true,
+                        confidence = EvidenceConfidence.MEDIUM,
+                        description = "${certFiles.size} user CA certificate files found on filesystem",
+                    ),
+                )
+                needsReview = true
+            }
+        }
+
+        val modifiedDirOk = runCatching {
+            File("/data/misc/user/0/cacerts-modified/").takeIf { it.isDirectory }?.listFiles()?.isNotEmpty()
+        }.getOrDefault(false) == true
+
+        if (modifiedDirOk) {
+            findings.add(
+                Finding(
+                    description = "System CA certificates have been modified (cacerts-modified present)",
+                    needsReview = true,
+                    source = EvidenceSource.MITM_PROXY_CERT,
+                    confidence = EvidenceConfidence.LOW,
+                ),
+            )
+            evidence.add(
+                EvidenceItem(
+                    source = EvidenceSource.MITM_PROXY_CERT,
+                    detected = true,
+                    confidence = EvidenceConfidence.LOW,
+                    description = "System CA trust store was modified",
+                ),
+            )
+            needsReview = true
+        }
+
+        return CertCheckOutcome(findings, evidence, needsReview)
     }
 
     internal fun parseProcNetListeners(lines: List<String>, protocol: String): List<LocalSocketListener> =

@@ -86,6 +86,12 @@ enum class EvidenceSource {
     NATIVE_ROOT_DETECTION,
     NATIVE_EMULATOR,
     SANDBOX_ISOLATION,
+    VERDICT_ENGINE,
+
+    CORPORATE_VPN_WHITELIST,
+    HTTP_PROXY_HEADER,
+    IPTABLES_RULES,
+    MITM_PROXY_CERT,
 }
 
 enum class StunScope {
@@ -296,6 +302,7 @@ enum class VerdictRuleCode(val code: String) {
     R4_LOCATION_GEO_CONFLICT("R4"),
     R4_HOSTING_REVIEW("R4"),
     R5_MATRIX("R5"),
+    R5_MATRIX_DEFAULT("R5"),
     R6_FALLBACK("R6"),
     UNSPECIFIED("unknown"),
 }

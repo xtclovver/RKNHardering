@@ -261,7 +261,9 @@ internal object SimpleResultModels {
     private fun signalArea(sources: Set<EvidenceSource>): SimpleSignalArea {
         val areas = sources.mapTo(linkedSetOf()) { source ->
             when (source) {
-                EvidenceSource.GEO_IP -> SimpleSignalArea.PUBLIC_ADDRESS
+                EvidenceSource.GEO_IP,
+                EvidenceSource.CORPORATE_VPN_WHITELIST,
+                -> SimpleSignalArea.PUBLIC_ADDRESS
                 EvidenceSource.INSTALLED_APP,
                 EvidenceSource.VPN_SERVICE_DECLARATION,
                 EvidenceSource.ACTIVE_VPN,
@@ -271,6 +273,9 @@ internal object SimpleResultModels {
                 EvidenceSource.CLASH_API,
                 EvidenceSource.PROXY_AUTH_BYPASS,
                 EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+                EvidenceSource.HTTP_PROXY_HEADER,
+                EvidenceSource.IPTABLES_RULES,
+                EvidenceSource.MITM_PROXY_CERT,
                 -> SimpleSignalArea.LOCAL_PROXY
                 EvidenceSource.ROUTING,
                 EvidenceSource.DNS,
@@ -300,6 +305,7 @@ internal object SimpleResultModels {
                 EvidenceSource.NATIVE_ROOT_DETECTION,
                 EvidenceSource.NATIVE_EMULATOR,
                 EvidenceSource.SANDBOX_ISOLATION,
+                EvidenceSource.VERDICT_ENGINE,
                 EvidenceSource.DUMPSYS,
                 -> SimpleSignalArea.DEVICE_ENVIRONMENT
                 EvidenceSource.ICMP_SPOOFING,
@@ -315,7 +321,9 @@ internal object SimpleResultModels {
     }
 
     private fun signalCause(source: EvidenceSource): SimpleResultCause? = when (source) {
-        EvidenceSource.GEO_IP -> SimpleResultCause.PUBLIC_IP_LOCATION
+        EvidenceSource.GEO_IP,
+        EvidenceSource.CORPORATE_VPN_WHITELIST,
+        -> SimpleResultCause.PUBLIC_IP_LOCATION
         EvidenceSource.DIRECT_NETWORK_CAPABILITIES,
         EvidenceSource.INDIRECT_NETWORK_CAPABILITIES,
         EvidenceSource.DUMPSYS,
@@ -326,6 +334,9 @@ internal object SimpleResultModels {
         EvidenceSource.XRAY_API,
         EvidenceSource.CLASH_API,
         EvidenceSource.PROXY_TECHNICAL_SIGNAL,
+        EvidenceSource.HTTP_PROXY_HEADER,
+        EvidenceSource.IPTABLES_RULES,
+        EvidenceSource.MITM_PROXY_CERT,
         -> SimpleResultCause.LOCAL_PROXY
         EvidenceSource.PROXY_AUTH_BYPASS -> SimpleResultCause.PROXY_AUTH_REQUIRED
         EvidenceSource.NETWORK_INTERFACE,
@@ -356,6 +367,7 @@ internal object SimpleResultModels {
         EvidenceSource.NATIVE_ROOT_DETECTION,
         EvidenceSource.NATIVE_EMULATOR,
         EvidenceSource.SANDBOX_ISOLATION,
+        EvidenceSource.VERDICT_ENGINE,
         -> SimpleResultCause.DEVICE_ENVIRONMENT
         EvidenceSource.INSTALLED_APP,
         EvidenceSource.VPN_SERVICE_DECLARATION,

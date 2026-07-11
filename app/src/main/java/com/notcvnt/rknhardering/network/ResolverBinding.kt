@@ -67,14 +67,24 @@ internal object ResolverSocketBinder {
     }
 
     private fun bindSocketToDevice(socket: Socket, interfaceName: String) {
-        bindSocketToDeviceOverride?.invoke(socket, interfaceName) ?: ParcelFileDescriptor.fromSocket(socket).use { pfd ->
-            bindFileDescriptorToDevice(pfd.fileDescriptor, interfaceName)
+        bindSocketToDeviceOverride?.invoke(socket, interfaceName) ?: try {
+            ParcelFileDescriptor.fromSocket(socket).use { pfd ->
+                bindFileDescriptorToDevice(pfd.fileDescriptor, interfaceName)
+            }
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("EBADF") == true) return
+            throw e
         }
     }
 
     private fun bindDatagramToDevice(socket: DatagramSocket, interfaceName: String) {
-        bindDatagramToDeviceOverride?.invoke(socket, interfaceName) ?: ParcelFileDescriptor.fromDatagramSocket(socket).use { pfd ->
-            bindFileDescriptorToDevice(pfd.fileDescriptor, interfaceName)
+        bindDatagramToDeviceOverride?.invoke(socket, interfaceName) ?: try {
+            ParcelFileDescriptor.fromDatagramSocket(socket).use { pfd ->
+                bindFileDescriptorToDevice(pfd.fileDescriptor, interfaceName)
+            }
+        } catch (e: RuntimeException) {
+            if (e.message?.contains("EBADF") == true) return
+            throw e
         }
     }
 

@@ -1134,7 +1134,9 @@ class MainActivity : AppCompatActivity() {
             -> R.string.simple_verdict_address_conflict
             VerdictRuleCode.R4_LOCATION_GEO_CONFLICT -> R.string.simple_verdict_location_conflict
             VerdictRuleCode.R4_HOSTING_REVIEW -> R.string.simple_verdict_hosting_review
-            VerdictRuleCode.R5_MATRIX -> R.string.simple_verdict_combined_signals
+            VerdictRuleCode.R5_MATRIX,
+            VerdictRuleCode.R5_MATRIX_DEFAULT,
+            -> R.string.simple_verdict_combined_signals
             VerdictRuleCode.R6_FALLBACK -> R.string.simple_verdict_review_signals
             VerdictRuleCode.UNSPECIFIED -> R.string.simple_verdict_general
         },

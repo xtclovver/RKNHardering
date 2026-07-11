@@ -131,6 +131,8 @@ data class IndirectSignsConfig(
     val checkProxyTools: Boolean = true,
     val checkLocalListeners: Boolean = true,
     val checkDumpsys: Boolean = true,
+    val checkIptables: Boolean = true,
+    val checkUserCerts: Boolean = true,
     val listenerPortThreshold: Int = 5,
 )
 

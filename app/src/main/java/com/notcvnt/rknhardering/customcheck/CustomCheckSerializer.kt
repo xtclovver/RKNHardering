@@ -165,6 +165,8 @@ object CustomCheckSerializer {
         obj.put("check_proxy_tools", i.checkProxyTools)
         obj.put("check_local_listeners", i.checkLocalListeners)
         obj.put("check_dumpsys", i.checkDumpsys)
+        obj.put("check_iptables", i.checkIptables)
+        obj.put("check_user_certs", i.checkUserCerts)
         obj.put("listener_port_threshold", i.listenerPortThreshold)
         return obj
     }
@@ -493,6 +495,8 @@ object CustomCheckSerializer {
         checkProxyTools = obj.optBoolean("check_proxy_tools", true),
         checkLocalListeners = obj.optBoolean("check_local_listeners", true),
         checkDumpsys = obj.optBoolean("check_dumpsys", true),
+        checkIptables = obj.optBoolean("check_iptables", true),
+        checkUserCerts = obj.optBoolean("check_user_certs", true),
         listenerPortThreshold = obj.optInt("listener_port_threshold", 5),
     )
 
