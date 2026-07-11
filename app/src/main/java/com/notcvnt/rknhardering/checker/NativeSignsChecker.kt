@@ -765,19 +765,7 @@ object NativeSignsChecker {
                         EvidenceConfidence.HIGH,
                     )
                 }
-                "selinux" -> {
-                    if (detail == "permissive") {
-                        Pair(
-                            context.getString(R.string.checker_native_root_selinux_permissive),
-                            EvidenceConfidence.HIGH,
-                        )
-                    } else {
-                        Pair(
-                            context.getString(R.string.checker_native_root_selinux_absent),
-                            EvidenceConfidence.LOW,
-                        )
-                    }
-                }
+                "selinux" -> continue
                 "root_uid" -> Pair(
                     context.getString(R.string.checker_native_root_uid, detail),
                     EvidenceConfidence.HIGH,

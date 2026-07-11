@@ -19,8 +19,10 @@ import kotlinx.coroutines.withContext
  */
 object VpnNativeDetectorChecker {
 
+    // fib_trie_denied and inet_diag_denied are excluded:
+    // SELinux blocks these on any stock Android — they are not VPN indicators.
     private val NETWORK_KINDS = setOf(
-        "fib_trie_denied", "inet_diag_denied", "bindtodevice_leak",
+        "bindtodevice_leak",
         "getsockname_leak", "udp_port_conflict_physical", "vpn_qdisc",
         "bpf_map_accessible", "route_count", "trim_oracle",
     )
@@ -36,6 +38,11 @@ object VpnNativeDetectorChecker {
         "proc_if_inet6_vpn", "proc_ipv6_route_vpn", "proc_net_dev_vpn",
         "ifindexname_vpn", "vpn_policy_rules_netlink",
         "bindtodevice_leak", "getsockname_leak", "udp_port_conflict_physical",
+    )
+
+    // Skipped entirely: SELinux blocks these on stock Android, not VPN indicators.
+    private val SKIPPED_KINDS = setOf(
+        "fib_trie_denied", "inet_diag_denied",
     )
 
     private val INFORMATIONAL_KINDS = setOf(
@@ -117,6 +124,7 @@ object VpnNativeDetectorChecker {
         val evidence = mutableListOf<EvidenceItem>()
 
         for (item in parsed) {
+            if (item.kind in SKIPPED_KINDS) continue
             evaluateItem(context, item, findings, evidence)
         }
 
@@ -159,8 +167,6 @@ object VpnNativeDetectorChecker {
             "proc_net_dev_vpn" -> R.string.vpn_desc_proc_net_dev
             "ifindexname_vpn" -> R.string.vpn_desc_ifindexname
             "vpn_policy_rules_netlink" -> R.string.vpn_desc_policy_rules_netlink
-            "fib_trie_denied" -> R.string.vpn_desc_fib_trie
-            "inet_diag_denied" -> R.string.vpn_desc_inet_diag
             "bindtodevice_leak" -> R.string.vpn_desc_bindtodevice_leak
             "getsockname_leak" -> R.string.vpn_desc_getsockname
             "udp_port_conflict_physical" -> R.string.vpn_desc_udp_port_physical

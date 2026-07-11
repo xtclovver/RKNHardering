@@ -10,6 +10,7 @@ import com.notcvnt.rknhardering.customcheck.mapper.MappingField
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
+import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.network.DnsResolverConfig
 import com.notcvnt.rknhardering.probe.CdnPullingClient
@@ -343,7 +344,11 @@ object CdnPullingChecker {
 
         val allSuccessfulResponsesExposeIp = successfulResponses.isNotEmpty() && successfulResponses.all { it.ip != null }
         val hasError = successfulCount == 0
-        val detected = actionableCount > 0
+        val proxyHeaderDetected = successfulResponses.any { response ->
+            detectProxyHeadersFromFields(response.importantFields).isNotEmpty() ||
+                detectProxyHeadersFromBody(response.rawBody).isNotEmpty()
+        }
+        val detected = actionableCount > 0 || proxyHeaderDetected
 
         val ipv4Conflict = actionableIpv4s.size > 1
         val ipv6Conflict = actionableIpv6s.size > 1
@@ -412,6 +417,49 @@ object CdnPullingChecker {
         )
     }
 
+    internal fun detectProxyHeadersFromFields(
+        fieldMap: Map<String, String>,
+    ): List<Finding> {
+        val findings = mutableListOf<Finding>()
+        // Cloudflare returns lowercase "warp" in /cdn-cgi/trace
+        val warpValue = fieldMap["warp"]?.lowercase()
+            ?: fieldMap["WARP"]?.lowercase()
+        if (warpValue == "on" || warpValue == "plus") {
+            findings += Finding(
+                description = "Cloudflare WARP detected in CDN response: ${fieldMap["warp"] ?: fieldMap["WARP"]}",
+                detected = true,
+                source = EvidenceSource.HTTP_PROXY_HEADER,
+                confidence = EvidenceConfidence.MEDIUM,
+            )
+        }
+        return findings
+    }
+
+    internal fun detectProxyHeadersFromBody(rawBody: String?): List<Finding> {
+        if (rawBody == null) return emptyList()
+        val findings = mutableListOf<Finding>()
+        val lower = rawBody.lowercase()
+        if (lower.contains("x-forwarded-for") || lower.contains("x-forwarded-proto") ||
+            lower.contains("x-forwarded-host")
+        ) {
+            findings += Finding(
+                description = "Response body contains X-Forwarded-* proxy headers (possible proxy traversal)",
+                detected = true,
+                source = EvidenceSource.HTTP_PROXY_HEADER,
+                confidence = EvidenceConfidence.LOW,
+            )
+        }
+        if (lower.contains("forwarded:") || lower.contains("via:")) {
+            findings += Finding(
+                description = "Response body contains Forwarded/Via proxy headers",
+                detected = true,
+                source = EvidenceSource.HTTP_PROXY_HEADER,
+                confidence = EvidenceConfidence.LOW,
+            )
+        }
+        return findings
+    }
+
     private fun buildFindings(
         successfulResponses: List<CdnPullingResponse>,
         allResponses: List<CdnPullingResponse>,
@@ -432,6 +480,9 @@ object CdnPullingChecker {
                 isInformational = true,
                 confidence = EvidenceConfidence.MEDIUM,
             )
+
+            findings += detectProxyHeadersFromFields(response.importantFields)
+            findings += detectProxyHeadersFromBody(response.rawBody)
         }
         allResponses.filter { it.error != null }.forEach { response ->
             findings += Finding(
