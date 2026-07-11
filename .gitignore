@@ -21,6 +21,7 @@ release.jks
 *.sh
 *.ps1
 !CONTRIBUTING.md
+!AGENTS.md
 !app/src/test/resources/export/golden/*.md
 /.codex
 .marketplace-keys/

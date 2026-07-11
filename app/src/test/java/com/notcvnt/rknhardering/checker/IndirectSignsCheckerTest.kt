@@ -597,13 +597,15 @@ class IndirectSignsCheckerTest {
 
     @Test
     fun `when checkVpnInterfaces=false the vpn-interfaces finding is skipped`() = runBlocking {
-        // With the toggle disabled the checkNetworkInterfaces path is entirely bypassed.
-        // In Robolectric there are no real VPN interfaces, so evidence from NETWORK_INTERFACE
-        // should be absent in both cases. The assertion confirms no exception is thrown and
-        // no detected NETWORK_INTERFACE evidence appears when the toggle is off.
+        // With the toggle disabled the checkNetworkInterfaces and checkMtu paths are entirely
+        // bypassed. The assertion confirms no exception is thrown and no detected
+        // NETWORK_INTERFACE evidence appears when the toggle is off.
         val result = IndirectSignsChecker.check(
             context = context,
-            config = IndirectSignsConfig(checkVpnInterfaces = false),
+            config = IndirectSignsConfig(
+                checkVpnInterfaces = false,
+                checkMtuAnomaly = false,
+            ),
         )
 
         assertFalse(

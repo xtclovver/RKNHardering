@@ -172,7 +172,10 @@ class CallTransportCheckerTest {
             publicIpFetcher = { _, _, _ -> Result.success("203.0.113.10") },
             proxyProbe = {
                 delay(500)
-                CallTransportChecker.ProxyProbeOutcome(reachable = false)
+                CallTransportChecker.ProxyProbeOutcome(
+                    reachable = false,
+                    observedPublicIp = "203.0.113.10",
+                )
             },
             proxyUdpStunProbe = { _, _, _, _ ->
                 delay(500)

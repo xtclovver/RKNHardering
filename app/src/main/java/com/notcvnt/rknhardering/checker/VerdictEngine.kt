@@ -192,10 +192,9 @@ object VerdictEngine {
         }
 
         val whitelistEntry = geo?.let(CorporateVpnWhitelist::match)
-        val whitelisted = whitelistEntry != null
 
         // R5 — 3-bit matrix (geo x direct x indirect)
-        val geoHit = geo?.outsideRu == true && !expectedRoamingExit && !whitelisted
+        val geoHit = geo?.outsideRu == true && !expectedRoamingExit
         val directHit = directSigns.evidence.any { it.detected && it.source in MATRIX_DIRECT_SOURCES }
         val indirectHit = indirectSigns.evidence.any { it.detected && it.source in MATRIX_INDIRECT_SOURCES } ||
             nativeSigns.evidence.any {
@@ -209,7 +208,8 @@ object VerdictEngine {
             !geoHit && directHit && !indirectHit -> Verdict.NOT_DETECTED
             !geoHit && !directHit && indirectHit -> Verdict.NOT_DETECTED
             geoHit && !directHit && !indirectHit -> Verdict.NEEDS_REVIEW
-            !geoHit && directHit && indirectHit -> Verdict.NEEDS_REVIEW
+            !geoHit && directHit && indirectHit ->
+                if (geoAxisAvailable) Verdict.NEEDS_REVIEW else Verdict.DETECTED
             geoHit && directHit && !indirectHit -> Verdict.DETECTED
             geoHit && !directHit && indirectHit -> Verdict.DETECTED
             geoHit && directHit && indirectHit -> Verdict.DETECTED
@@ -276,9 +276,9 @@ object VerdictEngine {
             participant("geo_available=$geoAxisAvailable"),
             participant("expected_roaming_exit=$expectedRoamingExit"),
         )
-        if (whitelisted) {
+        if (whitelistEntry != null) {
             r5Participants.add(
-                participant("corporate_vpn_whitelisted=${whitelistEntry?.name}", setOf(EvidenceSource.CORPORATE_VPN_WHITELIST)),
+                participant("corporate_vpn_whitelisted=${whitelistEntry.name}", setOf(EvidenceSource.CORPORATE_VPN_WHITELIST)),
             )
         }
         return decision(matrix, VerdictRuleCode.R5_MATRIX, *r5Participants.toTypedArray())
