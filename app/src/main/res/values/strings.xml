@@ -666,7 +666,7 @@
     <string name="checker_native_root_selinux_absent">SELinux enforcement status is not accessible</string>
     <string name="checker_native_root_uid">Process is running with root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Magisk property detected: %1$s</string>
-    <string name="checker_native_host_route_leak">Host route to %1$s via physical interface %2$s (VPN server IP leak)</string>
+    <string name="checker_native_host_route_review">Public host route to %1$s via %2$s (may be a VPN bypass or a system route)</string>
 
     <!-- NativeSignsChecker: emulator / sandbox isolation -->
     <string name="checker_native_emulator_marker">Emulator marker: %1$s</string>
@@ -1124,6 +1124,7 @@
     <string name="simple_cause_local_proxy">A local service that can redirect network traffic is responding on the device.</string>
     <string name="simple_cause_vpn_interface">A network interface created for tunneled traffic is active.</string>
     <string name="simple_cause_vpn_route">The device routing table sends traffic through a tunnel or an unexpected gateway.</string>
+    <string name="simple_cause_public_host_route">A public host route exists on a physical interface; it may be a system route and needs review.</string>
     <string name="simple_cause_dns_redirection">Domain-name requests are handled through a different or redirected network path.</string>
     <string name="simple_cause_traffic_bypass">Traffic sent outside the VPN used a different network path or public address.</string>
     <string name="simple_cause_proxy_auth_required">A local proxy asked for authentication, so its purpose could not be confirmed.</string>

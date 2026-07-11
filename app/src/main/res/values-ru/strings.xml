@@ -661,7 +661,7 @@
     <string name="checker_native_root_selinux_absent">Статус SELinux enforcement недоступен</string>
     <string name="checker_native_root_uid">Процесс выполняется с root UID: %1$s</string>
     <string name="checker_native_root_magisk_prop">Обнаружено свойство Magisk: %1$s</string>
-    <string name="checker_native_host_route_leak">Хост-маршрут к %1$s через физический интерфейс %2$s (утечка IP VPN-сервера)</string>
+    <string name="checker_native_host_route_review">Публичный хост-маршрут к %1$s через %2$s (возможен обход VPN или системный маршрут)</string>
 
     <!-- NativeSignsChecker: эмулятор / изоляция песочницы -->
     <string name="checker_native_emulator_marker">Маркер эмулятора: %1$s</string>
@@ -1112,6 +1112,7 @@
     <string name="simple_cause_local_proxy">На устройстве отвечает локальная служба, способная перенаправлять сетевой трафик.</string>
     <string name="simple_cause_vpn_interface">Активен сетевой интерфейс, созданный для туннельного трафика.</string>
     <string name="simple_cause_vpn_route">Таблица маршрутов устройства направляет трафик через туннель или неожиданный шлюз.</string>
+    <string name="simple_cause_public_host_route">На физическом интерфейсе есть публичный хост-маршрут; он может быть системным и требует проверки.</string>
     <string name="simple_cause_dns_redirection">Запросы доменных имён обрабатываются через другой или перенаправленный сетевой путь.</string>
     <string name="simple_cause_traffic_bypass">Трафик вне VPN прошёл по другому сетевому пути или получил другой публичный адрес.</string>
     <string name="simple_cause_proxy_auth_required">Локальный прокси запросил вход, поэтому подтвердить его назначение не удалось.</string>

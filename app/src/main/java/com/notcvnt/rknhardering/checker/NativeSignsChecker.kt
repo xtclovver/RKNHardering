@@ -40,6 +40,7 @@ object NativeSignsChecker {
 
     private const val ARPHRD_TUNTAP = 65534
     private const val RTPROT_KERNEL = 2
+    private const val RT_TABLE_LOCAL = 255
 
     private val HIGH_CONFIDENCE_ROOT_MOUNT_MARKERS = setOf(
         "magisk",
@@ -512,71 +513,57 @@ object NativeSignsChecker {
     ): PartialOutcome {
         val findings = mutableListOf<Finding>()
         val evidence = mutableListOf<EvidenceItem>()
-        var detected = false
 
-        val hostRoutes = routes.filter { route ->
-            route.source == NativeRouteEntry.RouteSource.NETLINK &&
-                !route.isDefault &&
-                (route.prefixLen == 32 || route.prefixLen == 128) &&
-                route.destination != null &&
-                !isKernelManagedLocalRoute(route) &&
-                isPublicRoutableAddress(route.destination) &&
-                NetworkInterfacePatterns.isStandardInterface(route.interfaceName)
-        }
+        val hostRoutes = routes.filter(::isVpnServerHostRouteCandidate)
 
         for (route in hostRoutes) {
             val dst = route.destination ?: continue
             findings += Finding(
                 description = context.getString(
-                    R.string.checker_native_host_route_leak,
+                    R.string.checker_native_host_route_review,
                     dst,
                     route.interfaceName,
                 ),
-                detected = true,
-                source = EvidenceSource.NATIVE_ROUTE,
+                detected = false,
+                needsReview = true,
+                source = EvidenceSource.NATIVE_HOST_ROUTE,
                 confidence = EvidenceConfidence.MEDIUM,
             )
             evidence += EvidenceItem(
-                source = EvidenceSource.NATIVE_ROUTE,
+                source = EvidenceSource.NATIVE_HOST_ROUTE,
                 detected = true,
                 confidence = EvidenceConfidence.MEDIUM,
-                description = "Host route to $dst via physical interface ${route.interfaceName}",
+                description = "Ambiguous public host route to $dst via ${route.interfaceName}",
             )
-            detected = true
         }
 
-        return PartialOutcome(findings, evidence, detected = detected)
+        return PartialOutcome(
+            findings = findings,
+            evidence = evidence,
+            detected = false,
+            needsReview = hostRoutes.isNotEmpty(),
+        )
     }
 
     /**
-     * Excludes kernel-managed entries that are not VPN host-route leaks:
-     *  - every entry from the kernel `local` table (255), even if a vendor reports
-     *    incomplete type/scope metadata
-     *  - `type=local` (the interface's own address) / `broadcast` / `anycast` / `multicast`
-     *  - `scope=host` (the route never leaves the box)
-     *  - `dst == prefsrc` (route destination equals the interface's own source address)
-     *  - kernel-created link routes on cellular modem interfaces; carriers use these
-     *    for service addressing and they exist independently of a VPN (issue #80)
-     * A genuine VPN server host-route leak is a `unicast` route to a *foreign* public IP
-     * (dst != prefsrc) in the main/policy tables.
+     * Route metadata is treated as an allowlist. A /32 or /128 alone cannot distinguish
+     * a VPN endpoint from carrier-managed modem routes, so incomplete or ambiguous rows
+     * must not be promoted to VPN evidence.
      */
-    internal fun isKernelManagedLocalRoute(route: NativeRouteEntry): Boolean {
-        if (route.table == 255) return true
-        when (route.type?.lowercase()) {
-            "local", "broadcast", "anycast", "multicast" -> return true
-        }
-        if (route.scope?.lowercase() == "host") return true
-        val dst = route.destination
-        val src = route.prefSrc
-        if (dst != null && src != null && dst == src) return true
+    internal fun isVpnServerHostRouteCandidate(route: NativeRouteEntry): Boolean {
+        if (route.source != NativeRouteEntry.RouteSource.NETLINK || route.isDefault) return false
+        if (route.prefixLen != 32 && route.prefixLen != 128) return false
+        val destination = route.destination ?: return false
+        val table = route.table ?: return false
+        val protocol = route.protocol ?: return false
+        if (!route.type.equals("unicast", ignoreCase = true)) return false
         if (
-            route.protocol == RTPROT_KERNEL &&
-            route.scope?.lowercase() == "link" &&
-            NetworkInterfacePatterns.isCellularModemInterface(route.interfaceName)
-        ) {
-            return true
-        }
-        return false
+            !route.scope.equals("global", ignoreCase = true) &&
+            !route.scope.equals("link", ignoreCase = true)
+        ) return false
+        if (table == RT_TABLE_LOCAL || protocol == RTPROT_KERNEL) return false
+        return isPublicRoutableAddress(destination) &&
+            NetworkInterfacePatterns.isStandardInterface(route.interfaceName)
     }
 
     internal fun isPublicRoutableAddress(addr: String): Boolean {

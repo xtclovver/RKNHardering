@@ -146,6 +146,30 @@ class SimpleResultModelsTest {
     }
 
     @Test
+    fun `ambiguous native host route stays a neutral review cause`() {
+        val result = CategoryResult(
+            name = "native",
+            detected = false,
+            needsReview = true,
+            findings = emptyList(),
+            evidence = listOf(
+                EvidenceItem(
+                    source = EvidenceSource.NATIVE_HOST_ROUTE,
+                    detected = true,
+                    confidence = EvidenceConfidence.MEDIUM,
+                    description = "raw route must not be rendered",
+                ),
+            ),
+        )
+
+        val model = SimpleResultModels.category(result)
+
+        assertEquals(SimpleResultStatus.REVIEW, model.status)
+        assertEquals(SimpleSignalArea.NETWORK_ROUTE, model.area)
+        assertEquals(listOf(SimpleResultCause.PUBLIC_HOST_ROUTE), model.causes)
+    }
+
+    @Test
     fun `error cause describes unavailable data without claiming a detected signal`() {
         val result = category(
             findings = listOf(

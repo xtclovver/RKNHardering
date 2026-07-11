@@ -638,7 +638,7 @@
     <string name="checker_native_root_selinux_absent">SELinux 强制执行状态不可访问</string>
     <string name="checker_native_root_uid">进程以 root UID 运行：%1$s</string>
     <string name="checker_native_root_magisk_prop">检测到 Magisk 属性：%1$s</string>
-    <string name="checker_native_host_route_leak">通过物理接口 %2$s 到 %1$s 的主机路由（VPN 服务器 IP 泄露）</string>
+    <string name="checker_native_host_route_review">通过 %2$s 到 %1$s 的公开主机路由（可能是 VPN 绕行路由或系统路由）</string>
 
     <!-- NativeSignsChecker: 模拟器 / 沙箱隔离 -->
     <string name="checker_native_emulator_marker">模拟器标记：%1$s</string>
@@ -1088,6 +1088,7 @@
     <string name="simple_cause_local_proxy">设备上的本地流量转发服务正在响应。</string>
     <string name="simple_cause_vpn_interface">用于隧道流量的网络接口处于活动状态。</string>
     <string name="simple_cause_vpn_route">设备路由表将流量发送到隧道或意外的网关。</string>
+    <string name="simple_cause_public_host_route">物理接口上存在公开主机路由；它可能是系统路由，需要复核。</string>
     <string name="simple_cause_dns_redirection">域名请求通过不同或重定向的网络路径处理。</string>
     <string name="simple_cause_traffic_bypass">VPN 外的流量使用了不同的网络路径或公网地址。</string>
     <string name="simple_cause_proxy_auth_required">本地代理要求身份验证，因此无法确认其用途。</string>

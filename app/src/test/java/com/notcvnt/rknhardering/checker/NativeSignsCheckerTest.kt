@@ -189,7 +189,7 @@ class NativeSignsCheckerTest {
     }
 
     @Test
-    fun `host route to public ip via physical interface emits NATIVE_ROUTE evidence`() {
+    fun `host route to public ip via physical interface requires review`() {
         val routes = listOf(
             NativeRouteEntry(
                 interfaceName = "wlan0",
@@ -200,12 +200,19 @@ class NativeSignsCheckerTest {
                 source = NativeRouteEntry.RouteSource.NETLINK,
                 family = 2,
                 destination = "8.8.8.8",
+                gateway = "192.168.1.1",
+                prefSrc = "192.168.1.10",
+                scope = "global",
+                type = "unicast",
+                table = 254,
                 prefixLen = 32,
+                protocol = 4,
             ),
         )
         val outcome = NativeSignsChecker.evaluateHostRoutes(context, routes)
-        assertTrue(outcome.detected)
-        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_ROUTE && it.detected })
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_HOST_ROUTE && it.detected })
     }
 
     @Test
@@ -266,7 +273,7 @@ class NativeSignsCheckerTest {
         val outcome = NativeSignsChecker.evaluateHostRoutes(context, routes)
 
         assertFalse(outcome.detected)
-        assertFalse(outcome.evidence.any { it.source == EvidenceSource.NATIVE_ROUTE })
+        assertFalse(outcome.evidence.any { it.source == EvidenceSource.NATIVE_HOST_ROUTE })
     }
 
     @Test
@@ -281,20 +288,52 @@ class NativeSignsCheckerTest {
         val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
 
         assertFalse(outcome.detected)
+        assertFalse(outcome.needsReview)
     }
 
     @Test
-    fun `static public host route via cellular interface remains detectable`() {
+    fun `static public host route via cellular interface requires review`() {
         val route = NativeRouteEntry(
-            interfaceName = "ccmni0", destinationHex = "1A1272F5", gatewayHex = "00000000",
+            interfaceName = "ccmni2", destinationHex = "0D0058A1", gatewayHex = "00000000",
             flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
-            family = 2, destination = "26.18.114.245", scope = "global",
+            family = 2, destination = "13.0.88.161", scope = "global",
             type = "unicast", table = 1008, prefixLen = 32, protocol = 4,
         )
 
         val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
 
-        assertTrue(outcome.detected)
+        assertFalse(outcome.detected)
+        assertTrue(outcome.needsReview)
+        assertTrue(outcome.evidence.any { it.source == EvidenceSource.NATIVE_HOST_ROUTE })
+    }
+
+    @Test
+    fun `host route with incomplete metadata is not promoted to VPN evidence`() {
+        val route = NativeRouteEntry(
+            interfaceName = "wlan0", destinationHex = "08080808", gatewayHex = "C0A80101",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "8.8.8.8", prefixLen = 32,
+        )
+
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
+
+        assertFalse(outcome.detected)
+        assertFalse(outcome.needsReview)
+    }
+
+    @Test
+    fun `non unicast host route is not promoted to VPN evidence`() {
+        val route = NativeRouteEntry(
+            interfaceName = "wlan0", destinationHex = "08080808", gatewayHex = "C0A80101",
+            flags = 0, isDefault = false, source = NativeRouteEntry.RouteSource.NETLINK,
+            family = 2, destination = "8.8.8.8", scope = "global",
+            type = "blackhole", table = 254, prefixLen = 32, protocol = 4,
+        )
+
+        val outcome = NativeSignsChecker.evaluateHostRoutes(context, listOf(route))
+
+        assertFalse(outcome.detected)
+        assertFalse(outcome.needsReview)
     }
 
     @Test

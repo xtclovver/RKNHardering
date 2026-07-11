@@ -501,7 +501,7 @@ For every interface, `/sys/class/net/<name>/type` is read. A value of `65534` (`
 
 #### 12.2 Host-route /32 heuristic
 
-The routing table (NETLINK) is scanned for a non-default route with a `/32` prefix (IPv4) or `/128` (IPv6) to a publicly routable address via a physical interface (`wlan0`, `rmnet`, `eth0`). This is the classic VPN client host-route to the server IP that bypasses the tunnel — a leak of the real VPN server IP. Entries from the `local` table and kernel-created link routes on modem interfaces (`rmnet*`, `ccmni*`, `pdp*`, `seth*`) are excluded because carriers use them for service addressing independently of a VPN. Static global host routes on these interfaces remain candidates. Result: `detected = true` (`EvidenceSource.NATIVE_ROUTE`).
+The routing table (NETLINK) is scanned for a fully described `unicast` route with `global` or `link` scope, a `/32` prefix (IPv4) or `/128` (IPv6), and a publicly routable destination via a regular physical interface. The route must not be kernel-created or belong to the `local` table; incomplete rows are not evidence. Such a row may be a VPN client's bypass route to its server, but a FIB row alone cannot reliably distinguish it from a system or carrier route, especially on `rmnet*`, `ccmni*`, `pdp*`, and `seth*`. The result therefore only requires review (`EvidenceSource.NATIVE_HOST_ROUTE`) and does not confirm a VPN by itself.
 
 #### 12.3 Emulator detector
 

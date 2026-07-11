@@ -144,6 +144,7 @@ internal class SimpleResultRenderer(
         SimpleResultCause.LOCAL_PROXY -> R.string.simple_cause_local_proxy
         SimpleResultCause.VPN_INTERFACE -> R.string.simple_cause_vpn_interface
         SimpleResultCause.VPN_ROUTE -> R.string.simple_cause_vpn_route
+        SimpleResultCause.PUBLIC_HOST_ROUTE -> R.string.simple_cause_public_host_route
         SimpleResultCause.DNS_REDIRECTION -> R.string.simple_cause_dns_redirection
         SimpleResultCause.TRAFFIC_BYPASS -> R.string.simple_cause_traffic_bypass
         SimpleResultCause.PROXY_AUTH_REQUIRED -> R.string.simple_cause_proxy_auth_required

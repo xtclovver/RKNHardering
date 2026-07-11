@@ -50,6 +50,7 @@ internal enum class SimpleResultCause {
     LOCAL_PROXY,
     VPN_INTERFACE,
     VPN_ROUTE,
+    PUBLIC_HOST_ROUTE,
     DNS_REDIRECTION,
     TRAFFIC_BYPASS,
     PROXY_AUTH_REQUIRED,
@@ -274,6 +275,7 @@ internal object SimpleResultModels {
                 EvidenceSource.ROUTING,
                 EvidenceSource.DNS,
                 EvidenceSource.NETWORK_INTERFACE,
+                EvidenceSource.NATIVE_HOST_ROUTE,
                 EvidenceSource.SPLIT_TUNNEL_BYPASS,
                 EvidenceSource.VPN_GATEWAY_LEAK,
                 EvidenceSource.VPN_NETWORK_BINDING,
@@ -332,6 +334,7 @@ internal object SimpleResultModels {
         EvidenceSource.ROUTING,
         EvidenceSource.NATIVE_ROUTE,
         -> SimpleResultCause.VPN_ROUTE
+        EvidenceSource.NATIVE_HOST_ROUTE -> SimpleResultCause.PUBLIC_HOST_ROUTE
         EvidenceSource.DNS -> SimpleResultCause.DNS_REDIRECTION
         EvidenceSource.SPLIT_TUNNEL_BYPASS,
         EvidenceSource.VPN_GATEWAY_LEAK,
