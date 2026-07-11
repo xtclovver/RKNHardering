@@ -2,12 +2,14 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.NativeSignalCatalog
 import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,7 +56,13 @@ object VpnNativeDetectorChecker {
         return CategoryResult(
             name = context.getString(R.string.checker_vpn_detector_category_name),
             detected = false,
-            findings = listOf(Finding(description = description, isInformational = true)),
+            findings = listOf(
+                Finding(
+                    description = description,
+                    isInformational = true,
+                    nativeSignalId = NativeSignalId.NATIVE_LIBRARY,
+                ),
+            ),
             needsReview = false,
             evidence = emptyList(),
         )
@@ -80,6 +88,7 @@ object VpnNativeDetectorChecker {
                 isInformational = true,
                 source = source,
                 confidence = EvidenceConfidence.LOW,
+                nativeSignalId = NativeSignalCatalog.fromDeepVpnKind(item.kind),
             )
             return
         }
@@ -92,6 +101,7 @@ object VpnNativeDetectorChecker {
             needsReview = !isHigh,
             source = source,
             confidence = confidence,
+            nativeSignalId = NativeSignalCatalog.fromDeepVpnKind(item.kind),
         )
         evidence += EvidenceItem(
             source = source,
@@ -124,6 +134,7 @@ object VpnNativeDetectorChecker {
             findings += Finding(
                 description = context.getString(R.string.checker_vpn_detector_no_anomalies),
                 isInformational = true,
+                nativeSignalId = NativeSignalId.GENERAL_DIAGNOSTICS,
             )
         }
 

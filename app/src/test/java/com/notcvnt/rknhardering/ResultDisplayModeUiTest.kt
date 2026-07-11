@@ -5,6 +5,8 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.ImageView
+import android.widget.LinearLayout
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.material.button.MaterialButton
 import com.notcvnt.rknhardering.checker.CheckSettings
@@ -15,6 +17,7 @@ import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
 import com.notcvnt.rknhardering.model.IpCheckerScope
@@ -78,6 +81,120 @@ class ResultDisplayModeUiTest {
         val visibleText = collectVisibleText(activity.findViewById(R.id.bodyDirect))
         assertFalse(visibleText.contains(TECHNICAL_MARKER))
         assertTrue(visibleText.contains(activity.getString(R.string.simple_result_checked_label)))
+    }
+
+    @Test
+    fun `native problem groups expand clean groups collapse and preserve row order`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(
+                Finding("interface clean first", isInformational = true, nativeSignalId = NativeSignalId.INTERFACE_ENUMERATION),
+                Finding("route first", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE),
+                Finding("route second", needsReview = true, nativeSignalId = NativeSignalId.HOST_ROUTE),
+            ),
+        )
+        invokePrivate<Unit>(
+            activity,
+            "applyScanEvent",
+            ScanEvent.Update(CheckUpdate.NativeSignsReady(native)),
+            false,
+        )
+
+        val clean = findByTag(activity, "native-group-details:INTERFACES")
+        val problem = findByTag(activity, "native-group-details:ROUTES")
+        assertEquals(View.GONE, clean.visibility)
+        assertEquals(View.VISIBLE, problem.visibility)
+        val text = collectVisibleText(problem)
+        assertTrue(text.indexOf("route first") < text.indexOf("route second"))
+        assertEquals(1, Regex("route first").findAll(text).count())
+        assertTrue(findByTag(activity, "native-group-header:ROUTES").contentDescription.toString().contains(activity.getString(R.string.accessibility_expanded)))
+    }
+
+    @Test
+    fun `native grouped rows keep privacy masking`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), true, ResultDisplayMode.NORMAL)
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(
+                Finding("route to 203.0.113.64", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE),
+            ),
+        )
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
+
+        val text = collectVisibleText(findByTag(activity, "native-group-details:ROUTES"))
+        assertFalse(text.contains("203.0.113.64"))
+        assertTrue(text.contains("203.0.*.*"))
+    }
+
+    @Test
+    fun `simple native card never exposes grouped technical findings`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.SIMPLE)
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(Finding("secret native detail", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE)),
+        )
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
+
+        assertFalse(collectVisibleText(activity.findViewById(R.id.bodyNativeSigns)).contains("secret native detail"))
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.findingsNativeSigns).visibility)
+    }
+
+    @Test
+    @Config(qualifiers = "fa-rIR")
+    fun `native help targets remain accessible in rtl`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(Finding("جزئیات بسیار طولانی برای آزمون چیدمان", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE)),
+        )
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
+        val groupHeader = findByTag(activity, "native-group-header:ROUTES") as LinearLayout
+        val help = findMaterialButton(activity.findViewById(R.id.bodyNativeSigns), activity.getString(R.string.native_help_open))!!
+        val chevron = groupHeader.getChildAt(groupHeader.childCount - 1) as ImageView
+
+        assertTrue(groupHeader.minimumHeight >= (48 * activity.resources.displayMetrics.density).toInt())
+        assertTrue(groupHeader.paddingStart > groupHeader.paddingEnd)
+        assertEquals(-90f, chevron.rotation)
+        assertTrue(help.minimumHeight >= (48 * activity.resources.displayMetrics.density).toInt())
+        assertTrue(help.contentDescription.isNotBlank())
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN")
+    fun `header and native row help buttons open localized pages`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        activity.findViewById<View>(R.id.btnHelpIpComparison).performClick()
+        assertEquals(
+            "https://xtclovver.github.io/RKNHardering/help/zh-CN/ip-comparison/",
+            shadowOf(activity).nextStartedActivity.data.toString(),
+        )
+        activity.findViewById<View>(R.id.btnHelpNativeSigns).performClick()
+        assertEquals(
+            "https://xtclovver.github.io/RKNHardering/help/zh-CN/native/",
+            shadowOf(activity).nextStartedActivity.data.toString(),
+        )
+
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(Finding("route", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE)),
+        )
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
+        findMaterialButton(activity.findViewById(R.id.bodyNativeSigns), activity.getString(R.string.native_help_open))!!.performClick()
+        assertEquals(
+            "https://xtclovver.github.io/RKNHardering/help/zh-CN/native/route-table/",
+            shadowOf(activity).nextStartedActivity.data.toString(),
+        )
     }
 
     @Test
@@ -148,6 +265,32 @@ class ResultDisplayModeUiTest {
 
         invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
         assertFalse(collectAllText(body).contains(activity.getString(R.string.technical_data_title)))
+    }
+
+    @Test
+    fun `advanced keeps normal native grouping and diagnostics as separate block`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val native = CategoryResult(
+            name = "native",
+            detected = true,
+            findings = listOf(Finding("native route", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE)),
+        )
+        val nativeSnapshot = snapshot().copy(
+            entries = snapshot().entries.map { it.copy(category = "nat", source = "native probe") },
+        )
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.ADVANCED)
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
+        invokePrivate<Unit>(
+            activity,
+            "applyScanEvent",
+            ScanEvent.Completed(checkResult(nativeSnapshot, native), false, ResultDisplayMode.ADVANCED),
+            false,
+        )
+        invokePrivate<Unit>(activity, "expandCategory", "nat")
+
+        assertNotNull(activity.findViewById<View>(R.id.bodyNativeSigns).findViewWithTag<View>("native-group:ROUTES"))
+        assertNotNull(findMaterialButton(activity.findViewById(R.id.bodyNativeSigns), activity.getString(R.string.technical_data_title)))
+        assertTrue(collectVisibleText(findByTag(activity, "native-group-details:ROUTES")).contains("native route"))
     }
 
     @Test
@@ -227,7 +370,10 @@ class ResultDisplayModeUiTest {
         truncated = runTruncated,
     )
 
-    private fun checkResult(snapshot: DiagnosticSnapshot? = null): CheckResult = CheckResult(
+    private fun checkResult(
+        snapshot: DiagnosticSnapshot? = null,
+        nativeSigns: CategoryResult = category("native"),
+    ): CheckResult = CheckResult(
         geoIp = category("geo"),
         ipComparison = IpComparisonResult(
             detected = false,
@@ -248,6 +394,7 @@ class ResultDisplayModeUiTest {
         ),
         verdict = Verdict.NOT_DETECTED,
         diagnosticSnapshot = snapshot,
+        nativeSigns = nativeSigns,
     )
 
     private fun category(name: String) = CategoryResult(name, detected = false, findings = emptyList())
@@ -291,6 +438,10 @@ class ResultDisplayModeUiTest {
         if (root !is ViewGroup) return null
         return (0 until root.childCount).firstNotNullOfOrNull { findTextView(root.getChildAt(it), predicate) }
     }
+
+    private fun findByTag(activity: MainActivity, tag: String): View =
+        activity.findViewById<View>(android.R.id.content).findViewWithTag(tag)
+            ?: error("View with tag $tag not found")
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> getPrivateField(target: Any, name: String): T {

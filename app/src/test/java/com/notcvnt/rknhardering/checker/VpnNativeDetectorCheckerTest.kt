@@ -6,6 +6,8 @@ import com.notcvnt.rknhardering.ScanCancellationSignal
 import com.notcvnt.rknhardering.ScanExecutionContext
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.NativeSignalCatalog
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -89,6 +91,41 @@ class VpnNativeDetectorCheckerTest {
         assertEquals(EvidenceSource.NATIVE_SOCKET, evidence.source)
         assertEquals(EvidenceConfidence.HIGH, evidence.confidence)
         assertTrue(evidence.detected)
+    }
+
+    @Test
+    fun `every deep detector kind receives its stable signal id`() {
+        val kinds = listOf(
+            "sysfs_vpn_leak", "getifaddrs_vpn", "sysclassnet_vpn", "rtm_getlink_vpn",
+            "proc_if_inet6_vpn", "proc_ipv6_route_vpn", "proc_net_dev_vpn", "ifindexname_vpn",
+            "vpn_policy_rules_netlink", "fib_trie_denied", "inet_diag_denied", "bindtodevice_leak",
+            "getsockname_leak", "udp_port_conflict_physical", "vpn_qdisc", "bpf_map_accessible",
+            "route_count", "trim_oracle", "pmtu_mss_combined", "udp_pmtu_ok", "udp_pmtu_fail",
+            "normal_pmtu", "timing_oracle", "backpressure", "gso_failed", "gso_send_failed",
+            "gso_ok", "hw_timestamp", "traceroute_denied",
+        )
+        NativeSignsBridge.detectVpnDetectorOverride = {
+            kinds.map { kind -> "vdet|$kind|detail" }.toTypedArray()
+        }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        kinds.forEach { kind ->
+            assertTrue(
+                kind,
+                result.findings.any { it.nativeSignalId == NativeSignalCatalog.fromDeepVpnKind(kind) },
+            )
+        }
+    }
+
+    @Test
+    fun `unknown deep kind remains visible in general category`() {
+        NativeSignsBridge.detectVpnDetectorOverride = { arrayOf("vdet|future_kind|future detail") }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertEquals(NativeSignalId.UNKNOWN, result.findings.single().nativeSignalId)
+        assertTrue(result.findings.single().description.contains("future_kind"))
     }
 
     @Test

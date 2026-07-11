@@ -10,6 +10,7 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -77,6 +78,7 @@ class CheckResultJsonExportFormatterTest {
                         isInformational = true,
                         source = EvidenceSource.NATIVE_ROUTE,
                         confidence = EvidenceConfidence.LOW,
+                        nativeSignalId = NativeSignalId.BACKPRESSURE,
                     ),
                     Finding(
                         description = "bindtodevice_leak: tun0",
@@ -113,6 +115,8 @@ class CheckResultJsonExportFormatterTest {
         val evidence = nativeSigns.getJSONArray("evidence")
 
         assertEquals("backpressure: 50000 packets", findings.getJSONObject(0).getString("description"))
+        assertFalse(findings.getJSONObject(0).has("nativeSignalId"))
+        assertFalse(json.toString().contains("BACKPRESSURE"))
         assertTrue(findings.getJSONObject(0).getBoolean("isInformational"))
         assertEquals("bindtodevice_leak: tun0", findings.getJSONObject(1).getString("description"))
         assertEquals("NATIVE_SOCKET", evidence.getJSONObject(0).getString("source"))

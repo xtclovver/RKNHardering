@@ -9,6 +9,9 @@
 /windows
 linux/
 *.md
+!docs/index.md
+!docs/help/
+!docs/help/**
 *.docx
 .externalNativeBuild
 .cxx

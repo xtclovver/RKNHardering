@@ -9,6 +9,10 @@ Android app for detecting VPNs and proxies on a device. Implements the Roskomnad
 
 Minimum Android version: 8.0 (API 26).
 
+## Check reference
+
+Detailed Native signs and IP comparison explanations are published in the [RKNHardering reference](https://xtclovver.github.io/RKNHardering/help/en/). Articles distinguish **project verified**, **community reported**, and **external project claim** evidence. The latter two labels are not guarantees of effectiveness or safety.
+
 You can download the project from:
 <table>
   <tr>

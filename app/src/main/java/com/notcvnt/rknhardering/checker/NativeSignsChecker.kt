@@ -2,12 +2,14 @@ package com.notcvnt.rknhardering.checker
 
 import android.content.Context
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.NativeSignalCatalog
 import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.network.NetworkInterfaceNameNormalizer
 import com.notcvnt.rknhardering.network.NetworkInterfacePatterns
 import com.notcvnt.rknhardering.probe.NativeEmulatorFinding
@@ -85,7 +87,13 @@ object NativeSignsChecker {
             return@withContext CategoryResult(
                 name = context.getString(R.string.checker_native_category_name),
                 detected = false,
-                findings = listOf(Finding(description = description, isInformational = true)),
+                findings = listOf(
+                    Finding(
+                        description = description,
+                        isInformational = true,
+                        nativeSignalId = NativeSignalId.NATIVE_LIBRARY,
+                    ),
+                ),
                 needsReview = false,
                 evidence = emptyList(),
             )
@@ -185,6 +193,7 @@ object NativeSignsChecker {
             findings += Finding(
                 description = context.getString(R.string.checker_native_no_anomalies),
                 isInformational = true,
+                nativeSignalId = NativeSignalId.GENERAL_DIAGNOSTICS,
             )
         }
 
@@ -218,6 +227,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_INTERFACE,
                 confidence = EvidenceConfidence.LOW,
+                nativeSignalId = NativeSignalId.INTERFACE_ENUMERATION,
             )
             return PartialOutcome(findings, evidence, detected = false, needsReview = true)
         }
@@ -231,6 +241,7 @@ object NativeSignsChecker {
             ),
             isInformational = true,
             source = EvidenceSource.NATIVE_INTERFACE,
+            nativeSignalId = NativeSignalId.INTERFACE_ENUMERATION,
         )
 
         val vpnInterfaces = uniqueByName.filter { iface ->
@@ -248,6 +259,7 @@ object NativeSignsChecker {
                 detected = true,
                 source = EvidenceSource.NATIVE_INTERFACE,
                 confidence = EvidenceConfidence.HIGH,
+                nativeSignalId = NativeSignalId.INTERFACE_ENUMERATION,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_INTERFACE,
@@ -269,6 +281,7 @@ object NativeSignsChecker {
                 detected = true,
                 source = EvidenceSource.NATIVE_INTERFACE,
                 confidence = EvidenceConfidence.HIGH,
+                nativeSignalId = NativeSignalId.TUNTAP_TYPE,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_INTERFACE,
@@ -291,6 +304,7 @@ object NativeSignsChecker {
                 ),
                 isInformational = true,
                 source = EvidenceSource.NATIVE_INTERFACE,
+                nativeSignalId = NativeSignalId.IPSEC_INTERFACE,
             )
         }
 
@@ -333,6 +347,7 @@ object NativeSignsChecker {
                 needsReview = !isSensitive,
                 source = EvidenceSource.NATIVE_JVM_MISMATCH,
                 confidence = if (isSensitive) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.JVM_NATIVE_MISMATCH,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_JVM_MISMATCH,
@@ -355,6 +370,7 @@ object NativeSignsChecker {
                 needsReview = !isSensitive,
                 source = EvidenceSource.NATIVE_JVM_MISMATCH,
                 confidence = if (isSensitive) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.JVM_NATIVE_MISMATCH,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_JVM_MISMATCH,
@@ -380,6 +396,7 @@ object NativeSignsChecker {
                     needsReview = true,
                     source = EvidenceSource.NATIVE_JVM_MISMATCH,
                     confidence = EvidenceConfidence.MEDIUM,
+                    nativeSignalId = NativeSignalId.JVM_NATIVE_MISMATCH,
                 )
                 evidence += EvidenceItem(
                     source = EvidenceSource.NATIVE_JVM_MISMATCH,
@@ -405,6 +422,7 @@ object NativeSignsChecker {
                     needsReview = true,
                     source = EvidenceSource.NATIVE_JVM_MISMATCH,
                     confidence = EvidenceConfidence.MEDIUM,
+                    nativeSignalId = NativeSignalId.JVM_NATIVE_MISMATCH,
                 )
                 evidence += EvidenceItem(
                     source = EvidenceSource.NATIVE_JVM_MISMATCH,
@@ -427,6 +445,7 @@ object NativeSignsChecker {
                         description = context.getString(R.string.checker_native_routes_empty),
                         isInformational = true,
                         source = EvidenceSource.NATIVE_ROUTE,
+                        nativeSignalId = NativeSignalId.ROUTE_TABLE,
                     ),
                 ),
                 evidence = emptyList(),
@@ -455,6 +474,7 @@ object NativeSignsChecker {
                 description = context.getString(R.string.checker_native_routes_no_default),
                 isInformational = true,
                 source = EvidenceSource.NATIVE_ROUTE,
+                nativeSignalId = NativeSignalId.ROUTE_TABLE,
             )
         } else {
             for (route in defaultRoutes) {
@@ -472,6 +492,7 @@ object NativeSignsChecker {
                         detected = true,
                         source = EvidenceSource.NATIVE_ROUTE,
                         confidence = EvidenceConfidence.HIGH,
+                        nativeSignalId = NativeSignalId.ROUTE_TABLE,
                     )
                     evidence += EvidenceItem(
                         source = EvidenceSource.NATIVE_ROUTE,
@@ -486,6 +507,7 @@ object NativeSignsChecker {
                         detected = true,
                         source = EvidenceSource.NATIVE_ROUTE,
                         confidence = EvidenceConfidence.MEDIUM,
+                        nativeSignalId = NativeSignalId.ROUTE_TABLE,
                     )
                     evidence += EvidenceItem(
                         source = EvidenceSource.NATIVE_ROUTE,
@@ -499,6 +521,7 @@ object NativeSignsChecker {
                         description = description,
                         isInformational = true,
                         source = EvidenceSource.NATIVE_ROUTE,
+                        nativeSignalId = NativeSignalId.ROUTE_TABLE,
                     )
                 }
             }
@@ -528,6 +551,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_HOST_ROUTE,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.HOST_ROUTE,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_HOST_ROUTE,
@@ -584,6 +608,7 @@ object NativeSignsChecker {
                         description = context.getString(R.string.checker_native_hooks_clean),
                         isInformational = true,
                         source = EvidenceSource.NATIVE_HOOK_MARKERS,
+                        nativeSignalId = NativeSignalId.HOOK_MARKERS,
                     ),
                 ),
                 evidence = emptyList(),
@@ -608,6 +633,7 @@ object NativeSignsChecker {
                         needsReview = true,
                         source = EvidenceSource.NATIVE_HOOK_MARKERS,
                         confidence = confidence,
+                        nativeSignalId = NativeSignalId.HOOK_MARKERS,
                     )
                     evidence += EvidenceItem(
                         source = EvidenceSource.NATIVE_HOOK_MARKERS,
@@ -624,8 +650,16 @@ object NativeSignsChecker {
                         isInformational = true,
                         source = EvidenceSource.NATIVE_HOOK_MARKERS,
                         confidence = EvidenceConfidence.LOW,
+                        nativeSignalId = NativeSignalId.RWX_MEMORY_REGIONS,
                     )
                 }
+                else -> findings += Finding(
+                    description = "${marker.kind}: ${marker.detail ?: marker.marker.orEmpty()}",
+                    isInformational = true,
+                    source = EvidenceSource.NATIVE_HOOK_MARKERS,
+                    confidence = EvidenceConfidence.LOW,
+                    nativeSignalId = NativeSignalId.UNKNOWN,
+                )
             }
         }
 
@@ -650,6 +684,7 @@ object NativeSignsChecker {
                 description = context.getString(R.string.checker_native_symbols_clean),
                 isInformational = true,
                 source = EvidenceSource.NATIVE_LIBRARY_INTEGRITY,
+                nativeSignalId = NativeSignalId.LIBRARY_INTEGRITY,
             )
             return PartialOutcome(findings, evidence)
         }
@@ -668,6 +703,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_LIBRARY_INTEGRITY,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.LIBRARY_INTEGRITY,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_LIBRARY_INTEGRITY,
@@ -719,6 +755,7 @@ object NativeSignsChecker {
                         description = context.getString(R.string.checker_native_root_clean),
                         isInformational = true,
                         source = EvidenceSource.NATIVE_ROOT_DETECTION,
+                        nativeSignalId = NativeSignalId.ROOT_INDICATORS,
                     ),
                 ),
                 evidence = emptyList(),
@@ -786,7 +823,16 @@ object NativeSignsChecker {
                     context.getString(R.string.checker_native_root_magisk_prop, detail),
                     EvidenceConfidence.HIGH,
                 )
-                else -> continue
+                else -> {
+                    findings += Finding(
+                        description = "${item.kind}: $detail",
+                        isInformational = true,
+                        source = EvidenceSource.NATIVE_ROOT_DETECTION,
+                        confidence = EvidenceConfidence.LOW,
+                        nativeSignalId = NativeSignalId.UNKNOWN,
+                    )
+                    continue
+                }
             }
 
             findings += Finding(
@@ -794,6 +840,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_ROOT_DETECTION,
                 confidence = confidence,
+                nativeSignalId = NativeSignalCatalog.fromRootKind(item.kind),
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_ROOT_DETECTION,
@@ -828,6 +875,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_EMULATOR,
                 confidence = confidence,
+                nativeSignalId = NativeSignalCatalog.fromEmulatorKind(finding.kind),
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_EMULATOR,
@@ -844,6 +892,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.NATIVE_EMULATOR,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.EMULATOR_BUILD,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.NATIVE_EMULATOR,
@@ -905,6 +954,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.SANDBOX_ISOLATION,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.ISOLATION_CLONE,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.SANDBOX_ISOLATION,
@@ -919,6 +969,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.SANDBOX_ISOLATION,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.ISOLATION_SECONDARY_USER,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.SANDBOX_ISOLATION,
@@ -935,6 +986,7 @@ object NativeSignsChecker {
                 needsReview = true,
                 source = EvidenceSource.SANDBOX_ISOLATION,
                 confidence = EvidenceConfidence.MEDIUM,
+                nativeSignalId = NativeSignalId.ISOLATION_WORK_PROFILE,
             )
             evidence += EvidenceItem(
                 source = EvidenceSource.SANDBOX_ISOLATION,
@@ -1018,6 +1070,7 @@ object NativeSignsChecker {
                     isInformational = true,
                     source = source,
                     confidence = EvidenceConfidence.LOW,
+                    nativeSignalId = NativeSignalCatalog.fromLegacyVpnKind(kind),
                 )
             } else {
                 for (item in items) {
@@ -1038,12 +1091,32 @@ object NativeSignsChecker {
                         needsReview = !isHigh,
                         source = source,
                         confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM,
+                        nativeSignalId = NativeSignalCatalog.fromLegacyVpnKind(kind),
                     )
                     evidence += EvidenceItem(source = source, detected = true, confidence = if (isHigh) EvidenceConfidence.HIGH else EvidenceConfidence.MEDIUM, description = describeVpnFinding(context, kind, detail))
                     detected = detected || isHigh
                     needsReview = needsReview || !isHigh
                 }
             }
+        }
+
+        val knownKinds = allKinds.toSet()
+        val unknownItems = buildList {
+            props.filter { it.kind !in knownKinds }.forEach { item ->
+                add(item.kind to if (item.value != null) "${item.prop}=${item.value}" else item.prop.orEmpty())
+            }
+            leaks.filter { it.kind !in knownKinds }.forEach { item -> add(item.kind to item.detail.orEmpty()) }
+            advanced.filter { it.kind !in knownKinds }.forEach { item -> add(item.kind to item.detail.orEmpty()) }
+            syscalls.filter { it.kind !in knownKinds && !it.kind.startsWith("unavailable") }
+                .forEach { item -> add(item.kind to item.detail.orEmpty()) }
+        }
+        for ((kind, detail) in unknownItems) {
+            findings += Finding(
+                description = "$kind: $detail",
+                isInformational = true,
+                confidence = EvidenceConfidence.LOW,
+                nativeSignalId = NativeSignalId.UNKNOWN,
+            )
         }
 
         for (item in unavailableSyscalls) {
@@ -1054,6 +1127,7 @@ object NativeSignsChecker {
                 isInformational = true,
                 source = EvidenceSource.NATIVE_SOCKET,
                 confidence = EvidenceConfidence.LOW,
+                nativeSignalId = NativeSignalId.SYSCALL_UNAVAILABLE,
             )
         }
 

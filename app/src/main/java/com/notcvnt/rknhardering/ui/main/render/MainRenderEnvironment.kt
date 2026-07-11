@@ -1,10 +1,14 @@
 package com.notcvnt.rknhardering.ui.main.render
 
 import android.content.Context
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.res.ColorStateList
+import android.net.Uri
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.annotation.AttrRes
 import androidx.annotation.ColorRes
 import androidx.core.content.ContextCompat
@@ -95,6 +99,16 @@ internal class MainRenderEnvironment(
             BidiFormatter.getInstance(true).unicodeWrap(text)
         } else {
             text
+        }
+    }
+
+    fun openExternalHelp(url: String) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, R.string.help_open_failed, Toast.LENGTH_LONG).show()
+        } catch (_: SecurityException) {
+            Toast.makeText(context, R.string.help_open_failed, Toast.LENGTH_LONG).show()
         }
     }
 }

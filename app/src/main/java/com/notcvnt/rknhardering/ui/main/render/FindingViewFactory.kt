@@ -7,6 +7,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.material.button.MaterialButton
+import com.notcvnt.rknhardering.NativeSignalCatalog
+import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.StatusVisualResolver
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.util.maskIpsInText
@@ -65,6 +68,40 @@ internal class FindingViewFactory(
                 }
             }
         return row
+    }
+
+    fun createNativeFindingView(finding: Finding, privacyMode: Boolean = false): View {
+        val info = NativeSignalCatalog.info(finding.nativeSignalId)
+        return LinearLayout(themedContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            tag = "native-finding:${info.id.name}"
+            addView(createFindingView(finding, privacyMode))
+            addView(
+                MaterialButton(
+                    themedContext(),
+                    null,
+                    com.google.android.material.R.attr.borderlessButtonStyle,
+                ).apply {
+                    text = getString(R.string.native_help_open)
+                    setIconResource(R.drawable.ic_help)
+                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    minHeight = 48.dp
+                    minimumHeight = 48.dp
+                    textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                    contentDescription = getString(
+                        R.string.native_help_open_description,
+                        NativeSignalCatalog.title(env.context, finding.nativeSignalId),
+                    )
+                    setOnClickListener {
+                        env.openExternalHelp(NativeSignalCatalog.articleUrl(env.context, finding.nativeSignalId))
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
     }
 
     fun createInfoView(label: String, value: String): View {

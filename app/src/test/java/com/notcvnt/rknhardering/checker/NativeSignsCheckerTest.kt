@@ -4,9 +4,13 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.NativeSignalCatalog
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.probe.NativeInterface
+import com.notcvnt.rknhardering.probe.NativeEmulatorFinding
 import com.notcvnt.rknhardering.probe.NativeRouteEntry
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
+import com.notcvnt.rknhardering.probe.NativeVpnSyscallFinding
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,6 +53,89 @@ class NativeSignsCheckerTest {
         assertFalse(result.detected)
         assertFalse(result.needsReview)
         assertTrue(result.findings.isNotEmpty())
+        assertTrue(result.findings.all { it.nativeSignalId == NativeSignalId.NATIVE_LIBRARY })
+    }
+
+    @Test
+    fun `every legacy vpn kind receives its stable signal id`() {
+        val kinds = listOf(
+            "vpn_prop", "dns_prop", "vpn_file", "vpnhide", "lsposed", "hook_prop",
+            "tcp_vpn_port", "udp_vpn_port", "inet6_vpn_iface", "route_vpn_iface",
+            "arp_vpn_iface", "sysctl_forwarding", "sysctl_rp_filter", "established_vpn",
+            "vpn_policy_rules", "vpn_qdisc", "hidden_mac_neighbors", "tcp_mss_low",
+            "so_bindtodevice", "loopback_port_conflict", "bpf_map_accessible", "ip_recverr",
+        )
+
+        kinds.forEach { kind ->
+            val outcome = NativeSignsChecker.evaluateVpnSignals(
+                context,
+                props = emptyList(),
+                leaks = emptyList(),
+                advanced = emptyList(),
+                syscalls = listOf(NativeVpnSyscallFinding(kind, "detail")),
+            )
+            val expected = NativeSignalCatalog.fromLegacyVpnKind(kind)
+            assertEquals(kind, expected, outcome.findings.single { it.nativeSignalId == expected }.nativeSignalId)
+        }
+    }
+
+    @Test
+    fun `unknown and unavailable legacy vpn kinds remain visible with fallback ids`() {
+        val outcome = NativeSignsChecker.evaluateVpnSignals(
+            context,
+            props = emptyList(),
+            leaks = emptyList(),
+            advanced = emptyList(),
+            syscalls = listOf(
+                NativeVpnSyscallFinding("future_kind", "future detail"),
+                NativeVpnSyscallFinding("unavailable|probe", "not permitted"),
+            ),
+        )
+
+        assertTrue(outcome.findings.any { it.description.contains("future_kind") && it.nativeSignalId == NativeSignalId.UNKNOWN })
+        assertTrue(outcome.findings.any { it.description.contains("not permitted") && it.nativeSignalId == NativeSignalId.SYSCALL_UNAVAILABLE })
+    }
+
+    @Test
+    fun `every root kind receives its stable signal id`() {
+        val cases = mapOf(
+            "su_binary" to "/system/xbin/su",
+            "root_prop" to "ro.debuggable=1",
+            "root_mgmt" to "/data/adb/magisk",
+            "system_rw" to "rw",
+            "suspicious_mount" to "/data/adb/modules",
+            "overlay_mount" to "lowerdir=/system upperdir=/data/adb/modules/magisk",
+            "selinux" to "permissive",
+            "root_uid" to "0",
+            "magisk_prop" to "ro.magisk=1",
+        )
+
+        cases.forEach { (kind, detail) ->
+            NativeSignsBridge.detectRootOverride = { arrayOf("$kind|$detail") }
+            val outcome = NativeSignsChecker.evaluateRootIndicators(context)
+            assertTrue(kind, outcome.findings.any { it.nativeSignalId == NativeSignalCatalog.fromRootKind(kind) })
+        }
+    }
+
+    @Test
+    fun `emulator and isolation branches receive stable signal ids`() {
+        val emulatorKinds = listOf("qemu_prop", "qemu_pipe", "goldfish", "qemu_driver", "bluestacks")
+        val emulator = NativeSignsChecker.evaluateEmulator(
+            context,
+            emulatorKinds.map { NativeEmulatorFinding(it, "detail") },
+            buildFacts = listOf("Build.MODEL=Emulator"),
+        )
+        emulatorKinds.forEach { kind ->
+            assertTrue(kind, emulator.findings.any { it.nativeSignalId == NativeSignalCatalog.fromEmulatorKind(kind) })
+        }
+        assertTrue(emulator.findings.any { it.nativeSignalId == NativeSignalId.EMULATOR_BUILD })
+
+        val clone = NativeSignsChecker.evaluateIsolation(context, userId = 999, isProfileOwner = false)
+        val secondary = NativeSignsChecker.evaluateIsolation(context, userId = 10, isProfileOwner = false)
+        val work = NativeSignsChecker.evaluateIsolation(context, userId = 0, isProfileOwner = true)
+        assertEquals(NativeSignalId.ISOLATION_CLONE, clone.findings.single().nativeSignalId)
+        assertEquals(NativeSignalId.ISOLATION_SECONDARY_USER, secondary.findings.single().nativeSignalId)
+        assertEquals(NativeSignalId.ISOLATION_WORK_PROFILE, work.findings.single().nativeSignalId)
     }
 
     @Test
@@ -115,6 +202,7 @@ class NativeSignsCheckerTest {
         val result = runBlocking { NativeSignsChecker.check(context) }
 
         assertFalse(result.detected)
+        assertTrue(result.findings.all { it.nativeSignalId != null })
         val hookEvidence = result.evidence.filter {
             it.source == EvidenceSource.NATIVE_HOOK_MARKERS && it.detected
         }

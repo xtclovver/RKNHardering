@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
 import com.google.android.material.card.MaterialCardView
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.StatusSemantic
@@ -80,6 +81,9 @@ internal class IpComparisonRenderer(
         val header = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = 48.dp
+            isClickable = true
+            isFocusable = true
         }
 
         val title = TextView(themedContext()).apply {
@@ -97,11 +101,11 @@ internal class IpComparisonRenderer(
             setTextColor(statusColor(statusSemantic(group.detected, group.needsReview)))
         }
 
-        val toggle = TextView(themedContext()).apply {
-            text = if (expanded) "▼" else "▶"
-            textSize = 12f
-            setPadding(8.dp, 0, 0, 0)
-            setTextColor(onSurfaceVariantColor())
+        val toggle = ImageView(themedContext()).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(48.dp, 48.dp)
+            setPadding(15.dp, 15.dp, 15.dp, 15.dp)
         }
 
         val summary = TextView(themedContext()).apply {
@@ -124,18 +128,32 @@ internal class IpComparisonRenderer(
         header.addView(status)
         header.addView(toggle)
 
-        val toggleDetails = {
-            val nextExpanded = details.visibility != View.VISIBLE
+        val setExpanded = { nextExpanded: Boolean ->
             details.visibility = if (nextExpanded) View.VISIBLE else View.GONE
-            toggle.text = if (nextExpanded) "▼" else "▶"
+            toggle.rotation = if (nextExpanded) {
+                if (isRtlLayout()) -90f else 90f
+            } else {
+                0f
+            }
+            val state = getString(
+                if (nextExpanded) R.string.accessibility_expanded else R.string.accessibility_collapsed,
+            )
+            header.contentDescription = getString(
+                R.string.accessibility_group_state,
+                group.title,
+                group.statusLabel,
+                state,
+            )
+            ViewCompat.setStateDescription(header, state)
         }
-        header.setOnClickListener { toggleDetails() }
-        summary.setOnClickListener { toggleDetails() }
+        header.setOnClickListener { setExpanded(details.visibility != View.VISIBLE) }
+        summary.setOnClickListener { setExpanded(details.visibility != View.VISIBLE) }
 
         container.addView(header)
         container.addView(summary)
         container.addView(details)
         card.addView(container)
+        setExpanded(expanded)
         return card
     }
 

@@ -1,0 +1,106 @@
+---
+title: Native signs reference
+permalink: /help/en/native/
+---
+
+# Native signs reference
+
+The detailed reference distinguishes evidence verified by the project from community reports and claims made by external projects. Recommendations are conditional and do not guarantee that a device, VPN, root state, firmware, or server-side signal will be hidden.
+
+## Evidence labels
+
+- **Project verified / проверено проектом / بررسی‌شده توسط پروژه / 项目验证** — implemented and tested in RKNHardering.
+- **Community reported / сообщено сообществом / گزارش جامعه / 社区报告** — a user-reported scenario, not a guarantee.
+- **External project claim / заявлено внешним проектом / ادعای پروژهٔ بیرونی / 外部项目声明** — a claim that must be audited and tested independently.
+
+Issue [#48](https://github.com/xtclovver/RKNHardering/issues/48) and [RKNHardering-defense](https://github.com/jinndi/RKNHardering-defense) are community reports for TUN, MTU, and IP scenarios. [VPN Hide](https://github.com/okhsunrog/vpnhide) is an external root tool that may itself create root, hook, Zygisk, LSPosed, or vpnhide signals; it does not hide server-side detection, root, or custom firmware. Issue [#51](https://github.com/xtclovver/RKNHardering/issues/51) is retained as discussion context. WINGSV is not recommended because its current documentation does not establish the protection mechanism required by these vectors.
+
+## Signals
+
+- [native-library](./native-library/)
+- [interface-enumeration](./interface-enumeration/)
+- [tuntap-type](./tuntap-type/)
+- [ipsec-interface](./ipsec-interface/)
+- [jvm-native-mismatch](./jvm-native-mismatch/)
+- [route-table](./route-table/)
+- [host-route](./host-route/)
+- [hook-markers](./hook-markers/)
+- [rwx-memory-regions](./rwx-memory-regions/)
+- [library-integrity](./library-integrity/)
+- [root-indicators](./root-indicators/)
+- [root-su-binary](./root-su-binary/)
+- [root-property](./root-property/)
+- [root-management](./root-management/)
+- [root-system-rw](./root-system-rw/)
+- [root-suspicious-mount](./root-suspicious-mount/)
+- [root-overlay-mount](./root-overlay-mount/)
+- [root-selinux](./root-selinux/)
+- [root-uid](./root-uid/)
+- [root-magisk-property](./root-magisk-property/)
+- [emulator-qemu-property](./emulator-qemu-property/)
+- [emulator-qemu-pipe](./emulator-qemu-pipe/)
+- [emulator-goldfish](./emulator-goldfish/)
+- [emulator-qemu-driver](./emulator-qemu-driver/)
+- [emulator-bluestacks](./emulator-bluestacks/)
+- [emulator-build-profile](./emulator-build-profile/)
+- [isolation-clone](./isolation-clone/)
+- [isolation-secondary-user](./isolation-secondary-user/)
+- [isolation-work-profile](./isolation-work-profile/)
+- [emulator-indicators](./emulator-indicators/)
+- [isolation-profile](./isolation-profile/)
+- [vpn-property](./vpn-property/)
+- [dns-property](./dns-property/)
+- [vpn-file](./vpn-file/)
+- [vpnhide](./vpnhide/)
+- [lsposed](./lsposed/)
+- [hook-property](./hook-property/)
+- [tcp-vpn-port](./tcp-vpn-port/)
+- [udp-vpn-port](./udp-vpn-port/)
+- [inet6-vpn-interface](./inet6-vpn-interface/)
+- [route-vpn-interface](./route-vpn-interface/)
+- [arp-vpn-interface](./arp-vpn-interface/)
+- [sysctl-forwarding](./sysctl-forwarding/)
+- [sysctl-rp-filter](./sysctl-rp-filter/)
+- [established-vpn-socket](./established-vpn-socket/)
+- [vpn-policy-rules](./vpn-policy-rules/)
+- [vpn-qdisc](./vpn-qdisc/)
+- [hidden-mac-neighbors](./hidden-mac-neighbors/)
+- [tcp-mss-low](./tcp-mss-low/)
+- [so-bindtodevice](./so-bindtodevice/)
+- [loopback-port-conflict](./loopback-port-conflict/)
+- [bpf-map-accessible](./bpf-map-accessible/)
+- [ip-recverr](./ip-recverr/)
+- [syscall-unavailable](./syscall-unavailable/)
+- [sysfs-vpn-leak](./sysfs-vpn-leak/)
+- [getifaddrs-vpn](./getifaddrs-vpn/)
+- [sysclassnet-vpn](./sysclassnet-vpn/)
+- [rtm-getlink-vpn](./rtm-getlink-vpn/)
+- [proc-if-inet6-vpn](./proc-if-inet6-vpn/)
+- [proc-ipv6-route-vpn](./proc-ipv6-route-vpn/)
+- [proc-net-dev-vpn](./proc-net-dev-vpn/)
+- [ifindexname-vpn](./ifindexname-vpn/)
+- [vpn-policy-rules-netlink](./vpn-policy-rules-netlink/)
+- [fib-trie-denied](./fib-trie-denied/)
+- [inet-diag-denied](./inet-diag-denied/)
+- [bindtodevice-leak](./bindtodevice-leak/)
+- [getsockname-leak](./getsockname-leak/)
+- [udp-port-conflict-physical](./udp-port-conflict-physical/)
+- [deep-vpn-qdisc](./deep-vpn-qdisc/)
+- [deep-bpf-map-accessible](./deep-bpf-map-accessible/)
+- [route-count](./route-count/)
+- [trim-oracle](./trim-oracle/)
+- [pmtu-mss-combined](./pmtu-mss-combined/)
+- [udp-pmtu-ok](./udp-pmtu-ok/)
+- [udp-pmtu-fail](./udp-pmtu-fail/)
+- [normal-pmtu](./normal-pmtu/)
+- [timing-oracle](./timing-oracle/)
+- [backpressure](./backpressure/)
+- [gso-failed](./gso-failed/)
+- [gso-send-failed](./gso-send-failed/)
+- [gso-ok](./gso-ok/)
+- [hardware-timestamp](./hardware-timestamp/)
+- [traceroute-denied](./traceroute-denied/)
+- [general-diagnostics](./general-diagnostics/)
+- [unknown-signals](./unknown-signals/)
+
+[Back to language index](../)

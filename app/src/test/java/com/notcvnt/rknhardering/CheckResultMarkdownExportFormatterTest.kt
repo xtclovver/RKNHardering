@@ -10,6 +10,7 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.NativeSignalId
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.UnparsedIp
 import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
@@ -61,6 +62,7 @@ class CheckResultMarkdownExportFormatterTest {
                         isInformational = true,
                         source = EvidenceSource.NATIVE_ROUTE,
                         confidence = EvidenceConfidence.LOW,
+                        nativeSignalId = NativeSignalId.BACKPRESSURE,
                     ),
                     Finding(
                         description = "bindtodevice_leak: tun0",
@@ -92,6 +94,8 @@ class CheckResultMarkdownExportFormatterTest {
         )
 
         assertTrue(markdown.contains("backpressure: 50000 packets | informational=true"))
+        assertFalse(markdown.contains("BACKPRESSURE"))
+        assertFalse(markdown.contains("nativeSignalId"))
         assertTrue(markdown.contains("bindtodevice_leak: tun0 | detected=true | source=NATIVE_SOCKET"))
         assertTrue(markdown.contains("source=NATIVE_SOCKET | detected=true | confidence=HIGH"))
         assertTrue(markdown.contains("description=bindtodevice_leak: tun0"))

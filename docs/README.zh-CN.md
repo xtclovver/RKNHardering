@@ -9,6 +9,10 @@
 
 最低 Android 版本：8.0（API 26）。
 
+## 检查参考
+
+Native signs 与 IP comparison 的详细说明发布在 [RKNHardering 参考](https://xtclovver.github.io/RKNHardering/help/zh-CN/)。文章区分**项目验证**、**社区报告**和**外部项目声明**；后两者不代表有效性或安全保证。
+
 您可以从以下位置下载本项目：
 <table>
   <tr>

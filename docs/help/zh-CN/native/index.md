@@ -1,0 +1,106 @@
+---
+title: Native signs 参考
+permalink: /help/zh-CN/native/
+---
+
+# Native signs 参考
+
+本参考将项目验证的证据、社区报告和外部项目声明分开说明。建议取决于设备，不能保证隐藏 VPN、Root、固件或服务器端信号。
+
+## 证据标签
+
+- **项目验证** — 该向量已在 RKNHardering 中实现并测试。
+- **社区报告** — 用户报告的场景，不是保证。
+- **外部项目声明** — 必须独立审计和测试该声明。
+
+Issue [#48](https://github.com/xtclovver/RKNHardering/issues/48) 与 [RKNHardering-defense](https://github.com/jinndi/RKNHardering-defense) 是关于 TUN、MTU 和 IP 场景的社区报告。[VPN Hide](https://github.com/okhsunrog/vpnhide) 是外部 Root 工具，本身可能产生 Root、Hook、Zygisk、LSPosed 或 vpnhide 信号；它不会隐藏服务器端检测、Root 或自定义固件。Issue [#51](https://github.com/xtclovver/RKNHardering/issues/51) 仅保留为讨论来源。不推荐 WINGSV，因为当前文档没有证明所需的保护机制。
+
+## 信号
+
+- [native-library](./native-library/)
+- [interface-enumeration](./interface-enumeration/)
+- [tuntap-type](./tuntap-type/)
+- [ipsec-interface](./ipsec-interface/)
+- [jvm-native-mismatch](./jvm-native-mismatch/)
+- [route-table](./route-table/)
+- [host-route](./host-route/)
+- [hook-markers](./hook-markers/)
+- [rwx-memory-regions](./rwx-memory-regions/)
+- [library-integrity](./library-integrity/)
+- [root-indicators](./root-indicators/)
+- [root-su-binary](./root-su-binary/)
+- [root-property](./root-property/)
+- [root-management](./root-management/)
+- [root-system-rw](./root-system-rw/)
+- [root-suspicious-mount](./root-suspicious-mount/)
+- [root-overlay-mount](./root-overlay-mount/)
+- [root-selinux](./root-selinux/)
+- [root-uid](./root-uid/)
+- [root-magisk-property](./root-magisk-property/)
+- [emulator-qemu-property](./emulator-qemu-property/)
+- [emulator-qemu-pipe](./emulator-qemu-pipe/)
+- [emulator-goldfish](./emulator-goldfish/)
+- [emulator-qemu-driver](./emulator-qemu-driver/)
+- [emulator-bluestacks](./emulator-bluestacks/)
+- [emulator-build-profile](./emulator-build-profile/)
+- [isolation-clone](./isolation-clone/)
+- [isolation-secondary-user](./isolation-secondary-user/)
+- [isolation-work-profile](./isolation-work-profile/)
+- [emulator-indicators](./emulator-indicators/)
+- [isolation-profile](./isolation-profile/)
+- [vpn-property](./vpn-property/)
+- [dns-property](./dns-property/)
+- [vpn-file](./vpn-file/)
+- [vpnhide](./vpnhide/)
+- [lsposed](./lsposed/)
+- [hook-property](./hook-property/)
+- [tcp-vpn-port](./tcp-vpn-port/)
+- [udp-vpn-port](./udp-vpn-port/)
+- [inet6-vpn-interface](./inet6-vpn-interface/)
+- [route-vpn-interface](./route-vpn-interface/)
+- [arp-vpn-interface](./arp-vpn-interface/)
+- [sysctl-forwarding](./sysctl-forwarding/)
+- [sysctl-rp-filter](./sysctl-rp-filter/)
+- [established-vpn-socket](./established-vpn-socket/)
+- [vpn-policy-rules](./vpn-policy-rules/)
+- [vpn-qdisc](./vpn-qdisc/)
+- [hidden-mac-neighbors](./hidden-mac-neighbors/)
+- [tcp-mss-low](./tcp-mss-low/)
+- [so-bindtodevice](./so-bindtodevice/)
+- [loopback-port-conflict](./loopback-port-conflict/)
+- [bpf-map-accessible](./bpf-map-accessible/)
+- [ip-recverr](./ip-recverr/)
+- [syscall-unavailable](./syscall-unavailable/)
+- [sysfs-vpn-leak](./sysfs-vpn-leak/)
+- [getifaddrs-vpn](./getifaddrs-vpn/)
+- [sysclassnet-vpn](./sysclassnet-vpn/)
+- [rtm-getlink-vpn](./rtm-getlink-vpn/)
+- [proc-if-inet6-vpn](./proc-if-inet6-vpn/)
+- [proc-ipv6-route-vpn](./proc-ipv6-route-vpn/)
+- [proc-net-dev-vpn](./proc-net-dev-vpn/)
+- [ifindexname-vpn](./ifindexname-vpn/)
+- [vpn-policy-rules-netlink](./vpn-policy-rules-netlink/)
+- [fib-trie-denied](./fib-trie-denied/)
+- [inet-diag-denied](./inet-diag-denied/)
+- [bindtodevice-leak](./bindtodevice-leak/)
+- [getsockname-leak](./getsockname-leak/)
+- [udp-port-conflict-physical](./udp-port-conflict-physical/)
+- [deep-vpn-qdisc](./deep-vpn-qdisc/)
+- [deep-bpf-map-accessible](./deep-bpf-map-accessible/)
+- [route-count](./route-count/)
+- [trim-oracle](./trim-oracle/)
+- [pmtu-mss-combined](./pmtu-mss-combined/)
+- [udp-pmtu-ok](./udp-pmtu-ok/)
+- [udp-pmtu-fail](./udp-pmtu-fail/)
+- [normal-pmtu](./normal-pmtu/)
+- [timing-oracle](./timing-oracle/)
+- [backpressure](./backpressure/)
+- [gso-failed](./gso-failed/)
+- [gso-send-failed](./gso-send-failed/)
+- [gso-ok](./gso-ok/)
+- [hardware-timestamp](./hardware-timestamp/)
+- [traceroute-denied](./traceroute-denied/)
+- [general-diagnostics](./general-diagnostics/)
+- [unknown-signals](./unknown-signals/)
+
+[返回语言目录](../)

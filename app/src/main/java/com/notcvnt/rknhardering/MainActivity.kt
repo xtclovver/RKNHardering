@@ -72,6 +72,7 @@ import com.notcvnt.rknhardering.ui.main.render.DomainReachabilityRenderer
 import com.notcvnt.rknhardering.ui.main.render.FindingViewFactory
 import com.notcvnt.rknhardering.ui.main.render.IpChannelsRenderer
 import com.notcvnt.rknhardering.ui.main.render.IpComparisonRenderer
+import com.notcvnt.rknhardering.ui.main.render.NativeSignsRenderer
 import com.notcvnt.rknhardering.ui.main.render.MainRenderEnvironment
 import com.notcvnt.rknhardering.ui.main.render.SimpleResultRenderer
 import com.notcvnt.rknhardering.ui.main.render.TechnicalDataRenderer
@@ -148,6 +149,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusNativeSigns: TextView
     private lateinit var textNativeSignsSummary: TextView
     private lateinit var findingsNativeSigns: LinearLayout
+    private lateinit var btnHelpNativeSigns: ImageButton
+    private lateinit var btnHelpIpComparison: ImageButton
     private lateinit var cardIpChannels: MaterialCardView
     private lateinit var ipChannelsContainer: LinearLayout
     private lateinit var cardVerdict: MaterialCardView
@@ -269,6 +272,7 @@ class MainActivity : AppCompatActivity() {
     private val findingViews by lazy { FindingViewFactory(renderEnv) }
     private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
     private val ipComparisonRenderer by lazy { IpComparisonRenderer(renderEnv) }
+    private val nativeSignsRenderer by lazy { NativeSignsRenderer(renderEnv, findingViews) }
     private val cdnPullingRenderer by lazy { CdnPullingRenderer(renderEnv, findingViews) }
     private val callTransportRenderer by lazy { CallTransportRenderer(renderEnv, findingViews) }
     private val bypassRenderer by lazy { BypassRenderer(renderEnv, findingViews) }
@@ -297,6 +301,13 @@ class MainActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[CheckViewModel::class.java]
         bindViews()
+
+        btnHelpNativeSigns.setOnClickListener {
+            renderEnv.openExternalHelp(NativeSignalCatalog.nativeIndexUrl(this))
+        }
+        btnHelpIpComparison.setOnClickListener {
+            renderEnv.openExternalHelp(NativeSignalCatalog.ipComparisonUrl(this))
+        }
 
         btnRunCheck.setOnClickListener {
             if (viewModel.isRunning.value) {
@@ -435,6 +446,8 @@ class MainActivity : AppCompatActivity() {
         statusNativeSigns = findViewById(R.id.statusNativeSigns)
         textNativeSignsSummary = findViewById(R.id.textNativeSignsSummary)
         findingsNativeSigns = findViewById(R.id.findingsNativeSigns)
+        btnHelpNativeSigns = findViewById(R.id.btnHelpNativeSigns)
+        btnHelpIpComparison = findViewById(R.id.btnHelpIpComparison)
         cardIpChannels = findViewById(R.id.cardIpChannels)
         ipChannelsContainer = findViewById(R.id.ipChannelsContainer)
         cardVerdict = findViewById(R.id.cardVerdict)
@@ -1895,7 +1908,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayNativeSigns(result: CategoryResult, privacyMode: Boolean) {
-        categoryCards.renderNativeSigns(
+        nativeSignsRenderer.render(
             result,
             cardNativeSigns,
             iconNativeSigns,
@@ -2051,12 +2064,19 @@ class MainActivity : AppCompatActivity() {
             },
         )
         holder.chevron.animate()
-            .rotation(if (expanded) 90f else 0f)
+            .rotation(
+                if (expanded) {
+                    if (ViewCompat.getLayoutDirection(holder.header) == ViewCompat.LAYOUT_DIRECTION_RTL) -90f else 90f
+                } else {
+                    0f
+                },
+            )
             .setDuration(200L)
             .start()
         if (expanded) {
             syncExpandedCategoryHint(holder.id)
         }
+        updateTileAccessibility(holder)
     }
 
     private fun setTileStatus(id: String, status: Int, hint: String?) {
@@ -2069,21 +2089,30 @@ class MainActivity : AppCompatActivity() {
             holder.hint.text = hint
         }
         holder.statusDot.contentDescription = statusLabel(semantic)
-        holder.header.contentDescription = buildString {
-            append(holder.title.text)
-            append(". ")
-            append(statusLabel(semantic))
-            holder.hint.text?.takeIf { it.isNotBlank() }?.let { currentHint ->
-                append(". ")
-                append(currentHint)
-            }
-        }
+        updateTileAccessibility(holder)
         if (
             (status == TILE_STATUS_REVIEW || status == TILE_STATUS_DETECTED || status == TILE_STATUS_ERROR) &&
             previousStatus != status
         ) {
             expandCategory(id)
         }
+    }
+
+    private fun updateTileAccessibility(holder: TileHolder) {
+        val expanded = holder.body.visibility == View.VISIBLE
+        val state = getString(if (expanded) R.string.accessibility_expanded else R.string.accessibility_collapsed)
+        holder.header.contentDescription = buildString {
+            append(holder.title.text)
+            append(". ")
+            append(holder.statusDot.contentDescription ?: statusLabel(StatusSemantic.NEUTRAL))
+            holder.hint.text?.takeIf { it.isNotBlank() }?.let { currentHint ->
+                append(". ")
+                append(currentHint)
+            }
+            append(". ")
+            append(state)
+        }
+        ViewCompat.setStateDescription(holder.header, state)
     }
 
     private fun semanticForTileStatus(status: Int): StatusSemantic {

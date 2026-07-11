@@ -291,6 +291,16 @@
                                     tools:text="Все 8 чекеров совпали" />
                             </LinearLayout>
 
+                            <ImageButton
+                                android:id="@+id/btnHelpIpComparison"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/ip_comparison_help_description"
+                                android:padding="12dp"
+                                android:src="@drawable/ic_help"
+                                app:tint="?android:attr/textColorSecondary" />
+
                             <ImageView
                                 android:id="@+id/chevronIpComparison"
                                 android:layout_width="18dp"
@@ -845,6 +855,16 @@
                                     android:textSize="12sp"
                                     tools:text="JNI-проверки пройдены" />
                             </LinearLayout>
+
+                            <ImageButton
+                                android:id="@+id/btnHelpNativeSigns"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/native_help_index_description"
+                                android:padding="12dp"
+                                android:src="@drawable/ic_help"
+                                app:tint="?android:attr/textColorSecondary" />
 
                             <ImageView
                                 android:id="@+id/chevronNativeSigns"

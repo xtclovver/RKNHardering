@@ -1,0 +1,7 @@
+title: RKNHardering Help
+description: Native signs and IP comparison reference
+markdown: kramdown
+exclude:
+  - README.en.md
+  - README.fa.md
+  - README.zh-CN.md

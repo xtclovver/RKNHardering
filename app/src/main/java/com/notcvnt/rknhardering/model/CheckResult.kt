@@ -185,6 +185,7 @@ data class Finding(
     val confidence: EvidenceConfidence? = null,
     val family: String? = null,
     val packageName: String? = null,
+    val nativeSignalId: NativeSignalId? = null,
 )
 
 data class EvidenceItem(
