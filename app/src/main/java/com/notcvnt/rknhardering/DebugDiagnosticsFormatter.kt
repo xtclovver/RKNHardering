@@ -23,6 +23,7 @@ import com.notcvnt.rknhardering.model.LocalProxyOwner
 import com.notcvnt.rknhardering.model.LocalProxyCheckResult
 import com.notcvnt.rknhardering.model.MatchedVpnApp
 import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
+import com.notcvnt.rknhardering.model.displayDescription
 import com.notcvnt.rknhardering.export.sectionStatusTag
 import com.notcvnt.rknhardering.probe.NativeInterfaceProbe
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
@@ -79,6 +80,12 @@ object DebugDiagnosticsFormatter {
         appendLocationSignalsDiagnostics(builder, result.locationSignals)
         appendBypass(builder, result.bypassResult)
         appendCategory(builder, "nativeSigns", result.nativeSigns)
+        appendCategory(builder, "betaChecks", result.betaChecks.category)
+        builder.appendLine("betaNetworkEpochRetryCount: ${result.betaChecks.networkEpochRetryCount}")
+        builder.appendLine(
+            "betaNetworkEpochChanges: " +
+                result.betaChecks.networkEpochChanges.map { it.name }.sorted().joinToString(",").ifBlank { NONE_DASH },
+        )
         appendNativeSignsRaw(builder, privacyMode)
 
         appendOperatorWhitelist(builder, result.operatorWhitelistProbe)
@@ -640,7 +647,19 @@ object DebugDiagnosticsFormatter {
 
     private fun formatFinding(finding: Finding): String {
         return buildList {
-            add("description=${maskIpsInText(finding.description)}")
+            add("description=${maskIpsInText(finding.displayDescription())}")
+            add("maturity=${finding.maturity}")
+            finding.checkId?.let { add("checkId=$it") }
+            finding.availability?.let { add("availability=$it") }
+            finding.rawConfidence?.let { add("rawConfidence=$it") }
+            finding.independenceGroup?.let { add("group=$it") }
+            finding.detectionDomain?.let { add("domain=$it") }
+            if (finding.suppressionRuleIds.isNotEmpty()) {
+                add("suppressions=${finding.suppressionRuleIds.joinToString(",")}")
+            }
+            if (finding.facts.isNotEmpty()) {
+                add("facts=${finding.facts.toSortedMap().entries.joinToString(",") { "${it.key}=${maskIpsInText(it.value)}" }}")
+            }
             add("detected=${finding.detected}")
             add("needsReview=${finding.needsReview}")
             add("error=${finding.isError}")
@@ -660,7 +679,12 @@ object DebugDiagnosticsFormatter {
             item.kind?.let { add("kind=$it") }
             item.family?.let { add("family=$it") }
             item.packageName?.let { add("package=$it") }
-            add("description=${maskIpsInText(item.description)}")
+            add("description=${maskIpsInText(item.displayDescription())}")
+            add("maturity=${item.maturity}")
+            item.checkId?.let { add("checkId=$it") }
+            item.independenceGroup?.let { add("independenceGroup=$it") }
+            add("detectionDomain=${item.detectionDomain}")
+            add("hardSignal=${item.hardSignal}")
         }.joinToString(" ")
     }
 

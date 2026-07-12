@@ -35,6 +35,30 @@ class ResolverBindingTest {
     }
 
     @Test
+    fun `socket binder creates file descriptor before binding to device`() {
+        var fileDescriptorCreated = false
+        val socket = object : Socket() {
+            override fun getReuseAddress(): Boolean {
+                fileDescriptorCreated = true
+                return false
+            }
+        }
+        ResolverSocketBinder.bindSocketToDeviceOverride = { _, _ ->
+            assertTrue(fileDescriptorCreated)
+        }
+
+        socket.use {
+            ResolverSocketBinder.bind(it, ResolverBinding.OsDeviceBinding("tun0"))
+        }
+    }
+
+    @Test
+    fun `socket descriptor ownership changes at api 29`() {
+        assertTrue(ResolverSocketBinder.usesSharedSocketDescriptor(28))
+        assertFalse(ResolverSocketBinder.usesSharedSocketDescriptor(29))
+    }
+
+    @Test
     fun `socket binding infrastructure failure is propagated`() {
         Socket().use { socket ->
             assertThrows(RuntimeException::class.java) {

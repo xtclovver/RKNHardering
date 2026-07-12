@@ -12,6 +12,7 @@ import com.notcvnt.rknhardering.NativeSignalCatalog
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.StatusVisualResolver
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.displayDescription
 import com.notcvnt.rknhardering.util.maskIpsInText
 
 /**
@@ -26,7 +27,8 @@ internal class FindingViewFactory(
     fun createFindingView(finding: Finding, privacyMode: Boolean = false): View {
         val semantic = statusSemantic(finding.detected, finding.needsReview, finding.isError)
         val visual = statusVisual(semantic)
-        val descriptionText = if (privacyMode) maskIpsInText(finding.description) else finding.description
+        val displayDescription = finding.displayDescription()
+        val descriptionText = if (privacyMode) maskIpsInText(displayDescription) else displayDescription
         val row = LinearLayout(themedContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.TOP
@@ -73,21 +75,26 @@ internal class FindingViewFactory(
     fun createNativeFindingView(finding: Finding, privacyMode: Boolean = false): View {
         val info = NativeSignalCatalog.info(finding.nativeSignalId)
         return LinearLayout(themedContext()).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
             tag = "native-finding:${info.id.name}"
-            addView(createFindingView(finding, privacyMode))
+            addView(
+                createFindingView(finding, privacyMode),
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+            )
             addView(
                 MaterialButton(
                     themedContext(),
                     null,
                     com.google.android.material.R.attr.borderlessButtonStyle,
                 ).apply {
-                    text = getString(R.string.native_help_open)
+                    text = ""
                     setIconResource(R.drawable.ic_help)
-                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    iconPadding = 0
                     minHeight = 48.dp
                     minimumHeight = 48.dp
-                    textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                    minWidth = 48.dp
+                    minimumWidth = 48.dp
                     contentDescription = getString(
                         R.string.native_help_open_description,
                         NativeSignalCatalog.title(env.context, finding.nativeSignalId),

@@ -305,6 +305,11 @@ internal object SimpleResultModels {
                 EvidenceSource.ICMP_SPOOFING,
                 EvidenceSource.RTT_TRIANGULATION,
                 -> SimpleSignalArea.REMOTE_SITE
+                else -> if (source.name.startsWith("BETA_")) {
+                    SimpleSignalArea.DEVICE_ENVIRONMENT
+                } else {
+                    SimpleSignalArea.NONE
+                }
             }
         }
         return when (areas.size) {
@@ -360,6 +365,11 @@ internal object SimpleResultModels {
         EvidenceSource.INSTALLED_APP,
         EvidenceSource.VPN_SERVICE_DECLARATION,
         -> null
+        else -> if (source.name.startsWith("BETA_")) {
+            SimpleResultCause.DEVICE_ENVIRONMENT
+        } else {
+            null
+        }
     }
 
     private fun errorCause(source: EvidenceSource?): SimpleResultCause = when (source) {

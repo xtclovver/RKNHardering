@@ -22,6 +22,7 @@ import com.notcvnt.rknhardering.customcheck.RttTarget
 import com.notcvnt.rknhardering.customcheck.RttTriangulationConfig
 import com.notcvnt.rknhardering.customcheck.StunServer
 import com.notcvnt.rknhardering.model.BypassResult
+import com.notcvnt.rknhardering.model.BetaCheckResult
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
@@ -43,6 +44,7 @@ import com.notcvnt.rknhardering.probe.OperatorWhitelistProbeResult
 import com.notcvnt.rknhardering.probe.TunProbeModeOverride
 import com.notcvnt.rknhardering.probe.UnderlyingNetworkProber
 import com.notcvnt.rknhardering.checker.TunInterfaceInfo
+import com.notcvnt.rknhardering.model.PrivilegedProbeProvider
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +53,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
+
+data class BetaCheckSettings(
+    val enabled: Boolean = false,
+    val hiddenAndroidApis: Boolean = true,
+    val kernelNetlink: Boolean = true,
+    val socketOracles: Boolean = true,
+    val profileIsolation: Boolean = true,
+    val sandboxIntegrity: Boolean = true,
+    val bpfNetfilter: Boolean = false,
+    val aggressive: Boolean = false,
+    val privilegedChecksEnabled: Boolean = false,
+    val privilegedProvider: PrivilegedProbeProvider = PrivilegedProbeProvider.NONE,
+)
 
 data class CheckSettings(
     val splitTunnelEnabled: Boolean = true,
@@ -75,6 +90,7 @@ data class CheckSettings(
     val splitTunnelCheckUnderlyingNetwork: Boolean = true,
     val splitTunnelCheckVpnNetworkBinding: Boolean = true,
     val splitTunnelCheckMtprotoViaProxy: Boolean = true,
+    val beta: BetaCheckSettings = BetaCheckSettings(),
 
     // === Per-checker custom-profile parameters (defaults preserve legacy behaviour) ===
     val geoIp: GeoIpConfig = GeoIpConfig(),
@@ -102,6 +118,7 @@ sealed interface CheckUpdate {
     data class IndirectSignsReady(val result: CategoryResult) : CheckUpdate
     data class LocationSignalsReady(val result: CategoryResult) : CheckUpdate
     data class NativeSignsReady(val result: CategoryResult) : CheckUpdate
+    data class BetaChecksReady(val result: BetaCheckResult) : CheckUpdate
     data class BypassProgress(val progress: BypassChecker.Progress) : CheckUpdate
     data class BypassReady(val result: BypassResult) : CheckUpdate
     data class IpConsensusReady(val result: IpConsensusResult) : CheckUpdate
@@ -181,6 +198,7 @@ object VpnCheckRunner {
             },
         val nativeCheck: suspend (Context) -> CategoryResult =
             { ctx -> NativeSignsChecker.check(ctx) },
+        val betaChecks: BetaChecksDependency = BetaChecksChecker,
         val domainReachabilityCheck: suspend (Context, List<CustomDomain>, DnsResolverConfig) -> DomainReachabilityResult =
             { ctx, domains, resolverConfig -> DomainReachabilityChecker.check(ctx, domains, resolverConfig) },
         val bypassCheck: suspend (
@@ -521,6 +539,21 @@ object VpnCheckRunner {
                 dependencies.nativeCheck(context)
             }
         } else null
+        val betaDeferred = if (settings.beta.enabled) {
+            safeAsync(context = Dispatchers.IO, fallback = {
+                BetaCheckResult.error(context.getString(R.string.beta_checks_error))
+            }) {
+                dependencies.betaChecks.check(
+                    BetaChecksRequest(
+                        context = context,
+                        settings = settings.beta,
+                        resolverConfig = settings.resolverConfig,
+                        networkRequestsEnabled = settings.networkRequestsEnabled,
+                        executionContext = executionContext,
+                    ),
+                )
+            }
+        } else null
         val domainReachabilityDeferred = if (settings.domainReachabilityEnabled && settings.reachabilityDomains.isNotEmpty()) {
             safeAsync(context = Dispatchers.IO, fallback = { Fallbacks.domainReachability(it) }) {
                 dependencies.domainReachabilityCheck(context, settings.reachabilityDomains, settings.resolverConfig)
@@ -562,6 +595,7 @@ object VpnCheckRunner {
         val indirectReadyDeferred = publishOnReady(indirectDeferred, executionContext, onUpdate, CheckUpdate::IndirectSignsReady)
         val locationReadyDeferred = publishOnReady(locationDeferred, executionContext, onUpdate, CheckUpdate::LocationSignalsReady)
         val nativeReadyDeferred = publishOnReady(nativeDeferred, executionContext, onUpdate, CheckUpdate::NativeSignsReady)
+        val betaReadyDeferred = publishOnReady(betaDeferred, executionContext, onUpdate, CheckUpdate::BetaChecksReady)
         val domainReachabilityReadyDeferred = publishOnReady(domainReachabilityDeferred, executionContext, onUpdate, CheckUpdate::DomainReachabilityReady)
         val bypassReadyDeferred = publishOnReady(bypassDeferred, executionContext, onUpdate, CheckUpdate::BypassReady)
 
@@ -637,6 +671,7 @@ object VpnCheckRunner {
         val indirectSigns = indirectReadyDeferred?.await() ?: emptyIndirect
         val locationSignals = locationReadyDeferred?.await() ?: emptyLocation
         val nativeSigns = nativeReadyDeferred?.await() ?: emptyNative
+        val betaChecks = betaReadyDeferred?.await() ?: BetaCheckResult.disabled()
         val bypassResult = bypassReadyDeferred?.await() ?: emptyBypass
         val domainReachability = domainReachabilityReadyDeferred?.await() ?: DomainReachabilityResult.empty()
         val tunProbeResult = tunActiveProbeDeferred?.await()
@@ -678,6 +713,8 @@ object VpnCheckRunner {
             bypassResult = bypassResult,
             ipConsensus = ipConsensus,
             nativeSigns = nativeSigns,
+            betaSigns = betaChecks.category,
+            betaEnabled = settings.beta.enabled,
             icmpSpoofing = icmpSpoofing,
             geoCheckAvailable = settings.networkRequestsEnabled,
         )
@@ -695,6 +732,9 @@ object VpnCheckRunner {
         DiagnosticResultRecorder.recordCategory(diagnosticCollector, "ind", "IndirectSignsChecker", indirectSigns)
         DiagnosticResultRecorder.recordCategory(diagnosticCollector, "loc", "LocationSignalsChecker", locationSignals)
         DiagnosticResultRecorder.recordCategory(diagnosticCollector, "nat", "NativeSignsChecker", nativeSigns)
+        if (settings.beta.enabled) {
+            DiagnosticResultRecorder.recordCategory(diagnosticCollector, "bet", "BetaChecksChecker", betaChecks.category)
+        }
         DiagnosticResultRecorder.recordCategory(diagnosticCollector, "icmp", "IcmpSpoofingChecker", icmpSpoofing)
         DiagnosticResultRecorder.recordCategory(diagnosticCollector, "rtt", "RttTriangulationChecker", rttTriangulation)
         DiagnosticResultRecorder.recordBypass(diagnosticCollector, bypassResult)
@@ -736,6 +776,7 @@ object VpnCheckRunner {
             verdict = verdict,
             tunProbeDiagnostics = tunProbeResult?.tunProbeDiagnostics,
             nativeSigns = nativeSigns,
+            betaChecks = betaChecks,
             icmpSpoofing = icmpSpoofing,
             rttTriangulation = rttTriangulation,
             ipConsensus = ipConsensus,

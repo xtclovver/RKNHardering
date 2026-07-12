@@ -45,6 +45,7 @@ internal object CategoryTiles {
     const val LOC = "loc"
     const val BYP = "byp"
     const val NAT = "nat"
+    const val BET = "bet"
     const val REA = "rea"
 
     val ALL: List<TileSpec> = listOf(
@@ -136,6 +137,21 @@ internal object CategoryTiles {
                 hint = R.id.headerHintNativeSigns,
                 chevron = R.id.chevronNativeSigns,
                 body = R.id.bodyNativeSigns,
+            ),
+        ),
+        TileSpec(
+            id = BET,
+            titleRes = R.string.main_card_beta_checks,
+            iconRes = R.drawable.ic_tune,
+            views = TileViewIds(
+                card = R.id.cardBetaChecks,
+                header = R.id.headerBetaChecks,
+                dot = R.id.headerDotBetaChecks,
+                icon = R.id.headerIconBetaChecks,
+                title = R.id.headerTitleBetaChecks,
+                hint = R.id.headerHintBetaChecks,
+                chevron = R.id.chevronBetaChecks,
+                body = R.id.bodyBetaChecks,
             ),
         ),
         TileSpec(

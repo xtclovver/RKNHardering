@@ -4,8 +4,10 @@ import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportNetworkPath
 import com.notcvnt.rknhardering.model.CallTransportStatus
 import com.notcvnt.rknhardering.model.CategoryResult
+import com.notcvnt.rknhardering.model.DetectionDomain
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
+import com.notcvnt.rknhardering.model.EvidenceMaturity
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.Verdict
 import com.notcvnt.rknhardering.model.VerdictDecision
@@ -13,6 +15,16 @@ import com.notcvnt.rknhardering.model.VerdictParticipant
 import com.notcvnt.rknhardering.model.VerdictRuleCode
 
 object VerdictEngine {
+
+    private val NETWORK_DOMAINS = setOf(
+        DetectionDomain.VPN_OR_PROXY,
+        DetectionDomain.NETWORK_PATH_DIVERGENCE,
+    )
+
+    private val TAMPER_DOMAINS = setOf(
+        DetectionDomain.APP_VIRTUALIZATION,
+        DetectionDomain.HOOK_OR_TAMPERING,
+    )
 
     private val HARD_DETECT_BYPASS = setOf(
         EvidenceSource.SPLIT_TUNNEL_BYPASS,
@@ -48,6 +60,21 @@ object VerdictEngine {
         EvidenceSource.SANDBOX_ISOLATION,
     )
 
+    private val STABLE_NETWORK_GROUPS = mapOf(
+        EvidenceSource.DIRECT_NETWORK_CAPABILITIES to "android_connectivity",
+        EvidenceSource.SYSTEM_PROXY to "android_proxy",
+        EvidenceSource.ACTIVE_VPN to "android_vpn_service",
+        EvidenceSource.NETWORK_INTERFACE to "kernel_link",
+        EvidenceSource.ROUTING to "kernel_route",
+        EvidenceSource.DNS to "dns_path",
+        EvidenceSource.PROXY_TECHNICAL_SIGNAL to "local_control_plane",
+        EvidenceSource.SPLIT_TUNNEL_BYPASS to "active_egress",
+        EvidenceSource.PROXY_AUTH_BYPASS to "android_proxy",
+        EvidenceSource.VPN_GATEWAY_LEAK to "active_egress",
+        EvidenceSource.VPN_NETWORK_BINDING to "android_connectivity",
+        EvidenceSource.TUN_ACTIVE_PROBE to "active_egress",
+    )
+
     fun evaluate(
         geoIp: CategoryResult,
         directSigns: CategoryResult,
@@ -56,6 +83,8 @@ object VerdictEngine {
         bypassResult: BypassResult,
         ipConsensus: IpConsensusResult,
         nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        betaSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        betaEnabled: Boolean = false,
         icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         geoCheckAvailable: Boolean = true,
     ): Verdict = evaluateDetailed(
@@ -66,6 +95,8 @@ object VerdictEngine {
         bypassResult = bypassResult,
         ipConsensus = ipConsensus,
         nativeSigns = nativeSigns,
+        betaSigns = betaSigns,
+        betaEnabled = betaEnabled,
         icmpSpoofing = icmpSpoofing,
         geoCheckAvailable = geoCheckAvailable,
     ).verdict
@@ -78,6 +109,8 @@ object VerdictEngine {
         bypassResult: BypassResult,
         ipConsensus: IpConsensusResult,
         nativeSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        betaSigns: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
+        betaEnabled: Boolean = false,
         icmpSpoofing: CategoryResult = CategoryResult(name = "", detected = false, findings = emptyList()),
         geoCheckAvailable: Boolean = true,
     ): VerdictDecision {
@@ -92,6 +125,14 @@ object VerdictEngine {
                 participant("hard_bypass", hardBypassSources),
             )
         }
+
+        evaluateBetaRule(
+            betaEnabled = betaEnabled,
+            betaSigns = betaSigns,
+            directSigns = directSigns,
+            indirectSigns = indirectSigns,
+            bypassResult = bypassResult,
+        )?.let { return it }
 
         val geoAxis = ipConsensus.foreignIps.isNotEmpty() ||
             ipConsensus.geoCountryMismatch ||
@@ -195,6 +236,17 @@ object VerdictEngine {
                     (it.source == EvidenceSource.NATIVE_SOCKET && it.confidence == EvidenceConfidence.HIGH)
                 )
         }
+        val betaReviewEvidence = if (betaEnabled) {
+            betaSigns.evidence.filter {
+                it.detected &&
+                    it.maturity == EvidenceMaturity.BETA &&
+                    it.confidence != EvidenceConfidence.LOW &&
+                    it.detectionDomain != DetectionDomain.SYSTEM_NETWORK_CONTEXT
+            }
+        } else {
+            emptyList()
+        }
+        val betaReviewHit = betaReviewEvidence.isNotEmpty()
         val tunProbeReview = directSigns.evidence.any {
             it.source == EvidenceSource.TUN_ACTIVE_PROBE && !it.detected
         }
@@ -207,6 +259,7 @@ object VerdictEngine {
                     hasActionableCallTransportLeak ||
                     icmpSpoofing.needsReview ||
                     nativeReviewHit ||
+                    betaReviewHit ||
                     ipConsensus.needsReview ||
                     ipConsensus.channelConflict.isNotEmpty() ||
                     ipConsensus.probeTargetDivergence ||
@@ -221,12 +274,22 @@ object VerdictEngine {
                 if (hasActionableCallTransportLeak) add(participant("call_transport_leak"))
                 if (icmpSpoofing.needsReview) add(participant("icmp_needs_review", setOf(EvidenceSource.ICMP_SPOOFING)))
                 if (nativeReviewHit) add(participant("native_needs_review", nativeSigns.evidence.mapTo(linkedSetOf()) { it.source }))
+                if (betaReviewHit) add(participant("beta_needs_review", betaReviewEvidence.mapTo(linkedSetOf()) { it.source }))
                 if (ipConsensus.needsReview) add(participant("ip_consensus_needs_review"))
                 if (ipConsensus.channelConflict.isNotEmpty()) add(participant("ip_channel_conflict"))
                 if (ipConsensus.probeTargetDivergence) add(participant("probe_target_divergence"))
                 if (tunProbeReview) add(participant("tun_probe_review", setOf(EvidenceSource.TUN_ACTIVE_PROBE)))
             }
-            return decision(Verdict.NEEDS_REVIEW, VerdictRuleCode.R6_FALLBACK, *participants.toTypedArray())
+            return if (betaReviewHit) {
+                betaDecision(
+                    Verdict.NEEDS_REVIEW,
+                    VerdictRuleCode.R6_FALLBACK,
+                    betaReviewEvidence.mapTo(linkedSetOf()) { it.detectionDomain },
+                    *participants.toTypedArray(),
+                )
+            } else {
+                decision(Verdict.NEEDS_REVIEW, VerdictRuleCode.R6_FALLBACK, *participants.toTypedArray())
+            }
         }
 
         val matrixSources = buildSet {
@@ -252,6 +315,103 @@ object VerdictEngine {
         factor: String,
         sources: Set<EvidenceSource> = emptySet(),
     ): VerdictParticipant = VerdictParticipant(factor = factor, evidenceSources = sources)
+
+    private fun evaluateBetaRule(
+        betaEnabled: Boolean,
+        betaSigns: CategoryResult,
+        directSigns: CategoryResult,
+        indirectSigns: CategoryResult,
+        bypassResult: BypassResult,
+    ): VerdictDecision? {
+        if (!betaEnabled) return null
+        val positive = betaSigns.evidence.filter {
+            it.detected &&
+                it.maturity == EvidenceMaturity.BETA &&
+                it.confidence != EvidenceConfidence.LOW &&
+                it.detectionDomain != DetectionDomain.SYSTEM_NETWORK_CONTEXT
+        }
+        if (positive.isEmpty()) return null
+
+        positive.firstOrNull {
+            it.hardSignal && it.confidence == EvidenceConfidence.HIGH
+        }?.let { hard ->
+            return betaDecision(
+                verdict = Verdict.DETECTED,
+                rule = VerdictRuleCode.R2_BETA_EVIDENCE,
+                domains = setOf(hard.detectionDomain),
+                participant("beta_hard:${hard.checkId}", setOf(hard.source)),
+            )
+        }
+
+        fun groupsFor(domains: Set<DetectionDomain>): Set<String> = positive.asSequence()
+            .filter { it.detectionDomain in domains }
+            .mapNotNull { it.independenceGroup }
+            .toSet()
+
+        val networkGroups = groupsFor(NETWORK_DOMAINS)
+        val tamperGroups = groupsFor(TAMPER_DOMAINS)
+        val isolationGroups = groupsFor(setOf(DetectionDomain.ISOLATED_PROFILE))
+        val stableEvidence = sequenceOf(
+            directSigns.evidence.asSequence(),
+            indirectSigns.evidence.asSequence(),
+            bypassResult.evidence.asSequence(),
+        ).flatten().filter { it.detected && it.source in STABLE_NETWORK_GROUPS }
+        val independentStableSources = stableEvidence
+            .filter { STABLE_NETWORK_GROUPS[it.source] !in networkGroups }
+            .mapTo(linkedSetOf()) { it.source }
+
+        return when {
+            networkGroups.size >= 2 -> betaDecision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R2_BETA_EVIDENCE,
+                NETWORK_DOMAINS,
+                participant(
+                    "beta_network_groups=${networkGroups.sorted().joinToString(",")}",
+                    positive.filter { it.detectionDomain in NETWORK_DOMAINS }
+                        .mapTo(linkedSetOf()) { it.source },
+                ),
+            )
+            networkGroups.isNotEmpty() && independentStableSources.isNotEmpty() -> betaDecision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R2_BETA_EVIDENCE,
+                NETWORK_DOMAINS,
+                participant("beta_plus_stable_network", independentStableSources),
+            )
+            isolationGroups.isNotEmpty() &&
+                (networkGroups.isNotEmpty() || independentStableSources.isNotEmpty()) -> betaDecision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R2_BETA_EVIDENCE,
+                setOf(DetectionDomain.ISOLATED_PROFILE, DetectionDomain.NETWORK_PATH_DIVERGENCE),
+                participant(
+                    "isolated_context_plus_network_signal",
+                    positive.mapTo(linkedSetOf()) { it.source },
+                ),
+            )
+            tamperGroups.size >= 2 -> betaDecision(
+                Verdict.DETECTED,
+                VerdictRuleCode.R2_BETA_EVIDENCE,
+                TAMPER_DOMAINS,
+                participant(
+                    "beta_tamper_groups=${tamperGroups.sorted().joinToString(",")}",
+                    positive.filter { it.detectionDomain in TAMPER_DOMAINS }
+                        .mapTo(linkedSetOf()) { it.source },
+                ),
+            )
+            else -> null
+        }
+    }
+
+    private fun betaDecision(
+        verdict: Verdict,
+        rule: VerdictRuleCode,
+        domains: Set<DetectionDomain>,
+        vararg participants: VerdictParticipant,
+    ): VerdictDecision = VerdictDecision(
+        verdict = verdict,
+        rule = rule,
+        participants = participants.toList(),
+        detectionDomains = domains,
+    )
 
     private fun decision(
         verdict: Verdict,

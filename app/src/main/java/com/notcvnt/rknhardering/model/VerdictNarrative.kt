@@ -46,7 +46,7 @@ object VerdictNarrativeBuilder {
         val exposureStatus = determineExposureStatus(snapshot)
 
         return VerdictNarrative(
-            explanation = buildExplanation(context, result.verdict, exposureStatus),
+            explanation = buildExplanation(context, result, exposureStatus),
             exposureStatus = exposureStatus,
             meaningRows = buildMeaningRows(context, result.verdict, exposureStatus),
             discoveredRows = buildDiscoveredRows(context, snapshot, exposureStatus, privacyMode),
@@ -128,8 +128,18 @@ object VerdictNarrativeBuilder {
         }
     }
 
-    private fun buildExplanation(context: Context, verdict: Verdict, exposureStatus: ExposureStatus): String {
-        val base = when (verdict) {
+    private fun buildExplanation(context: Context, result: CheckResult, exposureStatus: ExposureStatus): String {
+        val domains = result.verdictDecision.detectionDomains
+        if (result.verdictDecision.rule == VerdictRuleCode.R2_BETA_EVIDENCE &&
+            domains.any { it == DetectionDomain.APP_VIRTUALIZATION || it == DetectionDomain.HOOK_OR_TAMPERING } &&
+            domains.none { it == DetectionDomain.VPN_OR_PROXY || it == DetectionDomain.NETWORK_PATH_DIVERGENCE }
+        ) {
+            return context.getString(R.string.narrative_explanation_beta_tampering)
+        }
+        if (domains == setOf(DetectionDomain.ISOLATED_PROFILE)) {
+            return context.getString(R.string.narrative_explanation_beta_isolation)
+        }
+        val base = when (result.verdict) {
             Verdict.DETECTED -> context.getString(R.string.narrative_explanation_detected)
             Verdict.NEEDS_REVIEW -> context.getString(R.string.narrative_explanation_needs_review)
             Verdict.NOT_DETECTED -> context.getString(R.string.narrative_explanation_not_detected)
@@ -284,6 +294,10 @@ object VerdictNarrativeBuilder {
         if (result.icmpSpoofing.needsReview) {
             reasons += context.getString(R.string.narrative_reason_icmp_signal)
         }
+        result.betaChecks.category.findings
+            .filter { it.detected || it.needsReview }
+            .take(2)
+            .forEach { reasons += it.displayDescription() }
 
         if (reasons.isEmpty()) {
             reasons += when (result.verdict) {
@@ -316,6 +330,8 @@ object VerdictNarrativeBuilder {
             result.ipComparison.needsReview ||
             result.icmpSpoofing.detected ||
             result.icmpSpoofing.needsReview ||
+            result.betaChecks.category.detected ||
+            result.betaChecks.category.needsReview ||
             result.directSigns.findings.any { it.source == EvidenceSource.TUN_ACTIVE_PROBE } ||
             result.indirectSigns.callTransportLeaks.any { it.status == CallTransportStatus.NEEDS_REVIEW } ||
             result.bypassResult.findings.any {

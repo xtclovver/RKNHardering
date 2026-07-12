@@ -1,6 +1,7 @@
 package com.notcvnt.rknhardering.customcheck
 
 import com.notcvnt.rknhardering.checker.CheckSettings
+import com.notcvnt.rknhardering.checker.BetaCheckSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,6 +13,17 @@ class CustomCheckRunnerTest {
 
     private fun defaultProfile(name: String = "Test"): CustomCheckProfile =
         CustomCheckProfile(name = name)
+
+    @Test
+    fun `custom profile cannot change local beta preference`() {
+        val beta = BetaCheckSettings(enabled = true, bpfNetfilter = true)
+        val settings = CustomCheckRunner.toCheckSettings(
+            defaultProfile(),
+            baseSettings.copy(beta = beta),
+        )
+
+        assertEquals(beta, settings.beta)
+    }
 
     // ── default profile maps to expected defaults ──────────────────────────────
 

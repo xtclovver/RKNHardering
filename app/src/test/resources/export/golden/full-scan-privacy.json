@@ -8,6 +8,10 @@
   },
   "verdict": {
     "value": "DETECTED",
+    "rule": "UNSPECIFIED",
+    "ruleCode": "unknown",
+    "detectionDomains": [],
+    "participants": [],
     "status": "[DETECTED]",
     "explanation": "The automated check considers the bypass confirmed. The local Xray API exposed a remote endpoint address.",
     "exposureStatus": "REMOTE_ENDPOINT_DISCOVERED",
@@ -76,6 +80,7 @@
       "needsReview": false,
       "hasError": false,
       "status": "[DETECTED]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "GeoIP says 203.0.*.*",
@@ -83,7 +88,8 @@
           "needsReview": false,
           "isInformational": true,
           "isError": false,
-          "source": "GEO_IP"
+          "source": "GEO_IP",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [
@@ -91,7 +97,10 @@
           "source": "GEO_IP",
           "detected": true,
           "confidence": "HIGH",
-          "description": "Hosting signal for 203.0.*.*"
+          "description": "Hosting signal for 203.0.*.*",
+          "maturity": "STABLE",
+          "detectionDomain": "VPN_OR_PROXY",
+          "hardSignal": false
         }
       ],
       "matchedApps": [],
@@ -171,7 +180,8 @@
           "needsReview": false,
           "isInformational": false,
           "isError": false,
-          "source": "SPLIT_TUNNEL_BYPASS"
+          "source": "SPLIT_TUNNEL_BYPASS",
+          "maturity": "STABLE"
         }
       ],
       "responses": [
@@ -198,6 +208,7 @@
       "needsReview": false,
       "hasError": false,
       "status": "[DETECTED]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "Installed app com.example.vpn at 198.51.*.*",
@@ -208,7 +219,8 @@
           "source": "INSTALLED_APP",
           "confidence": "HIGH",
           "family": "v2ray",
-          "packageName": "com.example.vpn"
+          "packageName": "com.example.vpn",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [
@@ -219,7 +231,10 @@
           "description": "VPN service active",
           "family": "v2ray",
           "packageName": "com.example.vpn",
-          "kind": "TARGETED_BYPASS"
+          "kind": "TARGETED_BYPASS",
+          "maturity": "STABLE",
+          "detectionDomain": "VPN_OR_PROXY",
+          "hardSignal": false
         }
       ],
       "matchedApps": [
@@ -276,6 +291,7 @@
       "needsReview": false,
       "hasError": false,
       "status": "[DETECTED]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "Indirect route mismatch 198.51.*.*",
@@ -283,7 +299,8 @@
           "needsReview": false,
           "isInformational": false,
           "isError": false,
-          "source": "ROUTING"
+          "source": "ROUTING",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [],
@@ -339,6 +356,7 @@
       "needsReview": false,
       "hasError": false,
       "status": "[DETECTED]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "Native getifaddrs() reports tun0",
@@ -347,7 +365,8 @@
           "isInformational": false,
           "isError": false,
           "source": "NATIVE_INTERFACE",
-          "confidence": "HIGH"
+          "confidence": "HIGH",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [
@@ -355,7 +374,10 @@
           "source": "NATIVE_INTERFACE",
           "detected": true,
           "confidence": "HIGH",
-          "description": "native interface tun0 is visible"
+          "description": "native interface tun0 is visible",
+          "maturity": "STABLE",
+          "detectionDomain": "VPN_OR_PROXY",
+          "hardSignal": false
         }
       ],
       "matchedApps": [],
@@ -363,12 +385,30 @@
       "callTransportLeaks": [],
       "stunProbeGroups": []
     },
+    "betaChecks": {
+      "name": "β Бета-проверки",
+      "detected": false,
+      "needsReview": false,
+      "hasError": false,
+      "status": "[OK]",
+      "maturity": "BETA",
+      "findings": [],
+      "evidence": [],
+      "matchedApps": [],
+      "activeApps": [],
+      "callTransportLeaks": [],
+      "stunProbeGroups": [],
+      "availabilitySummary": {},
+      "networkEpochChanges": [],
+      "networkEpochRetryCount": 0
+    },
     "icmpSpoofing": {
       "name": "ICMP spoofing",
       "detected": false,
       "needsReview": true,
       "hasError": false,
       "status": "[REVIEW]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "instagram.com replied and google.com was too fast",
@@ -376,14 +416,16 @@
           "needsReview": true,
           "isInformational": false,
           "isError": false,
-          "source": "ICMP_SPOOFING"
+          "source": "ICMP_SPOOFING",
+          "maturity": "STABLE"
         },
         {
           "description": "Blocked target instagram.com (157.240.*.*): 3\/3 replies",
           "detected": false,
           "needsReview": false,
           "isInformational": true,
-          "isError": false
+          "isError": false,
+          "maturity": "STABLE"
         }
       ],
       "evidence": [
@@ -391,7 +433,10 @@
           "source": "ICMP_SPOOFING",
           "detected": true,
           "confidence": "MEDIUM",
-          "description": "ICMP route behavior looked inconsistent"
+          "description": "ICMP route behavior looked inconsistent",
+          "maturity": "STABLE",
+          "detectionDomain": "VPN_OR_PROXY",
+          "hardSignal": false
         }
       ],
       "matchedApps": [],
@@ -405,6 +450,7 @@
       "needsReview": true,
       "hasError": false,
       "status": "[REVIEW]",
+      "maturity": "STABLE",
       "findings": [
         {
           "description": "RTT target mix needs review",
@@ -412,7 +458,8 @@
           "needsReview": true,
           "isInformational": false,
           "isError": false,
-          "source": "RTT_TRIANGULATION"
+          "source": "RTT_TRIANGULATION",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [],
@@ -427,6 +474,7 @@
       "needsReview": false,
       "hasError": false,
       "status": "[OK]",
+      "maturity": "STABLE",
       "findings": [],
       "evidence": [],
       "matchedApps": [],
@@ -520,7 +568,8 @@
           "isInformational": false,
           "isError": false,
           "source": "SPLIT_TUNNEL_BYPASS",
-          "confidence": "HIGH"
+          "confidence": "HIGH",
+          "maturity": "STABLE"
         }
       ],
       "evidence": [
@@ -528,7 +577,10 @@
           "source": "XRAY_API",
           "detected": true,
           "confidence": "HIGH",
-          "description": "Xray exposed 198.51.*.*"
+          "description": "Xray exposed 198.51.*.*",
+          "maturity": "STABLE",
+          "detectionDomain": "VPN_OR_PROXY",
+          "hardSignal": false
         }
       ]
     }

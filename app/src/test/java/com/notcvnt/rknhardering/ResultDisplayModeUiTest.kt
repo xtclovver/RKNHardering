@@ -158,7 +158,10 @@ class ResultDisplayModeUiTest {
         )
         invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
         val groupHeader = findByTag(activity, "native-group-header:ROUTES") as LinearLayout
-        val help = findMaterialButton(activity.findViewById(R.id.bodyNativeSigns), activity.getString(R.string.native_help_open))!!
+        val help = findMaterialButtonByContentDescription(
+            activity.findViewById(R.id.bodyNativeSigns),
+            activity.getString(R.string.native_help_open_description, NativeSignalCatalog.title(activity, NativeSignalId.ROUTE_TABLE)),
+        )!!
         val chevron = groupHeader.getChildAt(groupHeader.childCount - 1) as ImageView
 
         assertTrue(groupHeader.minimumHeight >= (48 * activity.resources.displayMetrics.density).toInt())
@@ -166,6 +169,8 @@ class ResultDisplayModeUiTest {
         assertEquals(-90f, chevron.rotation)
         assertTrue(help.minimumHeight >= (48 * activity.resources.displayMetrics.density).toInt())
         assertTrue(help.contentDescription.isNotBlank())
+        assertEquals("", help.text.toString())
+        assertEquals(help, (help.parent as LinearLayout).getChildAt(1))
     }
 
     @Test
@@ -190,7 +195,10 @@ class ResultDisplayModeUiTest {
             findings = listOf(Finding("route", detected = true, nativeSignalId = NativeSignalId.ROUTE_TABLE)),
         )
         invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.NativeSignsReady(native)), false)
-        findMaterialButton(activity.findViewById(R.id.bodyNativeSigns), activity.getString(R.string.native_help_open))!!.performClick()
+        findMaterialButtonByContentDescription(
+            activity.findViewById(R.id.bodyNativeSigns),
+            activity.getString(R.string.native_help_open_description, NativeSignalCatalog.title(activity, NativeSignalId.ROUTE_TABLE)),
+        )!!.performClick()
         assertEquals(
             "https://xtclovver.github.io/RKNHardering/help/zh-CN/native/route-table/",
             shadowOf(activity).nextStartedActivity.data.toString(),
@@ -431,6 +439,14 @@ class ResultDisplayModeUiTest {
         if (root is MaterialButton && root.text.toString() == text) return root
         if (root !is ViewGroup) return null
         return (0 until root.childCount).firstNotNullOfOrNull { findMaterialButton(root.getChildAt(it), text) }
+    }
+
+    private fun findMaterialButtonByContentDescription(root: View, description: String): MaterialButton? {
+        if (root is MaterialButton && root.contentDescription?.toString() == description) return root
+        if (root !is ViewGroup) return null
+        return (0 until root.childCount).firstNotNullOfOrNull {
+            findMaterialButtonByContentDescription(root.getChildAt(it), description)
+        }
     }
 
     private fun findTextView(root: View, predicate: (TextView) -> Boolean): TextView? {

@@ -93,6 +93,11 @@ add_library(
     native_signs_probe
     SHARED
     native_signs_probe.cpp
+    beta_socket_probe.cpp
+    beta_netlink_probe.cpp
+    beta_kernel_probe.cpp
+    beta_local_probe.cpp
+    beta_sandbox_probe.cpp
 )
 
 target_compile_options(

@@ -22,6 +22,7 @@ import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
+import com.notcvnt.rknhardering.model.EvidenceMaturity
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
@@ -482,6 +483,18 @@ class MainActivityUiRenderingTest {
             row.contentDescription.toString(),
             activity.getString(R.string.main_card_status_detected),
         )
+    }
+
+    @Test
+    fun `beta finding UI and accessibility use exactly one prefix`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        for (description in listOf("signal", "β signal")) {
+            val finding = Finding(description, maturity = EvidenceMaturity.BETA)
+            val row = invokePrivate<View>(activity, "createFindingView", finding, false) as ViewGroup
+
+            assertEquals(1, "β signal".toRegex().findAll(row.contentDescription.toString()).count())
+            assertTrueContains(row.contentDescription.toString(), "β signal")
+        }
     }
 
     @Test

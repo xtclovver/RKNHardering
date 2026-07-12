@@ -7,6 +7,7 @@ import com.notcvnt.rknhardering.model.DomainReachabilityResult
 import com.notcvnt.rknhardering.model.IpComparisonResult
 import com.notcvnt.rknhardering.model.IpConsensusResult
 import com.notcvnt.rknhardering.model.VerdictDecision
+import com.notcvnt.rknhardering.model.displayDescription
 
 object DiagnosticResultRecorder {
     fun recordCategory(
@@ -30,14 +31,14 @@ object DiagnosticResultRecorder {
                 result.evidence.forEachIndexed { index, item ->
                     appendLine(
                         "evidence[$index]=source:${item.source},detected:${item.detected}," +
-                            "confidence:${item.confidence},description:${item.description}",
+                            "confidence:${item.confidence},maturity:${item.maturity},checkId:${item.checkId},description:${item.displayDescription()}",
                     )
                 }
                 result.findings.forEachIndexed { index, finding ->
                     appendLine(
                         "finding[$index]=detected:${finding.detected},needsReview:${finding.needsReview}," +
                             "informational:${finding.isInformational},error:${finding.isError}," +
-                            "source:${finding.source},description:${finding.description}",
+                            "source:${finding.source},maturity:${finding.maturity},checkId:${finding.checkId},availability:${finding.availability},description:${finding.displayDescription()}",
                     )
                 }
                 result.stunProbeGroups.flatMap { it.results }.forEachIndexed { index, item ->
@@ -132,10 +133,10 @@ object DiagnosticResultRecorder {
                 appendLine("underlyingIp=${result.underlyingIp}")
                 appendLine("proxyChecks=${result.proxyChecks}")
                 result.evidence.forEachIndexed { index, item ->
-                    appendLine("evidence[$index]=source:${item.source},detected:${item.detected},confidence:${item.confidence},description:${item.description}")
+                    appendLine("evidence[$index]=source:${item.source},detected:${item.detected},confidence:${item.confidence},maturity:${item.maturity},checkId:${item.checkId},group:${item.independenceGroup},domain:${item.detectionDomain},hard:${item.hardSignal},description:${item.displayDescription()}")
                 }
                 result.findings.forEachIndexed { index, item ->
-                    appendLine("finding[$index]=detected:${item.detected},review:${item.needsReview},error:${item.isError},description:${item.description}")
+                    appendLine("finding[$index]=detected:${item.detected},review:${item.needsReview},error:${item.isError},maturity:${item.maturity},checkId:${item.checkId},availability:${item.availability},description:${item.displayDescription()}")
                 }
             },
         )
@@ -226,6 +227,7 @@ object DiagnosticResultRecorder {
             status = decision.verdict.name,
             body = buildString {
                 appendLine("rule=${decision.ruleCode}")
+                appendLine("detectionDomains=${decision.detectionDomains.joinToString(",")}")
                 decision.participants.forEachIndexed { index, participant ->
                     appendLine("participant[$index]=factor:${participant.factor},sources:${participant.evidenceSources}")
                 }

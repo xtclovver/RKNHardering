@@ -5,6 +5,8 @@ plugins {
 
 val nativeNdkVersion = "28.2.13676358"
 val nativeCmakeVersion = "3.22.1"
+fun quotedBuildConfig(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+fun betaCanaryProperty(name: String): String = providers.gradleProperty(name).orNull.orEmpty()
 val robolectricSdk33RuntimeDep by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -24,6 +26,7 @@ android {
     namespace = "com.notcvnt.rknhardering"
     ndkVersion = nativeNdkVersion
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.notcvnt.rknhardering"
@@ -33,6 +36,16 @@ android {
         versionName = "2.10.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         androidResources.localeFilters += listOf("en", "ru", "fa", "zh-rCN")
+        buildConfigField("String", "BETA_CANARY_IPV4", quotedBuildConfig(betaCanaryProperty("betaCanaryIpv4")))
+        buildConfigField("String", "BETA_CANARY_IPV6", quotedBuildConfig(betaCanaryProperty("betaCanaryIpv6")))
+        buildConfigField("int", "BETA_CANARY_HTTP_PORT", betaCanaryProperty("betaCanaryHttpPort").toIntOrNull()?.toString() ?: "0")
+        buildConfigField("int", "BETA_CANARY_HTTPS_PORT", betaCanaryProperty("betaCanaryHttpsPort").toIntOrNull()?.toString() ?: "0")
+        buildConfigField("int", "BETA_CANARY_TCP_PORT", betaCanaryProperty("betaCanaryTcpPort").toIntOrNull()?.toString() ?: "0")
+        buildConfigField("int", "BETA_CANARY_UDP_PORT", betaCanaryProperty("betaCanaryUdpPort").toIntOrNull()?.toString() ?: "0")
+        buildConfigField("int", "BETA_CANARY_DNS_PORT", betaCanaryProperty("betaCanaryDnsPort").toIntOrNull()?.toString() ?: "0")
+        buildConfigField("String", "BETA_CANARY_DNS_ZONE", quotedBuildConfig(betaCanaryProperty("betaCanaryDnsZone")))
+        buildConfigField("String", "BETA_CANARY_TLS_NAME", quotedBuildConfig(betaCanaryProperty("betaCanaryTlsName")))
+        buildConfigField("String", "BETA_CANARY_TLS_SPKI", quotedBuildConfig(betaCanaryProperty("betaCanaryTlsSpki")))
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -63,6 +76,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        aidl = true
     }
     externalNativeBuild {
         cmake {
@@ -122,6 +136,10 @@ dependencies {
     implementation(libs.grpc.okhttp)
     implementation(libs.okhttp)
     implementation(libs.okhttp.dnsoverhttps)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
+    implementation(libs.libsu.core)
+    implementation(libs.libsu.service)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)

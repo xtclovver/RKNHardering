@@ -48,6 +48,33 @@ enum class EvidenceConfidence {
     HIGH,
 }
 
+enum class EvidenceMaturity {
+    STABLE,
+    BETA,
+}
+
+enum class ProbeAvailability {
+    AVAILABLE,
+    UNAVAILABLE,
+    PERMISSION_DENIED,
+    UNSUPPORTED,
+    ERROR,
+    SKIPPED,
+    RACE,
+    MALFORMED_RESPONSE,
+    TRUNCATED,
+}
+
+enum class DetectionDomain {
+    VPN_OR_PROXY,
+    NETWORK_PATH_DIVERGENCE,
+    ISOLATED_PROFILE,
+    APP_VIRTUALIZATION,
+    HOOK_OR_TAMPERING,
+    DEVICE_INTEGRITY,
+    SYSTEM_NETWORK_CONTEXT,
+}
+
 enum class EvidenceSource {
     GEO_IP,
     DIRECT_NETWORK_CAPABILITIES,
@@ -86,6 +113,34 @@ enum class EvidenceSource {
     NATIVE_ROOT_DETECTION,
     NATIVE_EMULATOR,
     SANDBOX_ISOLATION,
+    BETA_VPN_BINDER,
+    BETA_USER_PROFILE,
+    BETA_CONNECTIVITY_BINDER,
+    BETA_NETD_NETID,
+    BETA_SOCKET_MARK,
+    BETA_SOCKET_DIAG,
+    BETA_WIREGUARD_GENL,
+    BETA_OVPN_GENL,
+    BETA_XFRM,
+    BETA_UNIX_DIAG,
+    BETA_BPF_NETFILTER,
+    BETA_NAMESPACE,
+    BETA_SANDBOX_IDENTITY,
+    BETA_HOOK_CONSISTENCY,
+    BETA_TUN_FD,
+    BETA_DNS_NETID,
+    BETA_ROUTE_LOOKUP,
+    BETA_POLICY_RULE,
+    BETA_RTNL_ADDRESS,
+    BETA_LINK_DRIVER,
+    BETA_INTERFACE_TRAFFIC,
+    BETA_PROXY_SELECTOR,
+    BETA_TRANSPORT_MATRIX,
+    BETA_TLS_INTERCEPTION,
+    BETA_PKTINFO,
+    BETA_NETWORK_TRANSITION,
+    BETA_TRACEROUTE,
+    BETA_SERVER_FINGERPRINT,
 }
 
 enum class StunScope {
@@ -186,7 +241,27 @@ data class Finding(
     val family: String? = null,
     val packageName: String? = null,
     val nativeSignalId: NativeSignalId? = null,
+    val maturity: EvidenceMaturity = EvidenceMaturity.STABLE,
+    val checkId: String? = null,
+    val availability: ProbeAvailability? = null,
+    val rawConfidence: EvidenceConfidence? = null,
+    val suppressionRuleIds: List<BetaSuppressionRuleId> = emptyList(),
+    val facts: Map<String, String> = emptyMap(),
+    val independenceGroup: String? = null,
+    val detectionDomain: DetectionDomain? = null,
 )
+
+private const val BETA_PREFIX = "β "
+
+fun Finding.displayDescription(): String {
+    val raw = description.removePrefix(BETA_PREFIX)
+    return if (maturity == EvidenceMaturity.BETA) "$BETA_PREFIX$raw" else raw
+}
+
+fun EvidenceItem.displayDescription(): String {
+    val raw = description.removePrefix(BETA_PREFIX)
+    return if (maturity == EvidenceMaturity.BETA) "$BETA_PREFIX$raw" else raw
+}
 
 data class EvidenceItem(
     val source: EvidenceSource,
@@ -196,6 +271,11 @@ data class EvidenceItem(
     val family: String? = null,
     val packageName: String? = null,
     val kind: VpnAppKind? = null,
+    val maturity: EvidenceMaturity = EvidenceMaturity.STABLE,
+    val checkId: String? = null,
+    val independenceGroup: String? = null,
+    val detectionDomain: DetectionDomain = DetectionDomain.VPN_OR_PROXY,
+    val hardSignal: Boolean = false,
 )
 
 data class MatchedVpnApp(
@@ -278,6 +358,7 @@ data class CategoryResult(
     val geoFacts: GeoIpFacts? = null,
     val locationFacts: LocationSignalsFacts? = null,
     val geoIpResponses: List<GeoIpResponse> = emptyList(),
+    val maturity: EvidenceMaturity = EvidenceMaturity.STABLE,
 ) {
     val hasError: Boolean
         get() = findings.any { it.isError }
@@ -291,6 +372,7 @@ enum class Verdict {
 
 enum class VerdictRuleCode(val code: String) {
     R1_HARD_BYPASS("R1"),
+    R2_BETA_EVIDENCE("R2"),
     R3_PROBE_TARGET_DIVERGENCE("R3"),
     R3_PROBE_TARGET_DIRECT_DIVERGENCE("R3"),
     R3_CROSS_CHANNEL_MISMATCH("R3"),
@@ -310,6 +392,7 @@ data class VerdictDecision(
     val verdict: Verdict,
     val rule: VerdictRuleCode,
     val participants: List<VerdictParticipant>,
+    val detectionDomains: Set<DetectionDomain> = emptySet(),
 ) {
     val ruleCode: String get() = rule.code
 }
@@ -484,6 +567,7 @@ data class CheckResult(
         detected = false,
         findings = emptyList(),
     ),
+    val betaChecks: BetaCheckResult = BetaCheckResult.disabled(),
     val icmpSpoofing: CategoryResult = CategoryResult(
         name = "",
         detected = false,

@@ -11,7 +11,9 @@ import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.EvidenceItem
+import com.notcvnt.rknhardering.model.ExecutionContextFacts
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.displayDescription
 import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
@@ -57,7 +59,7 @@ internal object CheckResultMarkdownExportFormatter {
         builder.appendLine()
         appendSummaryBlock(builder, narrative, snapshot)
         builder.appendLine()
-        appendVerdictSection(builder, narrative, snapshot.result.verdict)
+        appendVerdictSection(builder, narrative, snapshot.result)
         builder.appendLine()
         appendSectionSummary(builder, context, snapshot)
         builder.appendLine()
@@ -67,6 +69,13 @@ internal object CheckResultMarkdownExportFormatter {
         appendCategorySection(builder, context.getString(R.string.main_card_direct_signs), result.directSigns, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_indirect_signs), result.indirectSigns, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_native_signs), result.nativeSigns, snapshot.privacyMode)
+        appendCategorySection(builder, context.getString(R.string.main_card_beta_checks), result.betaChecks.category, snapshot.privacyMode)
+        appendExecutionContextSection(builder, result.betaChecks.executionContext, snapshot.privacyMode)
+        appendNetworkEpochChanges(
+            builder,
+            result.betaChecks.networkEpochChanges.map { it.name },
+            result.betaChecks.networkEpochRetryCount,
+        )
         appendCategorySection(builder, context.getString(R.string.main_card_icmp_spoofing), result.icmpSpoofing, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_rtt_triangulation), result.rttTriangulation, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_location_signals), result.locationSignals, snapshot.privacyMode)
@@ -97,13 +106,54 @@ internal object CheckResultMarkdownExportFormatter {
         builder.appendLine("```")
     }
 
+    private fun appendExecutionContextSection(
+        builder: StringBuilder,
+        facts: ExecutionContextFacts?,
+        privacyMode: Boolean,
+    ) {
+        facts ?: return
+        builder.appendLine("### Beta execution context")
+        builder.appendLine("- kind=${facts.kind} | confidence=${facts.confidence}")
+        if (!privacyMode) {
+            builder.appendLine("- uid=${facts.uid} | appId=${facts.appId}")
+            facts.mountNamespaceId?.let { builder.appendLine("- mountNamespaceId=${maskExportValue(it, false)}") }
+            facts.selinuxContext?.let { builder.appendLine("- selinuxContext=${maskExportValue(it, false)}") }
+        }
+        builder.appendLine(
+            "- userIds=uid:${facts.uidDerivedUserId},context:${facts.contextUserId ?: NONE}," +
+                "ce:${facts.dataDirUserId ?: NONE},de:${facts.deviceProtectedDataDirUserId ?: NONE}," +
+                "external:${facts.externalStorageUserId ?: NONE}",
+        )
+        builder.appendLine(
+            "- profile=${facts.publicIsProfile} | managed=${facts.publicIsManagedProfile} | " +
+                "hiddenType=${facts.hiddenProfileType ?: NONE}",
+        )
+        builder.appendLine(
+            "- consistency=uid:${facts.packageUidConsistent},source:${facts.sourceDirConsistent}," +
+                "publicSource:${facts.publicSourceDirConsistent},nativeLib:${facts.nativeLibraryDirConsistent}",
+        )
+        builder.appendLine("- mismatchAxes=${facts.virtualizationMismatchAxes.sorted().joinToString(",").ifBlank { NONE }}")
+        builder.appendLine("- mountNamespaceAvailable=${facts.mountNamespaceId != null} | selinuxContextAvailable=${facts.selinuxContext != null}")
+        builder.appendLine()
+    }
+
+    private fun appendNetworkEpochChanges(builder: StringBuilder, reasons: List<String>, retryCount: Int) {
+        if (reasons.isEmpty() && retryCount == 0) return
+        builder.appendLine("### Beta network epoch changes")
+        builder.appendLine("- retryCount=$retryCount")
+        builder.appendLine("- reasons=${reasons.sorted().joinToString(",").ifBlank { NONE }}")
+        builder.appendLine()
+    }
+
     private fun appendVerdictSection(
         builder: StringBuilder,
         narrative: VerdictNarrative,
-        verdict: Verdict,
+        result: com.notcvnt.rknhardering.model.CheckResult,
     ) {
         builder.appendLine("## Verdict")
-        builder.appendLine("- Status: ${verdictStatusTag(verdict)}")
+        builder.appendLine("- Status: ${verdictStatusTag(result.verdict)}")
+        builder.appendLine("- Rule: ${result.verdictDecision.rule} (${result.verdictDecision.ruleCode})")
+        builder.appendLine("- Detection domains: ${result.verdictDecision.detectionDomains.joinToString(",").ifEmpty { "none" }}")
         builder.appendLine("- Explanation: ${narrative.explanation}")
         builder.appendLine()
         builder.appendLine("### What this means")
@@ -167,6 +217,12 @@ internal object CheckResultMarkdownExportFormatter {
             title = context.getString(R.string.main_card_native_signs),
             status = sectionStatusTag(result.nativeSigns.detected, result.nativeSigns.needsReview, result.nativeSigns.hasError),
             summary = buildCategorySummary(result.nativeSigns, snapshot.privacyMode),
+        )
+        appendSectionSummaryRow(
+            builder,
+            title = context.getString(R.string.main_card_beta_checks),
+            status = sectionStatusTag(result.betaChecks.category.detected, result.betaChecks.category.needsReview, result.betaChecks.category.hasError),
+            summary = buildCategorySummary(result.betaChecks.category, snapshot.privacyMode),
         )
         appendSectionSummaryRow(
             builder,
@@ -375,7 +431,7 @@ internal object CheckResultMarkdownExportFormatter {
 
     private fun formatFinding(finding: Finding, privacyMode: Boolean): String {
         return buildList {
-            add(maskExportValue(finding.description, privacyMode))
+            add(maskExportValue(finding.displayDescription(), privacyMode))
             if (finding.detected) add("detected=true")
             if (finding.needsReview) add("needsReview=true")
             if (finding.isError) add("error=true")
@@ -384,6 +440,22 @@ internal object CheckResultMarkdownExportFormatter {
             finding.confidence?.let { add("confidence=$it") }
             finding.family?.let { add("family=$it") }
             finding.packageName?.let { add("package=$it") }
+            add("maturity=${finding.maturity}")
+            finding.checkId?.let { add("checkId=$it") }
+            finding.availability?.let { add("availability=$it") }
+            finding.rawConfidence?.let { add("rawConfidence=$it") }
+            finding.independenceGroup?.let { add("group=$it") }
+            finding.detectionDomain?.let { add("domain=$it") }
+            if (finding.suppressionRuleIds.isNotEmpty()) {
+                add("suppressions=${finding.suppressionRuleIds.joinToString(",")}")
+            }
+            if (finding.facts.isNotEmpty()) {
+                add(
+                    "facts=" + finding.facts.toSortedMap().entries.joinToString(",") { (key, value) ->
+                        "$key=${maskExportValue(value, privacyMode)}"
+                    },
+                )
+            }
         }.joinToString(" | ")
     }
 
@@ -395,7 +467,12 @@ internal object CheckResultMarkdownExportFormatter {
             item.kind?.let { add("kind=$it") }
             item.family?.let { add("family=$it") }
             item.packageName?.let { add("package=$it") }
-            add("description=${maskExportValue(item.description, privacyMode)}")
+            add("maturity=${item.maturity}")
+            item.checkId?.let { add("checkId=$it") }
+            item.independenceGroup?.let { add("independenceGroup=$it") }
+            add("detectionDomain=${item.detectionDomain}")
+            add("hardSignal=${item.hardSignal}")
+            add("description=${maskExportValue(item.displayDescription(), privacyMode)}")
         }.joinToString(" | ")
     }
 

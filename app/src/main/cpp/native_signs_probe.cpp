@@ -1,4 +1,9 @@
 #include "native_signs_probe.h"
+#include "beta_socket_probe.h"
+#include "beta_netlink_probe.h"
+#include "beta_sandbox_probe.h"
+#include "beta_kernel_probe.h"
+#include "beta_local_probe.h"
 
 #include <jni.h>
 #include <string>
@@ -1757,7 +1762,6 @@ static void detectVpnPolicyRules(std::vector<std::string> &findings) {
             }
 
             if (table >= 100 && table <= 200) {
-                // High table numbers are often VPN policy routing tables
                 bool isVpnIface = false;
                 for (const auto &name : tunNames) {
                     if (iface[0] && name == iface) {
@@ -1773,7 +1777,6 @@ static void detectVpnPolicyRules(std::vector<std::string> &findings) {
                     if (fwMark) ruleSummary += " fwmark=0x" + std::to_string(fwMark);
                 }
             }
-
         }
         if (done) break;
     }
@@ -2248,6 +2251,22 @@ const JNINativeMethod kMethods[] = {
     {"nativeInterfaceDump", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeInterfaceDump)},
     {"nativeNetlinkRouteDump", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkRouteDump)},
     {"nativeNetlinkSockDiag", "(II)[Ljava/lang/String;", reinterpret_cast<void *>(nativeNetlinkSockDiag)},
+    {"nativeBetaSocketIdentity", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaSocketIdentity)},
+    {"nativeBetaInetDiagByCookie", "(ILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaInetDiagByCookie)},
+    {"nativeBetaNetdIdentity", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaNetdIdentity)},
+    {"nativeBetaRoutingSnapshot", "(IILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaRoutingSnapshot)},
+    {"nativeBetaWireGuardProbe", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaWireGuardProbe)},
+    {"nativeBetaOvpnProbe", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaOvpnProbe)},
+    {"nativeBetaXfrmProbe", "(ZLcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaXfrmProbe)},
+    {"nativeBetaTunFdProbe", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaTunFdProbe)},
+    {"nativeBetaBpfNetfilterProbe", "(ZLcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaBpfNetfilterProbe)},
+    {"nativeBetaUnixDiagProbe", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaUnixDiagProbe)},
+    {"nativeBetaUnixPeerIdentityProbe", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaUnixPeerIdentityProbe)},
+    {"nativeBetaOriginalDestinationProbe", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaOriginalDestinationProbe)},
+    {"nativeBetaPktInfoProbe", "(I)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaPktInfoProbe)},
+    {"nativeBetaTransitionMonitor", "(ILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaTransitionMonitor)},
+    {"nativeBetaExtendedRouteProbe", "(IILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaExtendedRouteProbe)},
+    {"nativeBetaSandboxSnapshot", "([Ljava/lang/String;Z)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaSandboxSnapshot)},
     {"nativeDetectRoot", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectRoot)},
     {"nativeDetectEmulator", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectEmulator)},
     {"nativeDetectVpnProperties", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnProperties)},

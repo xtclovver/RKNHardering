@@ -41,6 +41,7 @@ class FormatterSectionParityTest {
             "## Direct signs",
             "## Indirect signs",
             "## Native signs",
+            "## β Beta checks",
             "## ICMP spoofing",
             "## RTT triangulation",
             "## Location signals",
@@ -72,6 +73,7 @@ class FormatterSectionParityTest {
             "\"directSigns\"",
             "\"indirectSigns\"",
             "\"nativeSigns\"",
+            "\"betaChecks\"",
             "\"icmpSpoofing\"",
             "\"rttTriangulation\"",
             "\"locationSignals\"",
@@ -105,6 +107,7 @@ class FormatterSectionParityTest {
             "[locationSignals]",
             "[bypass]",
             "[nativeSigns]",
+            "[betaChecks]",
             "[operatorWhitelist]",
             "[tunProbe]",
         ).forEach { marker ->

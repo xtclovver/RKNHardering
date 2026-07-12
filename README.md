@@ -664,6 +664,18 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 Если хотя бы одно detected-evidence имеет источник `SPLIT_TUNNEL_BYPASS`, `XRAY_API`, `VPN_GATEWAY_LEAK` или `VPN_NETWORK_BINDING` → `DETECTED`.
 
+**R2 — включённые пользователем бета-проверки:**
+
+Бета-режим по умолчанию выключен и включается отдельно в «Настройки → β Бета-проверки». В R2 участвуют только доступные, несупрессированные `BETA`-сигналы с `MEDIUM`/`HIGH` confidence. Hard-сигнал обязан быть `HIGH` и разрешён центральной policy. Два сигнала считаются кворумом только из разных `independenceGroup`; stable-сигнал из той же группы не даёт второй голос.
+
+- две независимые сетевые группы либо beta-сеть + независимый stable-сигнал → `DETECTED`;
+- изоляция профиля + независимый сетевой сигнал → `DETECTED` с обеими detection-domain;
+- две независимые группы подмены/виртуализации → `DETECTED` как подмена окружения, а не как активный VPN;
+- изоляция профиля или один beta-сигнал отдельно → не выше `NEEDS_REVIEW` через R6;
+- `LOW`, `SYSTEM_NETWORK_CONTEXT`, `UNAVAILABLE`, `PERMISSION_DENIED`, `UNSUPPORTED`, ошибки и супрессированные наблюдения не влияют на вердикт.
+
+Бета-проверки охватывают контекст пользователя и профиля, скрытые read-only Binder API, собственные socket/netd/routing-дескрипторы, sandbox/linker consistency и контролируемые transport/DNS/TLS canary-пробы. Отказ, неполный ответ или смена сети всегда нейтральны. Глобальные WireGuard/OpenVPN DCO/XFRM/BPF-запросы не выполняются в обычном app sandbox: для них есть отдельный выключенный по умолчанию master и явный выбор Shizuku либо root без автоматического fallback. Provider предоставляет только фиксированный read-only AIDL, санитизирует ответ и не принимает команды или пути. Canary endpoint задаётся Gradle-свойствами `betaCanary*`; без конфигурации активные пробы честно возвращают `UNAVAILABLE`. Источники и ограничения зафиксированы в `docs/beta-checks-research.md`.
+
 **R3 — IP-консенсус:**
 
 `IpConsensusBuilder` агрегирует сигналы из GeoIP, IpComparison, CDN Pulling, TUN-проба, bypass и callTransportLeaks. Если определён `geoAxis` (иностранные IP, geo-country mismatch или Warp-индикатор) и одновременно имеет место `probeTargetDivergence`, `probeTargetDirectDivergence` или `crossChannelMismatch` → `DETECTED`.
@@ -703,6 +715,7 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 - `NativeSignsChecker` нашёл маркеры хуков (`NATIVE_HOOK_MARKERS`) или нарушение целостности (`NATIVE_LIBRARY_INTEGRITY`)
 - `ipConsensus.needsReview`, `ipConsensus.channelConflict` не пуст, `ipConsensus.probeTargetDivergence`
 - `TUN_ACTIVE_PROBE` evidence с `detected = false` (tun есть, но VPN не активен для приложения)
+- один несупрессированный beta-сигнал `MEDIUM`/`HIGH`, кроме `SYSTEM_NETWORK_CONTEXT`
 
 Примечания:
 

@@ -37,6 +37,54 @@ object NativeSignsBridge {
     internal var netlinkSockDiagOverride: ((Int, Int) -> Array<String>)? = null
 
     @Volatile
+    internal var betaSocketIdentityOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaInetDiagByCookieOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaNetdIdentityOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaRoutingSnapshotOverride: ((Int, Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaWireGuardProbeOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var betaOvpnProbeOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var betaXfrmProbeOverride: ((Boolean) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaTunFdProbeOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var betaBpfNetfilterProbeOverride: ((Boolean) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaUnixDiagProbeOverride: (() -> Array<String>)? = null
+
+    @Volatile
+    internal var betaUnixPeerIdentityProbeOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaOriginalDestinationProbeOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaPktInfoProbeOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaTransitionMonitorOverride: ((Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaExtendedRouteProbeOverride: ((Int, Int) -> Array<String>)? = null
+
+    @Volatile
+    internal var betaSandboxSnapshotOverride: ((Array<String>, Boolean) -> Array<String>)? = null
+
+    @Volatile
     internal var detectRootOverride: (() -> Array<String>)? = null
 
     @Volatile
@@ -162,6 +210,144 @@ object NativeSignsBridge {
         }
     }
 
+    fun betaSocketIdentity(fd: Int): Array<String> = traceArray("betaSocketIdentity", "fd=$fd") {
+        betaSocketIdentityOverride?.invoke(fd)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching { nativeBetaSocketIdentity(fd) }.getOrDefault(emptyArray())
+    }
+
+    fun betaInetDiagByCookie(fd: Int, cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaInetDiagByCookie", "fd=$fd") {
+        betaInetDiagByCookieOverride?.invoke(fd)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                nativeBetaInetDiagByCookie(fd, cancellationSignal)
+            }.getOrDefault(emptyArray())
+        }
+
+    fun betaNetdIdentity(fd: Int): Array<String> =
+        traceArray("betaNetdIdentity", "fd=$fd") {
+            betaNetdIdentityOverride?.invoke(fd)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaNetdIdentity(fd)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaRoutingSnapshot(
+        fd: Int,
+        uid: Int,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Array<String> =
+        traceArray("betaRoutingSnapshot", "fd=$fd,uid=$uid") {
+            betaRoutingSnapshotOverride?.invoke(fd, uid)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaRoutingSnapshot(fd, uid, cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaWireGuardProbe(cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaWireGuardProbe") {
+            betaWireGuardProbeOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaWireGuardProbe(cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaOvpnProbe(cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaOvpnProbe") {
+            betaOvpnProbeOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaOvpnProbe(cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaXfrmProbe(
+        imsContext: Boolean,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Array<String> = traceArray("betaXfrmProbe", "imsContext=$imsContext") {
+        betaXfrmProbeOverride?.invoke(imsContext)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                nativeBetaXfrmProbe(imsContext, cancellationSignal)
+            }.getOrDefault(emptyArray())
+    }
+
+    fun betaTunFdProbe(cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaTunFdProbe") {
+            betaTunFdProbeOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaTunFdProbe(cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaBpfNetfilterProbe(
+        aggressive: Boolean,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Array<String> = traceArray("betaBpfNetfilterProbe", "aggressive=$aggressive") {
+        betaBpfNetfilterProbeOverride?.invoke(aggressive)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                nativeBetaBpfNetfilterProbe(aggressive, cancellationSignal)
+            }.getOrDefault(emptyArray())
+    }
+
+    fun betaUnixDiagProbe(cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaUnixDiagProbe") {
+            betaUnixDiagProbeOverride?.invoke()
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaUnixDiagProbe(cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaUnixPeerIdentityProbe(fd: Int): Array<String> =
+        traceArray("betaUnixPeerIdentityProbe", "fd=$fd") {
+            betaUnixPeerIdentityProbeOverride?.invoke(fd)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaUnixPeerIdentityProbe(fd)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaOriginalDestinationProbe(fd: Int): Array<String> =
+        traceArray("betaOriginalDestinationProbe", "fd=$fd") {
+            betaOriginalDestinationProbeOverride?.invoke(fd)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaOriginalDestinationProbe(fd)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaPktInfoProbe(fd: Int): Array<String> =
+        traceArray("betaPktInfoProbe", "fd=$fd") {
+            betaPktInfoProbeOverride?.invoke(fd)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaPktInfoProbe(fd)
+                }.getOrDefault(emptyArray())
+        }
+
+    fun betaTransitionMonitor(
+        durationMs: Int,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Array<String> = traceArray("betaTransitionMonitor", "durationMs=$durationMs") {
+        betaTransitionMonitorOverride?.invoke(durationMs)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                nativeBetaTransitionMonitor(durationMs, cancellationSignal)
+            }.getOrDefault(emptyArray())
+    }
+
+    fun betaExtendedRouteProbe(
+        fd: Int,
+        uid: Int,
+        cancellationSignal: ScanCancellationSignal? = null,
+    ): Array<String> = traceArray("betaExtendedRouteProbe", "fd=$fd,uid=$uid") {
+        betaExtendedRouteProbeOverride?.invoke(fd, uid)
+            ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                nativeBetaExtendedRouteProbe(fd, uid, cancellationSignal)
+            }.getOrDefault(emptyArray())
+    }
+
+    fun betaSandboxSnapshot(paths: Array<String>, aggressive: Boolean): Array<String> =
+        traceArray("betaSandboxSnapshot", "paths=${paths.size},aggressive=$aggressive") {
+            betaSandboxSnapshotOverride?.invoke(paths, aggressive)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaSandboxSnapshot(paths, aggressive)
+                }.getOrDefault(emptyArray())
+        }
+
     fun detectRoot(): Array<String> {
         return traceArray("detectRoot") {
             detectRootOverride?.invoke()
@@ -260,6 +446,22 @@ object NativeSignsBridge {
         interfaceDumpOverride = null
         netlinkRouteDumpOverride = null
         netlinkSockDiagOverride = null
+        betaSocketIdentityOverride = null
+        betaInetDiagByCookieOverride = null
+        betaNetdIdentityOverride = null
+        betaRoutingSnapshotOverride = null
+        betaWireGuardProbeOverride = null
+        betaOvpnProbeOverride = null
+        betaXfrmProbeOverride = null
+        betaTunFdProbeOverride = null
+        betaBpfNetfilterProbeOverride = null
+        betaUnixDiagProbeOverride = null
+        betaUnixPeerIdentityProbeOverride = null
+        betaOriginalDestinationProbeOverride = null
+        betaPktInfoProbeOverride = null
+        betaTransitionMonitorOverride = null
+        betaExtendedRouteProbeOverride = null
+        betaSandboxSnapshotOverride = null
         detectRootOverride = null
         detectEmulatorOverride = null
         detectVpnPropertiesOverride = null
@@ -281,6 +483,39 @@ object NativeSignsBridge {
     private external fun nativeInterfaceDump(): Array<String>
     private external fun nativeNetlinkRouteDump(family: Int): Array<String>
     private external fun nativeNetlinkSockDiag(family: Int, protocol: Int): Array<String>
+    private external fun nativeBetaSocketIdentity(fd: Int): Array<String>
+    private external fun nativeBetaInetDiagByCookie(fd: Int, cancellationSignal: ScanCancellationSignal?): Array<String>
+    private external fun nativeBetaNetdIdentity(fd: Int): Array<String>
+    private external fun nativeBetaRoutingSnapshot(
+        fd: Int,
+        uid: Int,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Array<String>
+    private external fun nativeBetaWireGuardProbe(cancellationSignal: ScanCancellationSignal?): Array<String>
+    private external fun nativeBetaOvpnProbe(cancellationSignal: ScanCancellationSignal?): Array<String>
+    private external fun nativeBetaXfrmProbe(
+        imsContext: Boolean,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Array<String>
+    private external fun nativeBetaTunFdProbe(cancellationSignal: ScanCancellationSignal?): Array<String>
+    private external fun nativeBetaBpfNetfilterProbe(
+        aggressive: Boolean,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Array<String>
+    private external fun nativeBetaUnixDiagProbe(cancellationSignal: ScanCancellationSignal?): Array<String>
+    private external fun nativeBetaUnixPeerIdentityProbe(fd: Int): Array<String>
+    private external fun nativeBetaOriginalDestinationProbe(fd: Int): Array<String>
+    private external fun nativeBetaPktInfoProbe(fd: Int): Array<String>
+    private external fun nativeBetaTransitionMonitor(
+        durationMs: Int,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Array<String>
+    private external fun nativeBetaExtendedRouteProbe(
+        fd: Int,
+        uid: Int,
+        cancellationSignal: ScanCancellationSignal?,
+    ): Array<String>
+    private external fun nativeBetaSandboxSnapshot(paths: Array<String>, aggressive: Boolean): Array<String>
     private external fun nativeDetectRoot(): Array<String>
     private external fun nativeDetectEmulator(): Array<String>
     private external fun nativeDetectVpnProperties(): Array<String>

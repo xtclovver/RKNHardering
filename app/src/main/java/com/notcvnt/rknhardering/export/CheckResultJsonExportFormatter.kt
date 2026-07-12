@@ -10,7 +10,9 @@ import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CdnPullingResponse
 import com.notcvnt.rknhardering.model.CdnPullingResult
 import com.notcvnt.rknhardering.model.EvidenceItem
+import com.notcvnt.rknhardering.model.ExecutionContextFacts
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.model.displayDescription
 import com.notcvnt.rknhardering.model.GeoIpFacts
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
@@ -61,6 +63,17 @@ internal object CheckResultJsonExportFormatter {
             "verdict",
             JSONObject().apply {
                 put("value", snapshot.result.verdict.name)
+                put("rule", snapshot.result.verdictDecision.rule.name)
+                put("ruleCode", snapshot.result.verdictDecision.ruleCode)
+                put("detectionDomains", jsonArray(snapshot.result.verdictDecision.detectionDomains.map { it.name }))
+                put("participants", JSONArray().apply {
+                    snapshot.result.verdictDecision.participants.forEach { participant ->
+                        put(JSONObject().apply {
+                            put("factor", participant.factor)
+                            put("evidenceSources", jsonArray(participant.evidenceSources.map { it.name }))
+                        })
+                    }
+                })
                 put("status", verdictStatusTag(snapshot.result.verdict))
                 put("explanation", narrative.explanation)
                 put("exposureStatus", narrative.exposureStatus.name)
@@ -120,6 +133,21 @@ internal object CheckResultJsonExportFormatter {
                 put("directSigns", categoryToJson(snapshot.result.directSigns, snapshot.privacyMode))
                 put("indirectSigns", categoryToJson(snapshot.result.indirectSigns, snapshot.privacyMode))
                 put("nativeSigns", categoryToJson(snapshot.result.nativeSigns, snapshot.privacyMode))
+                put("betaChecks", categoryToJson(snapshot.result.betaChecks.category, snapshot.privacyMode).apply {
+                    put("availabilitySummary", JSONObject().apply {
+                        snapshot.result.betaChecks.availabilitySummary.forEach { (availability, count) ->
+                            put(availability.name, count)
+                        }
+                    })
+                    put(
+                        "networkEpochChanges",
+                        jsonArray(snapshot.result.betaChecks.networkEpochChanges.map { it.name }.sorted()),
+                    )
+                    put("networkEpochRetryCount", snapshot.result.betaChecks.networkEpochRetryCount)
+                    snapshot.result.betaChecks.executionContext?.let { facts ->
+                        put("executionContext", executionContextToJson(facts, snapshot.privacyMode))
+                    }
+                })
                 put("icmpSpoofing", categoryToJson(snapshot.result.icmpSpoofing, snapshot.privacyMode))
                 put("rttTriangulation", categoryToJson(snapshot.result.rttTriangulation, snapshot.privacyMode))
                 put("locationSignals", categoryToJson(snapshot.result.locationSignals, snapshot.privacyMode))
@@ -143,6 +171,7 @@ internal object CheckResultJsonExportFormatter {
             put("needsReview", category.needsReview)
             put("hasError", category.hasError)
             put("status", sectionStatusTag(category.detected, category.needsReview, category.hasError))
+            put("maturity", category.maturity.name)
             put("findings", JSONArray().apply { category.findings.forEach { put(findingToJson(it, privacyMode)) } })
             put("evidence", JSONArray().apply { category.evidence.forEach { put(evidenceToJson(it, privacyMode)) } })
             put("matchedApps", JSONArray().apply { category.matchedApps.forEach { put(matchedAppToJson(it)) } })
@@ -153,6 +182,35 @@ internal object CheckResultJsonExportFormatter {
             category.locationFacts?.let { put("locationFacts", locationFactsToJson(it, privacyMode)) }
         }
     }
+
+    private fun executionContextToJson(facts: ExecutionContextFacts, privacyMode: Boolean): JSONObject =
+        JSONObject().apply {
+            put("kind", facts.kind.name)
+            put("confidence", facts.confidence.name)
+            put("uid", if (privacyMode) JSONObject.NULL else facts.uid)
+            put("appId", if (privacyMode) JSONObject.NULL else facts.appId)
+            put("uidDerivedUserId", facts.uidDerivedUserId)
+            put("contextUserId", facts.contextUserId)
+            put("dataDirUserId", facts.dataDirUserId)
+            put("deviceProtectedDataDirUserId", facts.deviceProtectedDataDirUserId)
+            put("externalStorageUserId", facts.externalStorageUserId)
+            put("publicIsProfile", facts.publicIsProfile)
+            put("publicIsManagedProfile", facts.publicIsManagedProfile)
+            put("hiddenProfileType", facts.hiddenProfileType)
+            put("packageUidConsistent", facts.packageUidConsistent)
+            put("sourceDirConsistent", facts.sourceDirConsistent)
+            put("publicSourceDirConsistent", facts.publicSourceDirConsistent)
+            put("nativeLibraryDirConsistent", facts.nativeLibraryDirConsistent)
+            put("publicUserProfileCount", facts.publicUserProfileCount)
+            put("publicCurrentUserInProfiles", facts.publicCurrentUserInProfiles)
+            put("mountNamespaceAvailable", facts.mountNamespaceId != null)
+            put("selinuxContextAvailable", facts.selinuxContext != null)
+            put("mountNamespaceId", if (privacyMode) JSONObject.NULL else facts.mountNamespaceId)
+            put("selinuxContext", if (privacyMode) JSONObject.NULL else facts.selinuxContext)
+            put("virtualizationMismatchAxes", jsonArray(facts.virtualizationMismatchAxes.sorted()))
+            put("splitOrUpdateLayout", facts.splitOrUpdateLayout)
+            put("adoptedOrEmulatedStorage", facts.adoptedOrEmulatedStorage)
+        }
 
     private fun geoFactsToJson(facts: GeoIpFacts, privacyMode: Boolean): JSONObject {
         return JSONObject().apply {
@@ -275,7 +333,7 @@ internal object CheckResultJsonExportFormatter {
 
     private fun findingToJson(finding: Finding, privacyMode: Boolean): JSONObject {
         return JSONObject().apply {
-            put("description", maskExportValue(finding.description, privacyMode))
+            put("description", maskExportValue(finding.displayDescription(), privacyMode))
             put("detected", finding.detected)
             put("needsReview", finding.needsReview)
             put("isInformational", finding.isInformational)
@@ -284,6 +342,20 @@ internal object CheckResultJsonExportFormatter {
             put("confidence", finding.confidence?.name)
             put("family", finding.family)
             put("packageName", finding.packageName)
+            put("maturity", finding.maturity.name)
+            put("checkId", finding.checkId)
+            put("availability", finding.availability?.name)
+            if (finding.maturity == com.notcvnt.rknhardering.model.EvidenceMaturity.BETA) {
+                put("rawConfidence", finding.rawConfidence?.name)
+                put("suppressionRuleIds", jsonArray(finding.suppressionRuleIds.map { it.name }))
+                put("independenceGroup", finding.independenceGroup)
+                put("detectionDomain", finding.detectionDomain?.name)
+                put("facts", JSONObject().apply {
+                    finding.facts.toSortedMap().forEach { (key, value) ->
+                        put(key, maskExportValue(value, privacyMode))
+                    }
+                })
+            }
         }
     }
 
@@ -292,10 +364,15 @@ internal object CheckResultJsonExportFormatter {
             put("source", item.source.name)
             put("detected", item.detected)
             put("confidence", item.confidence.name)
-            put("description", maskExportValue(item.description, privacyMode))
+            put("description", maskExportValue(item.displayDescription(), privacyMode))
             put("family", item.family)
             put("packageName", item.packageName)
             put("kind", item.kind?.name)
+            put("maturity", item.maturity.name)
+            put("checkId", item.checkId)
+            put("independenceGroup", item.independenceGroup)
+            put("detectionDomain", item.detectionDomain.name)
+            put("hardSignal", item.hardSignal)
         }
     }
 

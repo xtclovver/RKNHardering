@@ -11,6 +11,8 @@ TIMESTAMP    : 2023-11-14T22:13:20Z
 
 ## Verdict
 - Status: [DETECTED]
+- Rule: UNSPECIFIED (unknown)
+- Detection domains: none
 - Explanation: The automated check considers the bypass confirmed. The local Xray API exposed a remote endpoint address.
 
 ### What this means
@@ -47,6 +49,7 @@ TIMESTAMP    : 2023-11-14T22:13:20Z
 | Direct signs | [DETECTED] | Installed app com.example.vpn at 198.51.*.* |
 | Indirect signs | [DETECTED] | Indirect route mismatch 198.51.*.* |
 | Native signs | [DETECTED] | Native getifaddrs() reports tun0 |
+| β Beta checks | [OK] | <none> |
 | ICMP spoofing β | [REVIEW] | instagram.com replied and google.com was too fast |
 | RTT triangulation β | [REVIEW] | RTT target mix needs review |
 | Location signals | [OK] | <none> |
@@ -64,10 +67,10 @@ TIMESTAMP    : 2023-11-14T22:13:20Z
 - Geo facts: present
 
 ### Findings
-- GeoIP says 203.0.*.* | informational=true | source=GEO_IP
+- GeoIP says 203.0.*.* | informational=true | source=GEO_IP | maturity=STABLE
 
 ### Evidence
-- source=GEO_IP | detected=true | confidence=HIGH | description=Hosting signal for 203.0.*.*
+- source=GEO_IP | detected=true | confidence=HIGH | maturity=STABLE | detectionDomain=VPN_OR_PROXY | hardSignal=false | description=Hosting signal for 203.0.*.*
 
 ### Matched apps
 - <none>
@@ -110,7 +113,7 @@ TIMESTAMP    : 2023-11-14T22:13:20Z
 - Summary: rutracker.org exposed 203.0.*.*
 
 ### Findings
-- CDN trace matched 203.0.*.* | detected=true | source=SPLIT_TUNNEL_BYPASS
+- CDN trace matched 203.0.*.* | detected=true | source=SPLIT_TUNNEL_BYPASS | maturity=STABLE
 
 ### Responses
 #### Response 1: rutracker.org
@@ -143,10 +146,10 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- Installed app com.example.vpn at 198.51.*.* | detected=true | source=INSTALLED_APP | confidence=HIGH | family=v2ray | package=com.example.vpn
+- Installed app com.example.vpn at 198.51.*.* | detected=true | source=INSTALLED_APP | confidence=HIGH | family=v2ray | package=com.example.vpn | maturity=STABLE
 
 ### Evidence
-- source=ACTIVE_VPN | detected=true | confidence=HIGH | kind=TARGETED_BYPASS | family=v2ray | package=com.example.vpn | description=VPN service active
+- source=ACTIVE_VPN | detected=true | confidence=HIGH | kind=TARGETED_BYPASS | family=v2ray | package=com.example.vpn | maturity=STABLE | detectionDomain=VPN_OR_PROXY | hardSignal=false | description=VPN service active
 
 ### Matched apps
 - Example VPN | package=com.example.vpn | family=v2ray | kind=TARGETED_BYPASS | source=INSTALLED_APP | active=true | confidence=HIGH | version=1.2.3 | appType=V2RayNG | coreType=Xray/V2Ray | corePath=lib/arm64-v8a/libxray.so | goVersion=go1.24.1 | services=ExampleService
@@ -169,7 +172,7 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- Indirect route mismatch 198.51.*.* | detected=true | source=ROUTING
+- Indirect route mismatch 198.51.*.* | detected=true | source=ROUTING | maturity=STABLE
 
 ### Evidence
 - <none>
@@ -200,10 +203,36 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- Native getifaddrs() reports tun0 | detected=true | source=NATIVE_INTERFACE | confidence=HIGH
+- Native getifaddrs() reports tun0 | detected=true | source=NATIVE_INTERFACE | confidence=HIGH | maturity=STABLE
 
 ### Evidence
-- source=NATIVE_INTERFACE | detected=true | confidence=HIGH | description=native interface tun0 is visible
+- source=NATIVE_INTERFACE | detected=true | confidence=HIGH | maturity=STABLE | detectionDomain=VPN_OR_PROXY | hardSignal=false | description=native interface tun0 is visible
+
+### Matched apps
+- <none>
+
+### Active apps
+- <none>
+
+### Call transport
+- <none>
+
+## β Beta checks
+- Status: [OK]
+- Name: β Бета-проверки
+- Findings count: 0
+- Evidence count: 0
+- Matched apps: 0
+- Active apps: 0
+- Call transport signals: 0
+- STUN probe groups: 0
+- Geo facts: <none>
+
+### Findings
+- <none>
+
+### Evidence
+- <none>
 
 ### Matched apps
 - <none>
@@ -226,11 +255,11 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- instagram.com replied and google.com was too fast | needsReview=true | source=ICMP_SPOOFING
-- Blocked target instagram.com (157.240.*.*): 3/3 replies | informational=true
+- instagram.com replied and google.com was too fast | needsReview=true | source=ICMP_SPOOFING | maturity=STABLE
+- Blocked target instagram.com (157.240.*.*): 3/3 replies | informational=true | maturity=STABLE
 
 ### Evidence
-- source=ICMP_SPOOFING | detected=true | confidence=MEDIUM | description=ICMP route behavior looked inconsistent
+- source=ICMP_SPOOFING | detected=true | confidence=MEDIUM | maturity=STABLE | detectionDomain=VPN_OR_PROXY | hardSignal=false | description=ICMP route behavior looked inconsistent
 
 ### Matched apps
 - <none>
@@ -253,7 +282,7 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- RTT target mix needs review | needsReview=true | source=RTT_TRIANGULATION
+- RTT target mix needs review | needsReview=true | source=RTT_TRIANGULATION | maturity=STABLE
 
 ### Evidence
 - <none>
@@ -336,10 +365,10 @@ Unparsed IP inputs:
 - Xray API: 127.0.0.1:8080 | handlerAvailable=true | stats=statCount=2 sampleNames=outbound>>>proxy>>>traffic>>>uplink
 
 ### Findings
-- Bypass via 198.51.*.* | detected=true | source=SPLIT_TUNNEL_BYPASS | confidence=HIGH
+- Bypass via 198.51.*.* | detected=true | source=SPLIT_TUNNEL_BYPASS | confidence=HIGH | maturity=STABLE
 
 ### Evidence
-- source=XRAY_API | detected=true | confidence=HIGH | description=Xray exposed 198.51.*.*
+- source=XRAY_API | detected=true | confidence=HIGH | maturity=STABLE | detectionDomain=VPN_OR_PROXY | hardSignal=false | description=Xray exposed 198.51.*.*
 
 ### Proxy checks
 - endpoint=127.0.0.1:1080 | type=SOCKS5 | authRequired=true | ownerStatus=RESOLVED | proxyIp=203.0.*.* | status=CONFIRMED_BYPASS | mtProtoReachable=true | mtProtoTarget=149.154.*.*:443 | summaryReason=CONFIRMED_BYPASS

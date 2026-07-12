@@ -637,6 +637,10 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 اگر هر detected-evidence منبع `SPLIT_TUNNEL_BYPASS`، `XRAY_API`، `VPN_GATEWAY_LEAK` یا `VPN_NETWORK_BINDING` داشته باشد → `DETECTED`.
 
+**R2 — بررسی‌های بتای فعال‌شده توسط کاربر:**
+
+بررسی‌های بتا به‌طور پیش‌فرض خاموش‌اند. فقط شواهد `BETA` در دسترس و سرکوب‌نشده با اطمینان `MEDIUM`/`HIGH` شرکت می‌کنند. دو `independenceGroup` متفاوت، یا یک گروه بتا همراه با منبع پایدار و مستقل شبکه، می‌تواند `DETECTED` بدهد؛ یک سیگنال یا جداسازی نمایه به‌تنهایی حداکثر `NEEDS_REVIEW` است. حالت‌های `LOW`، صرفاً زمینه‌ای، رد مجوز، پشتیبانی‌نشده، غیردردسترس، خطا و سرکوب‌شده خنثی‌اند. خانواده‌های پیاده‌سازی‌شده شامل زمینهٔ اجرا، APIهای پنهان Binder فقط‌خواندنی، descriptorهای socket/netd/routing متعلق به برنامه، سازگاری sandbox/linker و canaryهای کنترل‌شدهٔ transport/DNS/TLS هستند. پرس‌وجوهای سراسری WireGuard/OpenVPN DCO/XFRM/BPF فقط با master جداگانه و خاموش به‌طور پیش‌فرض و انتخاب صریح Shizuku یا root اجرا می‌شوند؛ fallback خودکار وجود ندارد. endpointهای canary با ویژگی‌های Gradle از نوع `betaCanary*` تنظیم می‌شوند و بدون آن‌ها نتیجه `UNAVAILABLE` است. `beta-checks-research.md` را ببینید.
+
 **R3 — اجماع IP:**
 
 `IpConsensusBuilder` سیگنال‌های GeoIP، IpComparison، CDN Pulling، TUN probe، bypass و callTransportLeaks را یکپارچه می‌کند. اگر `geoAxis` مشخص شود (IP خارجی، geo-country mismatch یا نشانگر Warp) و همزمان `probeTargetDivergence`، `probeTargetDirectDivergence` یا `crossChannelMismatch` وجود داشته باشد → `DETECTED`.

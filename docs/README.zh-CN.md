@@ -637,6 +637,10 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 
 若任何 detected evidence 的来源为 `SPLIT_TUNNEL_BYPASS`、`XRAY_API`、`VPN_GATEWAY_LEAK` 或 `VPN_NETWORK_BINDING` → `DETECTED`。
 
+**R2 — 用户启用的测试版检查：**
+
+测试版检查默认关闭。只有可用、未被抑制且置信度为 `MEDIUM`/`HIGH` 的 `BETA` 证据才参与判定。两个不同的 `independenceGroup`，或一个测试版组加一个独立的稳定网络来源，可得到 `DETECTED`；单个信号或仅配置文件隔离最多得到 `NEEDS_REVIEW`。`LOW`、仅上下文、权限被拒绝、不支持、不可用、错误及被抑制的观察均为中性。已实现的系列包括执行上下文、只读隐藏 Binder API、应用自有 socket/netd/routing 描述符、sandbox/linker 一致性，以及受控 transport/DNS/TLS canary。全局 WireGuard/OpenVPN DCO/XFRM/BPF 查询仅在单独且默认关闭的 master 开启，并明确选择 Shizuku 或 root 后运行；不会自动回退。canary endpoint 通过 `betaCanary*` Gradle 属性配置，未配置时返回 `UNAVAILABLE`。参见 `beta-checks-research.md`。
+
 **R3 — IP 共识：**
 
 `IpConsensusBuilder` 整合来自 GeoIP、IpComparison、CDN Pulling、TUN 探测、bypass 和 callTransportLeaks 的信号。若确定了 `geoAxis`（境外 IP、地理国家不匹配或 Warp 指标），且同时存在 `probeTargetDivergence`、`probeTargetDirectDivergence` 或 `crossChannelMismatch` → `DETECTED`。

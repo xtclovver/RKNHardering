@@ -45,6 +45,12 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         ) { activity.navigateTo(SettingsCustomChecksFragment(), R.string.settings_cat_custom_checks) }
 
         bindRow(
+            view, R.id.rowBetaChecks,
+            iconRes = R.drawable.ic_error,
+            title = getString(R.string.settings_cat_beta_checks),
+        ) { activity.navigateTo(SettingsBetaChecksFragment(), R.string.settings_cat_beta_checks) }
+
+        bindRow(
             view, R.id.rowPrivacy,
             iconRes = R.drawable.ic_lock,
             title = getString(R.string.settings_cat_privacy),
@@ -100,6 +106,7 @@ internal class SettingsCategoriesFragment : Fragment(R.layout.fragment_settings_
         setRowValue(root, R.id.rowNetwork, if (networkRequestsEnabled()) R.string.settings_value_network_all else R.string.settings_value_network_disabled)
         setRowValue(root, R.id.rowDns, dnsValue())
         setRowValue(root, R.id.rowCustomChecks, customChecksValue())
+        setRowValue(root, R.id.rowBetaChecks, R.string.settings_cat_beta_checks_desc)
         setRowValue(root, R.id.rowPrivacy, if (privacyModeEnabled()) R.string.settings_value_privacy_masking else R.string.settings_value_off)
         setRowValue(root, R.id.rowAppearance, appearanceValue())
         setRowValue(root, R.id.rowAccessibility, colorVisionValue())

@@ -182,6 +182,17 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <service
+            android:name=".probe.privileged.RootPrivilegedProbeService"
+            android:exported="false"
+            tools:ignore="Instantiatable" />
     </application>
 
 </manifest>

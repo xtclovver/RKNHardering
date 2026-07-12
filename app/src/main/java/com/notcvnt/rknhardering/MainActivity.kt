@@ -38,6 +38,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.notcvnt.rknhardering.checker.BypassChecker
+import com.notcvnt.rknhardering.checker.BetaCheckSettings
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.model.BypassResult
@@ -108,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         DIRECT,
         INDIRECT,
         NATIVE_SIGNS,
+        BETA_CHECKS,
         ICMP,
         RTT_TRIANGULATION,
         LOCATION,
@@ -149,6 +151,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusNativeSigns: TextView
     private lateinit var textNativeSignsSummary: TextView
     private lateinit var findingsNativeSigns: LinearLayout
+    private lateinit var cardBetaChecks: MaterialCardView
+    private lateinit var iconBetaChecks: ImageView
+    private lateinit var statusBetaChecks: TextView
+    private lateinit var findingsBetaChecks: LinearLayout
     private lateinit var btnHelpNativeSigns: ImageButton
     private lateinit var btnHelpIpComparison: ImageButton
     private lateinit var cardIpChannels: MaterialCardView
@@ -446,6 +452,10 @@ class MainActivity : AppCompatActivity() {
         statusNativeSigns = findViewById(R.id.statusNativeSigns)
         textNativeSignsSummary = findViewById(R.id.textNativeSignsSummary)
         findingsNativeSigns = findViewById(R.id.findingsNativeSigns)
+        cardBetaChecks = findViewById(R.id.cardBetaChecks)
+        iconBetaChecks = findViewById(R.id.iconBetaChecks)
+        statusBetaChecks = findViewById(R.id.statusBetaChecks)
+        findingsBetaChecks = findViewById(R.id.findingsBetaChecks)
         btnHelpNativeSigns = findViewById(R.id.btnHelpNativeSigns)
         btnHelpIpComparison = findViewById(R.id.btnHelpIpComparison)
         cardIpChannels = findViewById(R.id.cardIpChannels)
@@ -821,6 +831,27 @@ class MainActivity : AppCompatActivity() {
             portRange = portRange,
             portRangeStart = portRangeStart,
             portRangeEnd = portRangeEnd,
+            beta = BetaCheckSettings(
+                enabled = prefs.getBoolean(SettingsPrefs.PREF_BETA_CHECKS_ENABLED, false),
+                hiddenAndroidApis = prefs.getBoolean(SettingsPrefs.PREF_BETA_HIDDEN_ANDROID_APIS, true),
+                kernelNetlink = prefs.getBoolean(SettingsPrefs.PREF_BETA_KERNEL_NETLINK, true),
+                socketOracles = prefs.getBoolean(SettingsPrefs.PREF_BETA_SOCKET_ORACLES, true),
+                profileIsolation = prefs.getBoolean(SettingsPrefs.PREF_BETA_PROFILE_ISOLATION, true),
+                sandboxIntegrity = prefs.getBoolean(SettingsPrefs.PREF_BETA_SANDBOX_INTEGRITY, true),
+                bpfNetfilter = prefs.getBoolean(SettingsPrefs.PREF_BETA_BPF_NETFILTER, false),
+                aggressive = prefs.getBoolean(SettingsPrefs.PREF_BETA_AGGRESSIVE_SCAN, false),
+                privilegedChecksEnabled = prefs.getBoolean(
+                    SettingsPrefs.PREF_BETA_PRIVILEGED_CHECKS_ENABLED,
+                    false,
+                ),
+                privilegedProvider = prefs.getString(SettingsPrefs.PREF_BETA_PRIVILEGED_PROVIDER, null)
+                    ?.let { value ->
+                        runCatching {
+                            com.notcvnt.rknhardering.model.PrivilegedProbeProvider.valueOf(value)
+                        }.getOrNull()
+                    }
+                    ?: com.notcvnt.rknhardering.model.PrivilegedProbeProvider.NONE,
+            ),
         )
 
         val customEnabled = prefs.getBoolean(SettingsActivity.PREF_CUSTOM_CHECKS_ENABLED, false)
@@ -1026,6 +1057,7 @@ class MainActivity : AppCompatActivity() {
             }
             is CheckUpdate.LocationSignalsReady -> renderSimpleCard(CATEGORY_LOC, SimpleResultModels.category(update.result))
             is CheckUpdate.NativeSignsReady -> renderSimpleCard(CATEGORY_NAT, SimpleResultModels.category(update.result))
+            is CheckUpdate.BetaChecksReady -> renderSimpleCard(CATEGORY_BET, SimpleResultModels.category(update.result.category))
             is CheckUpdate.BypassReady -> renderSimpleCard(CATEGORY_BYP, SimpleResultModels.bypass(update.result))
             is CheckUpdate.DomainReachabilityReady -> renderSimpleCard(
                 CATEGORY_REA,
@@ -1045,6 +1077,9 @@ class MainActivity : AppCompatActivity() {
         renderSimpleCard(CATEGORY_DIR, SimpleResultModels.category(result.directSigns))
         renderSimpleCard(CATEGORY_IND, SimpleResultModels.category(result.indirectSigns))
         renderSimpleCard(CATEGORY_NAT, SimpleResultModels.category(result.nativeSigns))
+        if (result.betaChecks.category.name.isNotEmpty()) {
+            renderSimpleCard(CATEGORY_BET, SimpleResultModels.category(result.betaChecks.category))
+        }
         renderSimpleCard(
             CATEGORY_STN,
             SimpleResultModels.callTransport(
@@ -1111,6 +1146,7 @@ class MainActivity : AppCompatActivity() {
         CATEGORY_DIR -> R.string.simple_title_direct
         CATEGORY_IND -> R.string.simple_title_indirect
         CATEGORY_NAT -> R.string.simple_title_native
+        CATEGORY_BET -> R.string.simple_title_beta
         CATEGORY_STN -> R.string.simple_title_call_transport
         CATEGORY_ICM -> R.string.simple_title_icmp
         CATEGORY_RTT -> R.string.simple_title_rtt
@@ -1128,6 +1164,7 @@ class MainActivity : AppCompatActivity() {
             CATEGORY_DIR -> R.string.simple_checked_direct
             CATEGORY_IND -> R.string.simple_checked_indirect
             CATEGORY_NAT -> R.string.simple_checked_native
+            CATEGORY_BET -> R.string.simple_checked_beta
             CATEGORY_STN -> R.string.simple_checked_call_transport
             CATEGORY_ICM -> R.string.simple_checked_icmp
             CATEGORY_RTT -> R.string.simple_checked_rtt
@@ -1141,6 +1178,7 @@ class MainActivity : AppCompatActivity() {
     private fun simpleVerdictExplanation(rule: VerdictRuleCode): String = getString(
         when (rule) {
             VerdictRuleCode.R1_HARD_BYPASS -> R.string.simple_verdict_hard_bypass
+            VerdictRuleCode.R2_BETA_EVIDENCE -> R.string.simple_verdict_beta_evidence
             VerdictRuleCode.R3_PROBE_TARGET_DIVERGENCE,
             VerdictRuleCode.R3_PROBE_TARGET_DIRECT_DIVERGENCE,
             VerdictRuleCode.R3_CROSS_CHANNEL_MISMATCH,
@@ -1179,6 +1217,18 @@ class MainActivity : AppCompatActivity() {
         if (cardDomainReachability.isVisible || !result.domainReachability.isEmpty) {
             displayDomainReachability(result.domainReachability)
             updateTileFromDomainReachability(result.domainReachability)
+        }
+
+        if (cardBetaChecks.isVisible || result.betaChecks.category.findings.isNotEmpty()) {
+            displayCategory(
+                result.betaChecks.category,
+                cardBetaChecks,
+                iconBetaChecks,
+                statusBetaChecks,
+                findingsBetaChecks,
+                privacyMode,
+            )
+            updateTileFromCategory(CATEGORY_BET, result.betaChecks.category)
         }
     }
 
@@ -1251,6 +1301,9 @@ class MainActivity : AppCompatActivity() {
         findingsNativeSigns.removeAllViews()
         findingsNativeSigns.visibility = View.GONE
 
+        findingsBetaChecks.removeAllViews()
+        findingsBetaChecks.visibility = View.GONE
+
         findingsBypass.removeAllViews()
         findingsBypass.visibility = View.GONE
 
@@ -1281,6 +1334,7 @@ class MainActivity : AppCompatActivity() {
         if (settings.directSigns.enabled) stages += RunningStage.DIRECT
         if (settings.indirectSigns.enabled) stages += RunningStage.INDIRECT
         if (settings.nativeSignsEnabled) stages += RunningStage.NATIVE_SIGNS
+        if (settings.beta.enabled) stages += RunningStage.BETA_CHECKS
         if (settings.locationSignals.enabled) stages += RunningStage.LOCATION
         if (settings.networkRequestsEnabled || settings.splitTunnelEnabled) {
             stages += RunningStage.IP_CONSENSUS
@@ -1409,6 +1463,20 @@ class MainActivity : AppCompatActivity() {
                 updateTileFromCategory(CATEGORY_NAT, update.result)
                 if (animate) animateContentReveal(findingsNativeSigns, textNativeSignsSummary)
             }
+            is CheckUpdate.BetaChecksReady -> {
+                markStageCompleted(RunningStage.BETA_CHECKS)
+                ensureCardVisible(cardBetaChecks)
+                displayCategory(
+                    update.result.category,
+                    cardBetaChecks,
+                    iconBetaChecks,
+                    statusBetaChecks,
+                    findingsBetaChecks,
+                    activeCheckPrivacyMode,
+                )
+                updateTileFromCategory(CATEGORY_BET, update.result.category)
+                if (animate) animateContentReveal(findingsBetaChecks)
+            }
             is CheckUpdate.BypassProgress -> {
                 showLoadingCardForStage(RunningStage.BYPASS)
                 updateBypassProgress(update.progress)
@@ -1444,6 +1512,7 @@ class MainActivity : AppCompatActivity() {
         RunningStage.DIRECT -> CATEGORY_DIR
         RunningStage.INDIRECT -> CATEGORY_IND
         RunningStage.NATIVE_SIGNS -> CATEGORY_NAT
+        RunningStage.BETA_CHECKS -> CATEGORY_BET
         RunningStage.ICMP -> CATEGORY_ICM
         RunningStage.RTT_TRIANGULATION -> CATEGORY_RTT
         RunningStage.LOCATION -> CATEGORY_LOC
@@ -1472,6 +1541,7 @@ class MainActivity : AppCompatActivity() {
         RunningStage.DIRECT -> StageCategoryViews(cardDirect, iconDirect, statusDirect, findingsDirect, directInfoSection, directDivider)
         RunningStage.INDIRECT -> StageCategoryViews(cardIndirect, iconIndirect, statusIndirect, findingsIndirect)
         RunningStage.NATIVE_SIGNS -> StageCategoryViews(cardNativeSigns, iconNativeSigns, statusNativeSigns, findingsNativeSigns)
+        RunningStage.BETA_CHECKS -> StageCategoryViews(cardBetaChecks, iconBetaChecks, statusBetaChecks, findingsBetaChecks)
         RunningStage.LOCATION -> StageCategoryViews(cardLocation, iconLocation, statusLocation, findingsLocation, locationInfoSection, locationDivider)
         else -> null
     }
@@ -1711,6 +1781,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.DIRECT -> getString(R.string.main_loading_direct)
             RunningStage.INDIRECT -> getString(R.string.main_loading_indirect)
             RunningStage.NATIVE_SIGNS -> getString(R.string.main_loading_native_signs)
+            RunningStage.BETA_CHECKS -> getString(R.string.main_loading_beta_checks)
             RunningStage.LOCATION -> getString(R.string.main_loading_location)
             RunningStage.IP_CONSENSUS -> getString(R.string.main_loading_ip_comparison)
             RunningStage.BYPASS -> getString(R.string.main_loading_bypass)
@@ -1735,6 +1806,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.DIRECT -> cardDirect
             RunningStage.INDIRECT -> cardIndirect
             RunningStage.NATIVE_SIGNS -> cardNativeSigns
+            RunningStage.BETA_CHECKS -> cardBetaChecks
             RunningStage.LOCATION -> cardLocation
             RunningStage.IP_CONSENSUS -> cardIpChannels
             RunningStage.BYPASS -> cardBypass
@@ -1752,6 +1824,7 @@ class MainActivity : AppCompatActivity() {
             RunningStage.DIRECT -> statusDirect
             RunningStage.INDIRECT -> statusIndirect
             RunningStage.NATIVE_SIGNS -> statusNativeSigns
+            RunningStage.BETA_CHECKS -> statusBetaChecks
             RunningStage.LOCATION -> statusLocation
             RunningStage.IP_CONSENSUS -> statusGeoIp
             RunningStage.BYPASS -> statusBypass
@@ -2004,6 +2077,7 @@ class MainActivity : AppCompatActivity() {
         private const val CATEGORY_LOC = CategoryTiles.LOC
         private const val CATEGORY_BYP = CategoryTiles.BYP
         private const val CATEGORY_NAT = CategoryTiles.NAT
+        private const val CATEGORY_BET = CategoryTiles.BET
         private const val CATEGORY_REA = CategoryTiles.REA
 
         private const val TILE_STATUS_NEUTRAL = 0
@@ -2267,6 +2341,10 @@ class MainActivity : AppCompatActivity() {
                 if ((textNativeSignsSummary.text?.isNotBlank() == true && textNativeSignsSummary.visibility == View.VISIBLE) || findingsNativeSigns.childCount > 0) return
                 syncHintOnlyContainer(findingsNativeSigns, previewMessageForCategory(id))
             }
+            CATEGORY_BET -> {
+                if (findingsBetaChecks.childCount > 0) return
+                syncHintOnlyContainer(findingsBetaChecks, previewMessageForCategory(id))
+            }
             CATEGORY_STN -> {
                 val hasSummary = textCallTransportSummary.visibility == View.VISIBLE &&
                     textCallTransportSummary.text?.isNotBlank() == true
@@ -2312,6 +2390,7 @@ class MainActivity : AppCompatActivity() {
             CATEGORY_DIR -> getString(R.string.main_preview_direct)
             CATEGORY_IND -> getString(R.string.main_preview_indirect)
             CATEGORY_NAT -> getString(R.string.main_preview_native_signs)
+            CATEGORY_BET -> getString(R.string.simple_checked_beta)
             CATEGORY_STN -> getString(R.string.main_preview_call_transport)
             CATEGORY_ICM -> getString(R.string.main_preview_icmp)
             CATEGORY_RTT -> getString(R.string.main_preview_rtt_triangulation)

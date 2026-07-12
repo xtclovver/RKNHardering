@@ -636,6 +636,10 @@ High confidence (→ `detected = true`): `sysfs_vpn_leak`, `getifaddrs_vpn`, `sy
 
 If any detected evidence has source `SPLIT_TUNNEL_BYPASS`, `XRAY_API`, `VPN_GATEWAY_LEAK`, or `VPN_NETWORK_BINDING` → `DETECTED`.
 
+**R2 — user-enabled beta checks:**
+
+Beta checks are off by default. Only available, unsuppressed `BETA` evidence with `MEDIUM`/`HIGH` confidence participates. Two different `independenceGroup` values, or one beta group plus an independent stable network source, can produce `DETECTED`; a single signal or profile isolation alone produces at most `NEEDS_REVIEW`. `LOW`, context-only, denied, unsupported, unavailable, error, and suppressed observations are neutral. The implemented families cover execution context, read-only hidden Binder APIs, app-owned socket/netd/routing descriptors, sandbox/linker consistency, and controlled transport/DNS/TLS canaries. Global WireGuard/OpenVPN DCO/XFRM/BPF queries require a separate, default-off consent switch and an explicit Shizuku or root provider; there is no automatic fallback. The provider exposes only fixed read-only AIDL methods and sanitizes results. Canary endpoints are supplied through `betaCanary*` Gradle properties; without them active probes report `UNAVAILABLE`. See `beta-checks-research.md`.
+
 **R3 — IP consensus:**
 
 `IpConsensusBuilder` aggregates signals from GeoIP, IpComparison, CDN Pulling, TUN probe, bypass, and callTransportLeaks. If a `geoAxis` is established (foreign IPs, geo-country mismatch, or Warp indicator) and `probeTargetDivergence`, `probeTargetDirectDivergence`, or `crossChannelMismatch` is present → `DETECTED`.
