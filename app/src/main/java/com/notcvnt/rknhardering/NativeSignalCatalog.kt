@@ -62,7 +62,7 @@ object NativeSignalCatalog {
         NativeSignalId.VPN_PROPERTY -> legacy(id, NativeSignalCategory.VPN_ARTIFACTS, "vpn-property", R.string.vpn_desc_prop)
         NativeSignalId.DNS_PROPERTY -> legacy(id, NativeSignalCategory.VPN_ARTIFACTS, "dns-property", R.string.vpn_desc_dns)
         NativeSignalId.VPN_FILE -> legacy(id, NativeSignalCategory.VPN_ARTIFACTS, "vpn-file", R.string.vpn_desc_file)
-        NativeSignalId.VPNHIDE -> legacy(id, NativeSignalCategory.HOOKS, "vpnhide", R.string.vpn_desc_vpnhide)
+        NativeSignalId.VPNHIDE -> legacy(id, NativeSignalCategory.HOOKS, "vpnhide", R.string.native_signal_title_vpnhide)
         NativeSignalId.LSPOSED -> legacy(id, NativeSignalCategory.HOOKS, "lsposed", R.string.vpn_desc_lsposed)
         NativeSignalId.HOOK_PROPERTY -> legacy(id, NativeSignalCategory.HOOKS, "hook-property", R.string.vpn_desc_hook)
         NativeSignalId.TCP_VPN_PORT -> legacy(id, NativeSignalCategory.VPN_ARTIFACTS, "tcp-vpn-port", R.string.vpn_desc_tcp_port)
@@ -202,6 +202,13 @@ object NativeSignalCatalog {
         "proc_ipv6_route_vpn" to NativeSignalId.PROC_IPV6_ROUTE_VPN,
         "proc_net_dev_vpn" to NativeSignalId.PROC_NET_DEV_VPN,
         "ifindexname_vpn" to NativeSignalId.IFINDEXNAME_VPN,
+        "vpnhide_ifindex_clean" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifindex_unavailable" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifindex_oracle" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifconf_clean" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifconf_unavailable" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifconf_tail_vpn" to NativeSignalId.VPNHIDE,
+        "vpnhide_ifconf_tail_oracle" to NativeSignalId.VPNHIDE,
         "vpn_policy_rules_netlink" to NativeSignalId.VPN_POLICY_RULES_NETLINK,
         "fib_trie_denied" to NativeSignalId.FIB_TRIE_DENIED,
         "inet_diag_denied" to NativeSignalId.INET_DIAG_DENIED,

@@ -715,6 +715,10 @@
     <string name="vpn_desc_udp_port_physical">UDP port conflict on physical interface</string>
     <string name="vpn_desc_trim_oracle">Bind probe vs RTM_GETLINK discrepancy</string>
     <string name="vpn_desc_ifindexname">VPN interface exposed via if_indextoname</string>
+    <string name="vpn_desc_vpnhide_ifindex_probe">VPNHide interface name and index consistency check</string>
+    <string name="vpn_desc_vpnhide_ifconf_probe">VPNHide interface list buffer check</string>
+    <string name="vpn_desc_vpnhide_probe_clean">%1$s: no anomalies detected</string>
+    <string name="vpn_desc_vpnhide_probe_unavailable">%1$s: unavailable (%2$s)</string>
     <string name="vpn_desc_pmtu_mss">UDP PMTU and TCP MSS analysis</string>
     <string name="vpn_desc_udp_pmtu_ok">UDP send succeeded (no PMTU bottleneck)</string>
     <string name="vpn_desc_udp_pmtu_fail">UDP send failed (PMTU issue)</string>
@@ -731,6 +735,7 @@
     <string name="checker_vpn_detector_category_name">VPN Detector (deep)</string>
     <string name="checker_vpn_detector_unavailable">VPN detector library not loaded</string>
     <string name="checker_vpn_detector_unavailable_with_reason">VPN detector library not loaded: %1$s</string>
+    <string name="checker_vpn_detector_failed_with_reason">VPN detector failed: %1$s</string>
     <string name="checker_vpn_detector_no_anomalies">No deep VPN signs detected</string>
 
 
@@ -1157,6 +1162,7 @@
     <string name="native_signal_title_route_table">Native routing table</string>
     <string name="native_signal_title_host_route">Public host routes</string>
     <string name="native_signal_title_hook_markers">Hook markers in process maps</string>
+    <string name="native_signal_title_vpnhide">VPNHide concealment checks</string>
     <string name="native_signal_title_rwx_memory">Writable executable memory regions</string>
     <string name="native_signal_title_library_integrity">Native library integrity</string>
     <string name="native_signal_title_root">Root indicators</string>

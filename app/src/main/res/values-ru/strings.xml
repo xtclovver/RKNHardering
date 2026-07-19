@@ -710,6 +710,10 @@
     <string name="vpn_desc_udp_port_physical">Конфликт UDP-порта на физическом интерфейсе</string>
     <string name="vpn_desc_trim_oracle">Расхождение bind probe и RTM_GETLINK</string>
     <string name="vpn_desc_ifindexname">VPN-интерфейс через if_indextoname</string>
+    <string name="vpn_desc_vpnhide_ifindex_probe">Проверка VPNHide на согласованность имени и индекса интерфейса</string>
+    <string name="vpn_desc_vpnhide_ifconf_probe">Проверка VPNHide буфера списка интерфейсов</string>
+    <string name="vpn_desc_vpnhide_probe_clean">%1$s: аномалий не обнаружено</string>
+    <string name="vpn_desc_vpnhide_probe_unavailable">%1$s: недоступна (%2$s)</string>
     <string name="vpn_desc_pmtu_mss">Анализ UDP PMTU и TCP MSS</string>
     <string name="vpn_desc_udp_pmtu_ok">UDP-отправка успешна (нет PMTU-проблемы)</string>
     <string name="vpn_desc_udp_pmtu_fail">UDP-отправка не удалась (PMTU-проблема)</string>
@@ -726,6 +730,7 @@
     <string name="checker_vpn_detector_category_name">VPN Детектор (глубокий)</string>
     <string name="checker_vpn_detector_unavailable">Библиотека VPN-детектора не загружена</string>
     <string name="checker_vpn_detector_unavailable_with_reason">Библиотека VPN-детектора не загружена: %1$s</string>
+    <string name="checker_vpn_detector_failed_with_reason">Сбой VPN-детектора: %1$s</string>
     <string name="checker_vpn_detector_no_anomalies">Глубоких признаков VPN не обнаружено</string>
 
 
@@ -1145,6 +1150,7 @@
     <string name="native_signal_title_route_table">Нативная таблица маршрутизации</string>
     <string name="native_signal_title_host_route">Публичные host-маршруты</string>
     <string name="native_signal_title_hook_markers">Маркеры хуков в картах процесса</string>
+    <string name="native_signal_title_vpnhide">Проверки сокрытия VPNHide</string>
     <string name="native_signal_title_rwx_memory">Записываемые исполняемые области памяти</string>
     <string name="native_signal_title_library_integrity">Целостность нативных библиотек</string>
     <string name="native_signal_title_root">Признаки root</string>

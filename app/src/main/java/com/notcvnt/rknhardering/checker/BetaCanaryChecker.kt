@@ -66,12 +66,18 @@ internal object BetaCanaryChecker {
             available.any { it.family == family && it.transport == BetaCanaryTransport.DNS } &&
                 available.any { it.family == family && it.transport == BetaCanaryTransport.HTTP }
         }
+        val facts = buildMap {
+            put("divergent", divergent.toString())
+            put("comparable", comparable.toString())
+            result.reason?.let { put("error", it) }
+        }
         return observation(
             "beta.dns_netid", EvidenceSource.BETA_DNS_NETID, "dns_path",
             DetectionDomain.NETWORK_PATH_DIVERGENCE, result.toAvailability(),
             divergent, comparable && !divergent, if (divergent) EvidenceConfidence.HIGH else EvidenceConfidence.LOW,
             context.getString(if (divergent) R.string.beta_canary_dns_divergent else R.string.beta_canary_dns_checked), epoch.id, at,
             suppressions = if (divergent) epoch.canarySuppressions() else emptyList(),
+            facts = facts,
         )
     }
 
@@ -84,12 +90,18 @@ internal object BetaCanaryChecker {
             family.mapNotNull(BetaCanaryObservation::observedAddressHash).distinct().size > 1
         }
         val comparable = available.groupBy { it.family }.values.any { it.size >= 2 }
+        val facts = buildMap {
+            put("divergent", divergent.toString())
+            put("comparable", comparable.toString())
+            result.reason?.let { put("error", it) }
+        }
         return observation(
             "beta.transport_matrix", EvidenceSource.BETA_TRANSPORT_MATRIX, "active_egress",
             DetectionDomain.NETWORK_PATH_DIVERGENCE, result.toAvailability(), divergent, comparable && !divergent,
             if (divergent) EvidenceConfidence.MEDIUM else EvidenceConfidence.LOW,
             context.getString(if (divergent) R.string.beta_canary_transport_divergent else R.string.beta_canary_transport_checked), epoch.id, at,
             suppressions = if (divergent) epoch.canarySuppressions() else emptyList(),
+            facts = facts,
         )
     }
 
@@ -97,6 +109,11 @@ internal object BetaCanaryChecker {
         val tls = result.observations.filter { it.transport == BetaCanaryTransport.HTTPS }
         val pinMismatch = tls.any { it.failureKind == "SPKI_PIN_MISMATCH" }
         val available = tls.any { it.status == BetaCanaryStatus.AVAILABLE }
+        val facts = buildMap {
+            put("pin_mismatch", pinMismatch.toString())
+            put("available", available.toString())
+            result.reason?.let { put("error", it) }
+        }
         return observation(
             "beta.tls_interception", EvidenceSource.BETA_TLS_INTERCEPTION, "tls_path",
             DetectionDomain.VPN_OR_PROXY,
@@ -110,6 +127,7 @@ internal object BetaCanaryChecker {
                 if (epoch.httpProxy != null) add(BetaSuppressionRuleId.ENTERPRISE_PROXY_CONTEXT)
                 if (epoch.validated == false) add(BetaSuppressionRuleId.NETWORK_NOT_VALIDATED)
             } else emptyList(),
+            facts = facts,
         )
     }
 
@@ -117,11 +135,16 @@ internal object BetaCanaryChecker {
         val available = result.observations.any {
             it.status == BetaCanaryStatus.AVAILABLE && it.serverFingerprintHash != null
         }
+        val facts = buildMap {
+            put("available", available.toString())
+            result.reason?.let { put("error", it) }
+        }
         return observation(
             "beta.server_fingerprint", EvidenceSource.BETA_SERVER_FINGERPRINT, "server_observation",
             DetectionDomain.SYSTEM_NETWORK_CONTEXT, result.toAvailability(), positive = false,
             clean = available, confidence = EvidenceConfidence.LOW,
             context.getString(R.string.beta_canary_server_checked), epochId, at,
+            facts = facts,
         )
     }
 
@@ -138,6 +161,7 @@ internal object BetaCanaryChecker {
         epochId: String,
         at: Long,
         suppressions: List<BetaSuppressionRuleId> = emptyList(),
+        facts: Map<String, String> = emptyMap(),
     ) = BetaObservation(
         checkId = checkId,
         source = source,
@@ -152,7 +176,7 @@ internal object BetaCanaryChecker {
         confidence = confidence,
         independenceGroup = group,
         detectionDomain = domain,
-        facts = mapOf("summary" to summary),
+        facts = facts + ("summary" to summary),
         suppressions = suppressions,
         observedAtElapsedMs = at,
         networkEpochId = epochId,

@@ -114,6 +114,36 @@ class ResultDisplayModeUiTest {
     }
 
     @Test
+    fun `clean vpnhide probes are visible after expanding hooks group`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
+        val ifindex = activity.getString(R.string.vpn_desc_vpnhide_ifindex_probe)
+        val ifconf = activity.getString(R.string.vpn_desc_vpnhide_ifconf_probe)
+        val native = CategoryResult(
+            name = "native",
+            detected = false,
+            findings = listOf(
+                Finding("$ifindex: clean", isInformational = true, nativeSignalId = NativeSignalId.VPNHIDE),
+                Finding("$ifconf: clean", isInformational = true, nativeSignalId = NativeSignalId.VPNHIDE),
+            ),
+        )
+        invokePrivate<Unit>(
+            activity,
+            "applyScanEvent",
+            ScanEvent.Update(CheckUpdate.NativeSignsReady(native)),
+            false,
+        )
+
+        val details = findByTag(activity, "native-group-details:HOOKS")
+        assertEquals(View.GONE, details.visibility)
+        findByTag(activity, "native-group-header:HOOKS").performClick()
+
+        val text = collectVisibleText(details)
+        assertTrue(text.contains(ifindex))
+        assertTrue(text.contains(ifconf))
+    }
+
+    @Test
     fun `native grouped rows keep privacy masking`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), true, ResultDisplayMode.NORMAL)

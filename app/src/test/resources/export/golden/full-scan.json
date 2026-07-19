@@ -387,20 +387,111 @@
     },
     "betaChecks": {
       "name": "β Бета-проверки",
-      "detected": false,
+      "detected": true,
       "needsReview": false,
-      "hasError": false,
-      "status": "[OK]",
+      "hasError": true,
+      "status": "[ERROR]",
       "maturity": "BETA",
-      "findings": [],
-      "evidence": [],
+      "findings": [
+        {
+          "description": "β Exact socket cookie confirmed",
+          "detected": false,
+          "needsReview": false,
+          "isInformational": true,
+          "isError": false,
+          "source": "BETA_SOCKET_DIAG",
+          "confidence": "LOW",
+          "maturity": "BETA",
+          "checkId": "beta.inet_diag_cookie",
+          "availability": "AVAILABLE",
+          "rawConfidence": "LOW",
+          "suppressionRuleIds": [],
+          "independenceGroup": "socket_diag",
+          "detectionDomain": "NETWORK_PATH_DIVERGENCE",
+          "facts": {
+            "cookie": "12345678",
+            "cookie_match": "true",
+            "matched": "true"
+          }
+        },
+        {
+          "description": "β WireGuard Genl failure",
+          "detected": false,
+          "needsReview": false,
+          "isInformational": false,
+          "isError": true,
+          "source": "BETA_WIREGUARD_GENL",
+          "confidence": "LOW",
+          "maturity": "BETA",
+          "checkId": "beta.wireguard_genl",
+          "availability": "ERROR",
+          "rawConfidence": "LOW",
+          "suppressionRuleIds": [],
+          "independenceGroup": "kernel_vpn",
+          "detectionDomain": "VPN_OR_PROXY",
+          "facts": {
+            "errno": "13",
+            "error": "Permission denied",
+            "stage": "family"
+          }
+        },
+        {
+          "description": "β Check skipped or not executed",
+          "detected": false,
+          "needsReview": false,
+          "isInformational": true,
+          "isError": false,
+          "source": "BETA_USER_PROFILE",
+          "confidence": "LOW",
+          "maturity": "BETA",
+          "checkId": "beta.user_profile",
+          "availability": "SKIPPED",
+          "rawConfidence": "LOW",
+          "suppressionRuleIds": [],
+          "independenceGroup": "android_user_manager",
+          "detectionDomain": "ISOLATED_PROFILE",
+          "facts": {}
+        }
+      ],
+      "evidence": [
+        {
+          "source": "BETA_SOCKET_DIAG",
+          "detected": true,
+          "confidence": "LOW",
+          "description": "β Exact socket cookie confirmed",
+          "maturity": "BETA",
+          "checkId": "beta.inet_diag_cookie",
+          "independenceGroup": "socket_diag",
+          "detectionDomain": "NETWORK_PATH_DIVERGENCE",
+          "hardSignal": false
+        }
+      ],
       "matchedApps": [],
       "activeApps": [],
       "callTransportLeaks": [],
       "stunProbeGroups": [],
-      "availabilitySummary": {},
+      "availabilitySummary": {
+        "AVAILABLE": 1,
+        "ERROR": 1,
+        "SKIPPED": 1
+      },
       "networkEpochChanges": [],
-      "networkEpochRetryCount": 0
+      "networkEpochRetryCount": 0,
+      "executionContext": {
+        "kind": "MAIN_USER",
+        "confidence": "LOW",
+        "uid": 10123,
+        "appId": 10123,
+        "uidDerivedUserId": 0,
+        "packageUidConsistent": true,
+        "mountNamespaceAvailable": true,
+        "selinuxContextAvailable": true,
+        "mountNamespaceId": "mnt:[123]",
+        "selinuxContext": "u:r:untrusted_app:s0:c1,c2",
+        "virtualizationMismatchAxes": [],
+        "splitOrUpdateLayout": false,
+        "adoptedOrEmulatedStorage": false
+      }
     },
     "icmpSpoofing": {
       "name": "ICMP spoofing",

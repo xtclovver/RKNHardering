@@ -220,7 +220,10 @@ internal object KernelBetaChecker {
         confidence = confidence,
         independenceGroup = group,
         detectionDomain = domain,
-        facts = mapOf("summary" to context.getString(summaryResource(checkId, positive))),
+        facts = row.fields.filter { (k, _) ->
+            val kl = k.lowercase()
+            !kl.contains("cookie") && !kl.contains("inode") && !kl.contains("interface") && !kl.contains("ifname")
+        } + ("summary" to context.getString(summaryResource(checkId, positive))),
         suppressions = suppressions,
         observedAtElapsedMs = at,
         networkEpochId = epochId,

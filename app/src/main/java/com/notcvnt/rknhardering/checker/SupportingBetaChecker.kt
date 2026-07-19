@@ -81,6 +81,7 @@ internal object SupportingBetaChecker {
                 summary = context.getString(R.string.beta_proxy_selector_unavailable),
                 epochId = epochId,
                 at = at,
+                facts = mapOf("error" to (error.message ?: error.toString())),
             )
         }
         val proxyTypes = selections.asSequence()
@@ -109,6 +110,7 @@ internal object SupportingBetaChecker {
             suppressions = if (proxyTypes.isEmpty()) emptyList() else {
                 listOf(BetaSuppressionRuleId.UNSCOPED_GLOBAL_STATE)
             },
+            facts = mapOf("proxy_types" to proxyTypes.joinToString(", ")),
         )
     }
 
@@ -165,6 +167,14 @@ internal object SupportingBetaChecker {
             before.rxBytes != null && before.txBytes != null && after.rxBytes != null && after.txBytes != null
         val increased = complete && canaryTransferred &&
             (after.rxBytes!! > before.rxBytes!! || after.txBytes!! > before.txBytes!!)
+        val facts = buildMap {
+            put("before_rx", before.rxBytes?.toString() ?: "null")
+            put("before_tx", before.txBytes?.toString() ?: "null")
+            put("after_rx", after.rxBytes?.toString() ?: "null")
+            put("after_tx", after.txBytes?.toString() ?: "null")
+            put("canary_transferred", canaryTransferred.toString())
+            put("increased", increased.toString())
+        }
         return observation(
             checkId = "beta.interface_traffic",
             source = EvidenceSource.BETA_INTERFACE_TRAFFIC,
@@ -179,6 +189,7 @@ internal object SupportingBetaChecker {
             epochId = epochId,
             at = at,
             suppressions = if (increased) listOf(BetaSuppressionRuleId.INSUFFICIENT_REPETITIONS) else emptyList(),
+            facts = facts,
         )
     }
 
@@ -198,10 +209,17 @@ internal object SupportingBetaChecker {
                 interfaceName,
                 epochId,
                 at,
+                facts = emptyMap(),
             )
         }
         val normalized = values.joinToString("\n").lowercase()
         val tunnelKind = TUNNEL_MARKERS.firstOrNull { marker -> normalized.contains(marker) }
+        val facts = buildMap {
+            put("tunnel_kind", tunnelKind ?: "none")
+            values.forEachIndexed { index, value ->
+                put("sysfs_value_$index", value)
+            }
+        }
         return interfaceObservation(
             context,
             ProbeAvailability.AVAILABLE,
@@ -214,6 +232,7 @@ internal object SupportingBetaChecker {
             suppressions = if (tunnelKind == null) emptyList() else {
                 listOf(BetaSuppressionRuleId.NO_CAUSAL_COUNTER_DELTA)
             },
+            facts = facts,
         )
     }
 
@@ -227,6 +246,7 @@ internal object SupportingBetaChecker {
         at: Long,
         tunnelKind: String? = null,
         suppressions: List<BetaSuppressionRuleId> = emptyList(),
+        facts: Map<String, String> = emptyMap(),
     ) = observation(
         checkId = "beta.interface_driver",
         source = EvidenceSource.BETA_LINK_DRIVER,
@@ -243,6 +263,7 @@ internal object SupportingBetaChecker {
         epochId = epochId,
         at = at,
         suppressions = suppressions,
+        facts = facts,
     )
 
     private fun observation(
@@ -257,6 +278,7 @@ internal object SupportingBetaChecker {
         epochId: String,
         at: Long,
         suppressions: List<BetaSuppressionRuleId> = emptyList(),
+        facts: Map<String, String> = emptyMap(),
     ) = BetaObservation(
         checkId = checkId,
         source = source,
@@ -266,7 +288,7 @@ internal object SupportingBetaChecker {
         confidence = confidence,
         independenceGroup = group,
         detectionDomain = domain,
-        facts = mapOf("summary" to summary),
+        facts = facts + ("summary" to summary),
         suppressions = suppressions,
         observedAtElapsedMs = at,
         networkEpochId = epochId,

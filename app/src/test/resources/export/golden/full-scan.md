@@ -49,7 +49,7 @@ TIMESTAMP    : 2023-11-14T22:13:20Z
 | Direct signs | [DETECTED] | Installed app com.example.vpn at 198.51.100.7 |
 | Indirect signs | [DETECTED] | Indirect route mismatch 198.51.100.7 |
 | Native signs | [DETECTED] | Native getifaddrs() reports tun0 |
-| β Beta checks | [OK] | <none> |
+| β Beta checks | [ERROR] | β Exact socket cookie confirmed |
 | ICMP spoofing β | [REVIEW] | instagram.com replied and google.com was too fast |
 | RTT triangulation β | [REVIEW] | RTT target mix needs review |
 | Location signals | [OK] | <none> |
@@ -218,10 +218,10 @@ loc=FI
 - <none>
 
 ## β Beta checks
-- Status: [OK]
+- Status: [ERROR]
 - Name: β Бета-проверки
-- Findings count: 0
-- Evidence count: 0
+- Findings count: 3
+- Evidence count: 1
 - Matched apps: 0
 - Active apps: 0
 - Call transport signals: 0
@@ -229,10 +229,12 @@ loc=FI
 - Geo facts: <none>
 
 ### Findings
-- <none>
+- β Exact socket cookie confirmed | informational=true | source=BETA_SOCKET_DIAG | confidence=LOW | maturity=BETA | checkId=beta.inet_diag_cookie | availability=AVAILABLE | rawConfidence=LOW | group=socket_diag | domain=NETWORK_PATH_DIVERGENCE | facts=cookie=12345678,cookie_match=true,matched=true
+- β WireGuard Genl failure | error=true | source=BETA_WIREGUARD_GENL | confidence=LOW | maturity=BETA | checkId=beta.wireguard_genl | availability=ERROR | rawConfidence=LOW | group=kernel_vpn | domain=VPN_OR_PROXY | facts=errno=13,error=Permission denied,stage=family
+- β Check skipped or not executed | informational=true | source=BETA_USER_PROFILE | confidence=LOW | maturity=BETA | checkId=beta.user_profile | availability=SKIPPED | rawConfidence=LOW | group=android_user_manager | domain=ISOLATED_PROFILE
 
 ### Evidence
-- <none>
+- source=BETA_SOCKET_DIAG | detected=true | confidence=LOW | maturity=BETA | checkId=beta.inet_diag_cookie | independenceGroup=socket_diag | detectionDomain=NETWORK_PATH_DIVERGENCE | hardSignal=false | description=β Exact socket cookie confirmed
 
 ### Matched apps
 - <none>
@@ -242,6 +244,17 @@ loc=FI
 
 ### Call transport
 - <none>
+
+### Beta execution context
+- kind=MAIN_USER | confidence=LOW
+- uid=10123 | appId=10123
+- mountNamespaceId=mnt:[123]
+- selinuxContext=u:r:untrusted_app:s0:c1,c2
+- userIds=uid:0,context:<none>,ce:<none>,de:<none>,external:<none>
+- profile=null | managed=null | hiddenType=<none>
+- consistency=uid:true,source:null,publicSource:null,nativeLib:null
+- mismatchAxes=<none>
+- mountNamespaceAvailable=true | selinuxContextAvailable=true
 
 ## ICMP spoofing β
 - Status: [REVIEW]

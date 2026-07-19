@@ -61,6 +61,31 @@ internal object HiddenAndroidBetaChecker {
         val activeLegacy = legacy?.present == true && legacy.state == LEGACY_VPN_STATE_CONNECTED
         val available = snapshot != null && (config != null || legacy != null)
         val clean = config?.present == false && legacy?.present == false
+
+        val facts = buildMap {
+            listOf(result, snapshot?.config, snapshot?.legacyInfo).filterNotNull().forEach { outcome ->
+                val reason = when (outcome) {
+                    is HiddenCallResult.Failure -> outcome.reason
+                    is HiddenCallResult.PermissionDenied -> outcome.reason
+                    is HiddenCallResult.Unsupported -> outcome.reason
+                    is HiddenCallResult.Skipped -> outcome.reason
+                    is HiddenCallResult.Unavailable -> outcome.reason
+                    else -> null
+                }
+                if (reason != null) {
+                    put("error", reason)
+                }
+            }
+            config?.let {
+                put("config_present", it.present.toString())
+                it.interfaceName?.let { name -> put("config_interface", name) }
+            }
+            legacy?.let {
+                put("legacy_present", it.present.toString())
+                put("legacy_state", it.state.toString())
+            }
+        }
+
         return observation(
             checkId = "beta.vpn_binder",
             source = EvidenceSource.BETA_VPN_BINDER,
@@ -80,6 +105,7 @@ internal object HiddenAndroidBetaChecker {
             },
             epochId = epochId,
             at = at,
+            facts = facts,
         )
     }
 
@@ -96,6 +122,24 @@ internal object HiddenAndroidBetaChecker {
         val divergent = snapshot?.differsFromPublicActiveNetwork == true
         val comparable = snapshot != null &&
             (snapshot.effectiveNetworkHandle != null || snapshot.publicActiveNetworkHandle != null)
+
+        val reason = when (result) {
+            is HiddenCallResult.Failure -> result.reason
+            is HiddenCallResult.PermissionDenied -> result.reason
+            is HiddenCallResult.Unsupported -> result.reason
+            is HiddenCallResult.Skipped -> result.reason
+            is HiddenCallResult.Unavailable -> result.reason
+            else -> null
+        }
+        val facts = buildMap {
+            reason?.let { put("error", it) }
+            snapshot?.let {
+                put("effective_network", it.effectiveNetworkHandle?.toString() ?: "null")
+                put("public_network", it.publicActiveNetworkHandle?.toString() ?: "null")
+                put("differs", it.differsFromPublicActiveNetwork.toString())
+            }
+        }
+
         return observation(
             checkId = "beta.connectivity_binder",
             source = EvidenceSource.BETA_CONNECTIVITY_BINDER,
@@ -118,6 +162,7 @@ internal object HiddenAndroidBetaChecker {
             suppressions = if (divergent && vpn) {
                 listOf(BetaSuppressionRuleId.NO_CAUSAL_COUNTER_DELTA)
             } else emptyList(),
+            facts = facts,
         )
     }
 
@@ -131,6 +176,14 @@ internal object HiddenAndroidBetaChecker {
         val foreground = facts?.foregroundUserId
         val comparable = current != null && foreground != null
         val mismatch = comparable && current != foreground
+
+        val obFacts = buildMap {
+            if (current != null) put("current_user", current.toString())
+            if (foreground != null) put("foreground_user", foreground.toString())
+            put("comparable", comparable.toString())
+            put("mismatch", mismatch.toString())
+        }
+
         return observation(
             checkId = "beta.foreground_user",
             source = EvidenceSource.BETA_USER_PROFILE,
@@ -150,6 +203,7 @@ internal object HiddenAndroidBetaChecker {
             },
             epochId = epochId,
             at = at,
+            facts = obFacts,
         )
     }
 
@@ -165,6 +219,7 @@ internal object HiddenAndroidBetaChecker {
         epochId: String,
         at: Long,
         suppressions: List<BetaSuppressionRuleId> = emptyList(),
+        facts: Map<String, String> = emptyMap(),
     ) = BetaObservation(
         checkId = checkId,
         source = source,
@@ -174,7 +229,7 @@ internal object HiddenAndroidBetaChecker {
         confidence = confidence,
         independenceGroup = group,
         detectionDomain = domain,
-        facts = mapOf("summary" to summary),
+        facts = facts + ("summary" to summary),
         suppressions = suppressions,
         observedAtElapsedMs = at,
         networkEpochId = epochId,

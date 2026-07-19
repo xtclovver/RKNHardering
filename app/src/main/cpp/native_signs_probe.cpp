@@ -1,4 +1,5 @@
 #include "native_signs_probe.h"
+#include "vpnhide_regression_probe.h"
 #include "beta_socket_probe.h"
 #include "beta_netlink_probe.h"
 #include "beta_sandbox_probe.h"
@@ -2301,6 +2302,7 @@ jobjectArray nativeDetectVpnDetector(JNIEnv *env, jclass /*clazz*/, jobject canc
     detectProcIpv6RouteVpn(raw);
     detectProcNetDevVpn(raw);
     detectIfindexnameVpn(raw);
+    vpnhide_regression::collectFindings(raw);
     detectRouteCount(raw);
     detectNormalPmtu(raw);
     detectFibTrieAccess(raw);

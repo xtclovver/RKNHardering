@@ -232,19 +232,21 @@ callTransport:
 
 [betaChecks]
 name: β Бета-проверки
-detected: false
+detected: true
 needsReview: false
-hasError: false
-status: [OK]
-findingsCount: 0
-evidenceCount: 0
+hasError: true
+status: [ERROR]
+findingsCount: 3
+evidenceCount: 1
 matchedAppsCount: 0
 activeAppsCount: 0
 callTransportCount: 0
 findings:
-- <none>
+- description=β Exact socket cookie confirmed maturity=BETA checkId=beta.inet_diag_cookie availability=AVAILABLE rawConfidence=LOW group=socket_diag domain=NETWORK_PATH_DIVERGENCE facts=cookie=12345678,cookie_match=true,matched=true detected=false needsReview=false error=false informational=true source=BETA_SOCKET_DIAG confidence=LOW
+- description=β WireGuard Genl failure maturity=BETA checkId=beta.wireguard_genl availability=ERROR rawConfidence=LOW group=kernel_vpn domain=VPN_OR_PROXY facts=errno=13,error=Permission denied,stage=family detected=false needsReview=false error=true informational=false source=BETA_WIREGUARD_GENL confidence=LOW
+- description=β Check skipped or not executed maturity=BETA checkId=beta.user_profile availability=SKIPPED rawConfidence=LOW group=android_user_manager domain=ISOLATED_PROFILE detected=false needsReview=false error=false informational=true source=BETA_USER_PROFILE confidence=LOW
 evidence:
-- <none>
+- source=BETA_SOCKET_DIAG detected=true confidence=LOW description=β Exact socket cookie confirmed maturity=BETA checkId=beta.inet_diag_cookie independenceGroup=socket_diag detectionDomain=NETWORK_PATH_DIVERGENCE hardSignal=false
 matchedApps:
 - <none>
 activeApps:

@@ -1,43 +1,6 @@
 package com.notcvnt.rknhardering
 
-import com.notcvnt.rknhardering.model.ActiveVpnApp
-import com.notcvnt.rknhardering.model.BypassResult
-import com.notcvnt.rknhardering.model.CallTransportLeakResult
-import com.notcvnt.rknhardering.model.CallTransportNetworkPath
-import com.notcvnt.rknhardering.model.CallTransportProbeKind
-import com.notcvnt.rknhardering.model.CallTransportService
-import com.notcvnt.rknhardering.model.CallTransportStatus
-import com.notcvnt.rknhardering.model.CategoryResult
-import com.notcvnt.rknhardering.model.CdnPullingResponse
-import com.notcvnt.rknhardering.model.CdnPullingResult
-import com.notcvnt.rknhardering.model.Channel
-import com.notcvnt.rknhardering.model.CheckResult
-import com.notcvnt.rknhardering.model.EvidenceConfidence
-import com.notcvnt.rknhardering.model.EvidenceItem
-import com.notcvnt.rknhardering.model.EvidenceSource
-import com.notcvnt.rknhardering.model.Finding
-import com.notcvnt.rknhardering.model.GeoIpFacts
-import com.notcvnt.rknhardering.model.IpCheckerGroupResult
-import com.notcvnt.rknhardering.model.IpCheckerResponse
-import com.notcvnt.rknhardering.model.IpCheckerScope
-import com.notcvnt.rknhardering.model.IpComparisonResult
-import com.notcvnt.rknhardering.model.IpConsensusResult
-import com.notcvnt.rknhardering.model.IpFamily
-import com.notcvnt.rknhardering.model.LocalProxyCheckResult
-import com.notcvnt.rknhardering.model.LocalProxyCheckStatus
-import com.notcvnt.rknhardering.model.LocalProxyOwner
-import com.notcvnt.rknhardering.model.LocalProxyOwnerStatus
-import com.notcvnt.rknhardering.model.LocalProxySummaryReason
-import com.notcvnt.rknhardering.model.MatchedVpnApp
-import com.notcvnt.rknhardering.model.ObservedIp
-import com.notcvnt.rknhardering.model.StunProbeGroupResult
-import com.notcvnt.rknhardering.model.StunProbeResult
-import com.notcvnt.rknhardering.model.StunScope
-import com.notcvnt.rknhardering.model.TargetGroup
-import com.notcvnt.rknhardering.model.UnparsedIp
-import com.notcvnt.rknhardering.model.Verdict
-import com.notcvnt.rknhardering.model.VpnAppKind
-import com.notcvnt.rknhardering.model.VpnAppTechnicalMetadata
+import com.notcvnt.rknhardering.model.*
 import com.notcvnt.rknhardering.probe.PublicIpProbeMode
 import com.notcvnt.rknhardering.probe.PublicIpProbeStatus
 import com.notcvnt.rknhardering.probe.PublicIpTransportDiagnostics
@@ -494,6 +457,101 @@ internal fun exportRichCheckResult(): CheckResult {
             ),
         ),
         tunProbeDiagnostics = exportTunProbeDiagnostics(),
+        betaChecks = BetaCheckResult(
+            category = CategoryResult(
+                name = "β Бета-проверки",
+                detected = true,
+                needsReview = false,
+                findings = listOf(
+                    Finding(
+                        description = "β Exact socket cookie confirmed",
+                        detected = false,
+                        needsReview = false,
+                        isInformational = true,
+                        isError = false,
+                        source = EvidenceSource.BETA_SOCKET_DIAG,
+                        confidence = EvidenceConfidence.LOW,
+                        maturity = EvidenceMaturity.BETA,
+                        checkId = "beta.inet_diag_cookie",
+                        availability = ProbeAvailability.AVAILABLE,
+                        rawConfidence = EvidenceConfidence.LOW,
+                        facts = mapOf(
+                            "cookie" to "12345678",
+                            "cookie_match" to "true",
+                            "matched" to "true"
+                        ),
+                        independenceGroup = "socket_diag",
+                        detectionDomain = DetectionDomain.NETWORK_PATH_DIVERGENCE,
+                    ),
+                    Finding(
+                        description = "β WireGuard Genl failure",
+                        detected = false,
+                        needsReview = false,
+                        isInformational = false,
+                        isError = true,
+                        source = EvidenceSource.BETA_WIREGUARD_GENL,
+                        confidence = EvidenceConfidence.LOW,
+                        maturity = EvidenceMaturity.BETA,
+                        checkId = "beta.wireguard_genl",
+                        availability = ProbeAvailability.ERROR,
+                        rawConfidence = EvidenceConfidence.LOW,
+                        facts = mapOf(
+                            "errno" to "13",
+                            "stage" to "family",
+                            "error" to "Permission denied"
+                        ),
+                        independenceGroup = "kernel_vpn",
+                        detectionDomain = DetectionDomain.VPN_OR_PROXY,
+                    ),
+                    Finding(
+                        description = "β Check skipped or not executed",
+                        detected = false,
+                        needsReview = false,
+                        isInformational = true,
+                        isError = false,
+                        source = EvidenceSource.BETA_USER_PROFILE,
+                        confidence = EvidenceConfidence.LOW,
+                        maturity = EvidenceMaturity.BETA,
+                        checkId = "beta.user_profile",
+                        availability = ProbeAvailability.SKIPPED,
+                        rawConfidence = EvidenceConfidence.LOW,
+                        facts = emptyMap(),
+                        independenceGroup = "android_user_manager",
+                        detectionDomain = DetectionDomain.ISOLATED_PROFILE,
+                    )
+                ),
+                evidence = listOf(
+                    EvidenceItem(
+                        source = EvidenceSource.BETA_SOCKET_DIAG,
+                        detected = true,
+                        confidence = EvidenceConfidence.LOW,
+                        description = "β Exact socket cookie confirmed",
+                        maturity = EvidenceMaturity.BETA,
+                        checkId = "beta.inet_diag_cookie",
+                        independenceGroup = "socket_diag",
+                        detectionDomain = DetectionDomain.NETWORK_PATH_DIVERGENCE,
+                    )
+                ),
+                maturity = EvidenceMaturity.BETA,
+            ),
+            executionContext = ExecutionContextFacts(
+                uid = 10123,
+                appId = 10123,
+                uidDerivedUserId = 0,
+                packageUidConsistent = true,
+                mountNamespaceId = "mnt:[123]",
+                selinuxContext = "u:r:untrusted_app:s0:c1,c2",
+                kind = ExecutionContextKind.MAIN_USER,
+                confidence = EvidenceConfidence.LOW,
+            ),
+            availabilitySummary = mapOf(
+                ProbeAvailability.AVAILABLE to 1,
+                ProbeAvailability.ERROR to 1,
+                ProbeAvailability.SKIPPED to 1
+            ),
+            networkEpochChanges = emptySet(),
+            networkEpochRetryCount = 0,
+        ),
         ipConsensus = IpConsensusResult(
             observedIps = listOf(
                 ObservedIp(

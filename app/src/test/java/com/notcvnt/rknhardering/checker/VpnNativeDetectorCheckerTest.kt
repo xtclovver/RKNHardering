@@ -8,6 +8,7 @@ import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.NativeSignalCatalog
 import com.notcvnt.rknhardering.model.NativeSignalId
+import com.notcvnt.rknhardering.model.ProbeAvailability
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -102,7 +103,9 @@ class VpnNativeDetectorCheckerTest {
             "getsockname_leak", "udp_port_conflict_physical", "vpn_qdisc", "bpf_map_accessible",
             "route_count", "trim_oracle", "pmtu_mss_combined", "udp_pmtu_ok", "udp_pmtu_fail",
             "normal_pmtu", "timing_oracle", "backpressure", "gso_failed", "gso_send_failed",
-            "gso_ok", "hw_timestamp", "traceroute_denied",
+            "gso_ok", "hw_timestamp", "traceroute_denied", "vpnhide_ifindex_clean",
+            "vpnhide_ifindex_unavailable", "vpnhide_ifconf_clean", "vpnhide_ifconf_unavailable",
+            "vpnhide_ifindex_oracle", "vpnhide_ifconf_tail_vpn", "vpnhide_ifconf_tail_oracle",
         )
         NativeSignsBridge.detectVpnDetectorOverride = {
             kinds.map { kind -> "vdet|$kind|detail" }.toTypedArray()
@@ -126,6 +129,112 @@ class VpnNativeDetectorCheckerTest {
 
         assertEquals(NativeSignalId.UNKNOWN, result.findings.single().nativeSignalId)
         assertTrue(result.findings.single().description.contains("future_kind"))
+    }
+
+    @Test
+    fun `clean vpnhide probes remain visible without affecting verdict`() {
+        NativeSignsBridge.detectVpnDetectorOverride = {
+            arrayOf(
+                "vdet|vpnhide_ifindex_clean|completed",
+                "vdet|vpnhide_ifconf_clean|returned_bytes=80",
+            )
+        }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertFalse(result.detected)
+        assertFalse(result.needsReview)
+        assertFalse(result.hasError)
+        assertTrue(result.evidence.isEmpty())
+        assertEquals(2, result.findings.size)
+        assertTrue(result.findings.all { it.isInformational })
+        assertTrue(result.findings.all { it.nativeSignalId == NativeSignalId.VPNHIDE })
+        assertTrue(result.findings.all { it.availability == ProbeAvailability.AVAILABLE })
+        assertEquals(
+            setOf("native.vpnhide.ifindex_consistency", "native.vpnhide.ifconf_tail"),
+            result.findings.mapNotNull { it.checkId }.toSet(),
+        )
+        assertTrue(result.findings.any {
+            it.description.contains(context.getString(com.notcvnt.rknhardering.R.string.vpn_desc_vpnhide_ifindex_probe))
+        })
+        assertTrue(result.findings.any {
+            it.description.contains(context.getString(com.notcvnt.rknhardering.R.string.vpn_desc_vpnhide_ifconf_probe))
+        })
+        assertTrue(result.findings.none { it.description.contains("vpnhide_if") })
+    }
+
+    @Test
+    fun `unavailable vpnhide probes are errors instead of clean results`() {
+        NativeSignsBridge.detectVpnDetectorOverride = {
+            arrayOf(
+                "vdet|vpnhide_ifindex_unavailable|stage=socket errno=13",
+                "vdet|vpnhide_ifconf_unavailable|stage=ioctl errno=1",
+            )
+        }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertFalse(result.detected)
+        assertFalse(result.needsReview)
+        assertTrue(result.hasError)
+        assertTrue(result.evidence.isEmpty())
+        assertEquals(2, result.findings.size)
+        assertTrue(result.findings.all { it.isError })
+        assertTrue(result.findings.all { it.availability == ProbeAvailability.ERROR })
+        assertTrue(result.findings.all { it.nativeSignalId == NativeSignalId.VPNHIDE })
+    }
+
+    @Test
+    fun `native detector exception is visible as an error`() {
+        NativeSignsBridge.detectVpnDetectorOverride = { error("native failure") }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertTrue(result.hasError)
+        assertFalse(result.detected)
+        assertFalse(result.needsReview)
+        assertTrue(result.evidence.isEmpty())
+        assertEquals(NativeSignalId.NATIVE_LIBRARY, result.findings.single().nativeSignalId)
+        assertTrue(result.findings.single().description.contains("native failure"))
+    }
+
+    @Test
+    fun `vpnhide concealment leaks are high confidence evidence`() {
+        NativeSignsBridge.detectVpnDetectorOverride = {
+            arrayOf(
+                "vdet|vpnhide_ifindex_oracle|stable_asymmetries=1 samples=tun0:33(reverse_errno=19)",
+                "vdet|vpnhide_ifconf_tail_vpn|returned_bytes=160 entry_size=40 stale_slots=1 vpn_like=1 names=tun0",
+            )
+        }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertTrue(result.detected)
+        assertFalse(result.needsReview)
+        assertEquals(2, result.evidence.size)
+        assertTrue(result.evidence.all { it.source == EvidenceSource.NATIVE_INTERFACE })
+        assertTrue(result.evidence.all { it.confidence == EvidenceConfidence.HIGH })
+        assertTrue(result.findings.all { it.nativeSignalId == NativeSignalId.VPNHIDE })
+        assertTrue(result.findings.all { it.availability == ProbeAvailability.AVAILABLE })
+        assertTrue(result.findings.none { it.description.contains("vpnhide_if") })
+    }
+
+    @Test
+    fun `generic vpnhide ifconf tail is review only`() {
+        NativeSignsBridge.detectVpnDetectorOverride = {
+            arrayOf(
+                "vdet|vpnhide_ifconf_tail_oracle|returned_bytes=160 entry_size=40 stale_slots=1 vpn_like=0 names=rmnet_data0",
+            )
+        }
+
+        val result = runBlocking { VpnNativeDetectorChecker.check(context) }
+
+        assertFalse(result.detected)
+        assertTrue(result.needsReview)
+        assertEquals(1, result.evidence.size)
+        assertEquals(EvidenceSource.NATIVE_INTERFACE, result.evidence.single().source)
+        assertEquals(EvidenceConfidence.MEDIUM, result.evidence.single().confidence)
+        assertEquals(NativeSignalId.VPNHIDE, result.findings.single().nativeSignalId)
     }
 
     @Test

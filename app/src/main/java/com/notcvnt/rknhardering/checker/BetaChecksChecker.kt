@@ -280,8 +280,30 @@ internal object BetaChecksChecker : BetaChecksDependency {
                 )
             }
         }
-        val observations = listOfNotNull(executionContext?.observation) + sandboxObservations +
+        val runObservations = listOfNotNull(executionContext?.observation) + sandboxObservations +
             foregroundObservations + effectiveNetworkObservations
+        val runCheckIds = runObservations.map { it.checkId }.toSet()
+        val observations = runObservations.toMutableList().apply {
+            BetaCheckRegistry.definitions.values.forEach { definition ->
+                if (definition.checkId !in runCheckIds) {
+                    add(
+                        BetaObservation(
+                            checkId = definition.checkId,
+                            source = definition.source,
+                            availability = ProbeAvailability.SKIPPED,
+                            polarity = com.notcvnt.rknhardering.model.ObservationPolarity.INCONCLUSIVE,
+                            authority = com.notcvnt.rknhardering.model.ObservationAuthority.HEURISTIC,
+                            confidence = com.notcvnt.rknhardering.model.EvidenceConfidence.LOW,
+                            independenceGroup = definition.independenceGroup,
+                            detectionDomain = definition.detectionDomain,
+                            observedAtElapsedMs = SystemClock.elapsedRealtime(),
+                            networkEpochId = epoch.id,
+                            facts = mapOf("summary" to "Check skipped or not executed"),
+                        )
+                    )
+                }
+            }
+        }
         val repeatValidations = observations.mapNotNull { observation ->
             val repeated = repeatedObservations[observation.checkId] ?: return@mapNotNull null
             val successful = listOf(observation, repeated).count {
@@ -323,7 +345,9 @@ internal object BetaChecksChecker : BetaChecksDependency {
         }
         val availability = buildMap {
             observations.forEach { observation ->
-                put(observation.availability, (get(observation.availability) ?: 0) + 1)
+                if (observation.facts["summary"] != "Check skipped or not executed") {
+                    put(observation.availability, (get(observation.availability) ?: 0) + 1)
+                }
             }
         }
         val coverageFinding = Finding(

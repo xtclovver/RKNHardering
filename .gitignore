@@ -23,6 +23,7 @@ xray-protos/bin
 release.jks
 .claude/
 *.sh
+!scripts/test-vpnhide-regression-probe.sh
 *.ps1
 !CONTRIBUTING.md
 !app/src/test/resources/export/golden/*.md

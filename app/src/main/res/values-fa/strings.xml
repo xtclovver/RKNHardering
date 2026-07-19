@@ -688,6 +688,10 @@
     <string name="vpn_desc_udp_port_physical">تداخل پورت UDP روی رابط فیزیکی</string>
     <string name="vpn_desc_trim_oracle">عدم تطابق bind probe و RTM_GETLINK</string>
     <string name="vpn_desc_ifindexname">رابط VPN از طریق if_indextoname</string>
+    <string name="vpn_desc_vpnhide_ifindex_probe">بررسی سازگاری نام و شاخص رابط VPNHide</string>
+    <string name="vpn_desc_vpnhide_ifconf_probe">بررسی بافر فهرست رابط‌های VPNHide</string>
+    <string name="vpn_desc_vpnhide_probe_clean">%1$s: ناهنجاری‌ای شناسایی نشد</string>
+    <string name="vpn_desc_vpnhide_probe_unavailable">%1$s: در دسترس نیست (%2$s)</string>
     <string name="vpn_desc_pmtu_mss">تحلیل UDP PMTU و TCP MSS</string>
     <string name="vpn_desc_udp_pmtu_ok">ارسال UDP موفق (بدون مشکل PMTU)</string>
     <string name="vpn_desc_udp_pmtu_fail">ارسال UDP ناموفق (مشکل PMTU)</string>
@@ -704,6 +708,7 @@
     <string name="checker_vpn_detector_category_name">تشخیص‌دهنده VPN (عمیق)</string>
     <string name="checker_vpn_detector_unavailable">کتابخانه تشخیص‌دهنده VPN بارگذاری نشد</string>
     <string name="checker_vpn_detector_unavailable_with_reason">کتابخانه تشخیص‌دهنده VPN بارگذاری نشد: %1$s</string>
+    <string name="checker_vpn_detector_failed_with_reason">تشخیص‌دهنده VPN با خطا مواجه شد: %1$s</string>
     <string name="checker_vpn_detector_no_anomalies">نشانه عمیق VPN یافت نشد</string>
 
 
@@ -1123,6 +1128,7 @@
     <string name="native_signal_title_route_table">جدول مسیریابی بومی</string>
     <string name="native_signal_title_host_route">مسیرهای میزبان عمومی</string>
     <string name="native_signal_title_hook_markers">نشانگرهای هوک در نقشهٔ فرایند</string>
+    <string name="native_signal_title_vpnhide">بررسی‌های پنهان‌سازی VPNHide</string>
     <string name="native_signal_title_rwx_memory">ناحیه‌های حافظهٔ نوشتنی و اجرایی</string>
     <string name="native_signal_title_library_integrity">یکپارچگی کتابخانهٔ بومی</string>
     <string name="native_signal_title_root">نشانه‌های روت</string>

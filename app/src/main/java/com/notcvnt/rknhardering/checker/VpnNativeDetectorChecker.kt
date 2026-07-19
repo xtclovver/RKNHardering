@@ -4,12 +4,14 @@ import android.content.Context
 import com.notcvnt.rknhardering.R
 import com.notcvnt.rknhardering.NativeSignalCatalog
 import com.notcvnt.rknhardering.ScanExecutionContext
+import com.notcvnt.rknhardering.rethrowIfCancellation
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.EvidenceConfidence
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.Finding
 import com.notcvnt.rknhardering.model.NativeSignalId
+import com.notcvnt.rknhardering.model.ProbeAvailability
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,13 +39,18 @@ object VpnNativeDetectorChecker {
         "sysfs_vpn_leak", "getifaddrs_vpn", "sysclassnet_vpn", "rtm_getlink_vpn",
         "proc_if_inet6_vpn", "proc_ipv6_route_vpn", "proc_net_dev_vpn",
         "ifindexname_vpn", "vpn_policy_rules_netlink",
+        "vpnhide_ifindex_oracle", "vpnhide_ifconf_tail_vpn",
         "bindtodevice_leak", "getsockname_leak", "udp_port_conflict_physical",
     )
 
     private val INFORMATIONAL_KINDS = setOf(
         "route_count", "pmtu_mss_combined", "udp_pmtu_ok", "normal_pmtu",
         "timing_oracle", "backpressure", "gso_failed", "gso_send_failed",
-        "gso_ok", "hw_timestamp",
+        "gso_ok", "hw_timestamp", "vpnhide_ifindex_clean", "vpnhide_ifconf_clean",
+    )
+
+    private val UNAVAILABLE_KINDS = setOf(
+        "vpnhide_ifindex_unavailable", "vpnhide_ifconf_unavailable",
     )
 
     private fun libraryUnavailableResult(context: Context): CategoryResult {
@@ -68,10 +75,42 @@ object VpnNativeDetectorChecker {
         )
     }
 
+    private fun detectorFailureResult(context: Context, error: Throwable): CategoryResult = CategoryResult(
+        name = context.getString(R.string.checker_vpn_detector_category_name),
+        detected = false,
+        findings = listOf(
+            Finding(
+                description = context.getString(
+                    R.string.checker_vpn_detector_failed_with_reason,
+                    error.message ?: error::class.java.simpleName,
+                ),
+                isError = true,
+                nativeSignalId = NativeSignalId.NATIVE_LIBRARY,
+            ),
+        ),
+        needsReview = false,
+        evidence = emptyList(),
+    )
+
     private fun mapSource(kind: String): EvidenceSource = when (kind) {
         in NETWORK_KINDS -> EvidenceSource.NATIVE_SOCKET
         in INDIRECT_KINDS -> EvidenceSource.NATIVE_ROUTE
         else -> EvidenceSource.NATIVE_INTERFACE
+    }
+
+    private fun vpnhideCheckId(kind: String): String? = when (kind) {
+        "vpnhide_ifindex_clean", "vpnhide_ifindex_unavailable", "vpnhide_ifindex_oracle" ->
+            "native.vpnhide.ifindex_consistency"
+        "vpnhide_ifconf_clean", "vpnhide_ifconf_unavailable",
+        "vpnhide_ifconf_tail_vpn", "vpnhide_ifconf_tail_oracle" ->
+            "native.vpnhide.ifconf_tail"
+        else -> null
+    }
+
+    private fun vpnhideAvailability(kind: String): ProbeAvailability? = when {
+        kind in UNAVAILABLE_KINDS -> ProbeAvailability.ERROR
+        vpnhideCheckId(kind) != null -> ProbeAvailability.AVAILABLE
+        else -> null
     }
 
     private fun evaluateItem(
@@ -82,6 +121,20 @@ object VpnNativeDetectorChecker {
     ) {
         val description = describe(context, item.kind, item.detail)
         val source = mapSource(item.kind)
+        val checkId = vpnhideCheckId(item.kind)
+        val availability = vpnhideAvailability(item.kind)
+        if (item.kind in UNAVAILABLE_KINDS) {
+            findings += Finding(
+                description = description,
+                isError = true,
+                source = source,
+                confidence = EvidenceConfidence.LOW,
+                nativeSignalId = NativeSignalCatalog.fromDeepVpnKind(item.kind),
+                checkId = checkId,
+                availability = availability,
+            )
+            return
+        }
         if (item.kind in INFORMATIONAL_KINDS) {
             findings += Finding(
                 description = description,
@@ -89,6 +142,8 @@ object VpnNativeDetectorChecker {
                 source = source,
                 confidence = EvidenceConfidence.LOW,
                 nativeSignalId = NativeSignalCatalog.fromDeepVpnKind(item.kind),
+                checkId = checkId,
+                availability = availability,
             )
             return
         }
@@ -102,12 +157,15 @@ object VpnNativeDetectorChecker {
             source = source,
             confidence = confidence,
             nativeSignalId = NativeSignalCatalog.fromDeepVpnKind(item.kind),
+            checkId = checkId,
+            availability = availability,
         )
         evidence += EvidenceItem(
             source = source,
             detected = true,
             confidence = confidence,
             description = description,
+            checkId = checkId,
         )
     }
 
@@ -117,10 +175,14 @@ object VpnNativeDetectorChecker {
         NativeSignsBridge.initIfNeeded()
         if (!NativeSignsBridge.isLibraryLoaded()) return@withContext libraryUnavailableResult(context)
 
-        val rows = runCatching {
+        val rowsResult = runCatching {
             NativeSignsBridge.detectVpnDetector(executionContext.cancellationSignal)
-        }.getOrDefault(emptyArray())
+        }
         executionContext.throwIfCancelled()
+        val rows = rowsResult.getOrElse { error ->
+            rethrowIfCancellation(error, executionContext)
+            return@withContext detectorFailureResult(context, error)
+        }
         val parsed = rows.mapNotNull { parseRow(it) }
 
         val findings = mutableListOf<Finding>()
@@ -160,6 +222,25 @@ object VpnNativeDetectorChecker {
     }
 
     private fun describe(context: Context, kind: String, detail: String): String {
+        val vpnhideProbeTitle = when (kind) {
+            "vpnhide_ifindex_clean", "vpnhide_ifindex_unavailable", "vpnhide_ifindex_oracle" ->
+                R.string.vpn_desc_vpnhide_ifindex_probe
+            "vpnhide_ifconf_clean", "vpnhide_ifconf_unavailable",
+            "vpnhide_ifconf_tail_vpn", "vpnhide_ifconf_tail_oracle" ->
+                R.string.vpn_desc_vpnhide_ifconf_probe
+            else -> null
+        }
+        if (vpnhideProbeTitle != null) {
+            val title = context.getString(vpnhideProbeTitle)
+            return when (kind) {
+                "vpnhide_ifindex_clean", "vpnhide_ifconf_clean" ->
+                    context.getString(R.string.vpn_desc_vpnhide_probe_clean, title)
+                "vpnhide_ifindex_unavailable", "vpnhide_ifconf_unavailable" ->
+                    context.getString(R.string.vpn_desc_vpnhide_probe_unavailable, title, detail)
+                else -> "$title: $detail"
+            }
+        }
+
         val resId = when (kind) {
             "sysfs_vpn_leak" -> R.string.vpn_desc_sysfs_leak
             "getifaddrs_vpn" -> R.string.vpn_desc_getifaddrs

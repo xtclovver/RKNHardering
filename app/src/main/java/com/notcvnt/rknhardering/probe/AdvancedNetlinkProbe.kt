@@ -339,7 +339,10 @@ internal object AdvancedNetlinkProbe {
         confidence = if (positive) EvidenceConfidence.HIGH else EvidenceConfidence.LOW,
         independenceGroup = group,
         detectionDomain = domain,
-        facts = mapOf("summary" to summary),
+        facts = row.fields.filter { (k, _) ->
+            val kl = k.lowercase()
+            !kl.contains("cookie") && !kl.contains("inode") && !kl.contains("interface") && !kl.contains("ifname")
+        } + ("summary" to summary),
         suppressions = suppressions,
         observedAtElapsedMs = at,
         networkEpochId = epochId,
