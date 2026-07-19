@@ -2230,7 +2230,7 @@ class MainActivity : AppCompatActivity() {
         val total = ru + nonRu
         val hint = when {
             result.hasError -> getString(R.string.tile_hint_error)
-            result.detected -> getString(R.string.tile_hint_review)
+            result.detected -> getString(R.string.main_card_status_detected)
             result.needsReview -> getString(R.string.tile_hint_review)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
             else -> null
@@ -2243,7 +2243,7 @@ class MainActivity : AppCompatActivity() {
         val total = result.responses.size
         val hint = when {
             result.hasError -> getString(R.string.tile_hint_error)
-            result.detected -> getString(R.string.tile_hint_review)
+            result.detected -> getString(R.string.main_card_status_detected)
             result.needsReview -> getString(R.string.tile_hint_review)
             total > 0 -> getString(R.string.tile_hint_clean_count, total)
             else -> null

@@ -200,6 +200,37 @@ class MainActivityUiRenderingTest {
     }
 
     @Test
+    fun `detected network checks do not show needs review tile hint`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val ipComparison = IpComparisonResult(
+            detected = true,
+            needsReview = false,
+            summary = "different IPs",
+            ruGroup = emptyIpCheckerGroup("RU"),
+            nonRuGroup = emptyIpCheckerGroup("NON_RU"),
+        )
+        val cdnPulling = CdnPullingResult(
+            detected = true,
+            needsReview = true,
+            summary = "CDN exposed an IP",
+            responses = listOf(
+                CdnPullingResponse(
+                    targetLabel = "rutracker.org",
+                    url = "https://rutracker.org/",
+                    ip = "203.0.113.64",
+                ),
+            ),
+        )
+
+        invokePrivate<Unit>(activity, "updateTileFromIpComparison", ipComparison)
+        invokePrivate<Unit>(activity, "updateTileFromCdn", cdnPulling)
+
+        val detectedLabel = activity.getString(R.string.main_card_status_detected)
+        assertEquals(detectedLabel, tileHint(activity, "ipc"))
+        assertEquals(detectedLabel, tileHint(activity, "cdn"))
+    }
+
+    @Test
     fun `bypass error finding reaches card and tile`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         val result = BypassResult(
