@@ -1,38 +1,85 @@
 ---
-title: "Нативный сигнал: traceroute-denied"
+title: "Loopback UDP send с TTL=1 получил EACCES"
 permalink: /help/ru/native/traceroute-denied/
 ---
 
-# Нативный сигнал: traceroute-denied
+# Loopback UDP send с TTL=1 получил EACCES
+
+> **ID:** `TRACEROUTE_DENIED`
+> **Категория:** Маршруты и сетевой стек
+> **Статус в RKNHardering 2.10.0:** Активная проверка
+> **Роль в вердикте:** Средняя
+
+Эта страница описывает фактическую реализацию RKNHardering 2.10.0. Здесь отдельно указано, что можно сделать без root, что требует root, а также где способ только уменьшает один сигнал, но не скрывает VPN целиком.
 
 ## Что проверяется и зачем
 
-RKNHardering проверяет стабильный нативный вектор `traceroute-denied`, сопоставляя видимое приложению состояние ядра, процесса, интерфейсов, маршрутов, свойств, файлов или сокетов с ожидаемым поведением Android.
+Проба создаёт обычный UDP socket, ставит `IP_TTL=1` и send timeout 100 ms, затем отправляет 64 bytes на `127.0.0.1:33434`. Строка появляется только если sendto вернул -1 именно с EACCES. ICMP reply, hop и внешний traceroute не измеряются.
+
+### Точное условие срабатывания
+
+EACCES при локальной UDP sendto после установки TTL=1.
 
 ## Что означает результат
 
-Detected или review означает, что этот вектор дал данные для анализа. Clean или unavailable описывает только эту проверку и не доказывает отсутствие VPN или модификаций.
+Это признак policy/firewall denial для конкретного socket path. Он не доказывает VPN encapsulation. Checker выставляет review средней уверенности.
+
+**Как строка влияет на отчёт:** Строка не даёт самостоятельный окончательный вердикт, но выставляет `needsReview=true` и добавляет доказательство средней уверенности.
 
 ## Ограничения и возможные ложные срабатывания
 
-Результат зависит от производителя, версии Android, SELinux, состояния сети, рабочего профиля и корпоративного ПО. Оценивайте строку вместе с категорией и итоговым вердиктом.
+Название «traceroute» условное: destination loopback, raw socket не используется, hop discovery отсутствует. EPERM/ENETUNREACH/другие errno вообще не выводятся.
+
+Важно оценивать эту строку вместе с соседними сигналами. Один чистый API не перекрывает Java Binder, libc, raw netlink/syscall, procfs/sysfs, локальные сокеты и серверные признаки одновременно.
 
 ## Рекомендации для этого вектора
 
-Проверьте конкретный маршрут, таблицу, интерфейс, MTU/MSS или возможность ядра и повторите тест после стабилизации сети. Не удаляйте маршруты вслепую: подготовьте откат и проверяйте связь после каждого шага.
+### Без root
+
+Отключите сторонний local firewall/DNS/VPN для контрольного запуска и запишите, исчезает ли EACCES. Не пытайтесь разрешить внешний traceroute — проверка локальная.
+
+### С root
+
+Проверьте UID-specific iptables/nftables и AVC. Не делайте flush; найдите точное правило, применяемое к loopback UDP/33434 или TTL-marked traffic.
+
+### Как проверить результат
+
+```bash
+adb logcat -d | grep -E 'avc: denied|33434|traceroute' | tail -80
+adb shell su -c 'iptables-save | grep -E "33434|owner|uid|lo"; ip6tables-save | grep -E "33434|owner|uid|lo"'
+```
+Shell packet может пройти, даже если app UID заблокирован.
+
+После любого изменения сделайте `force-stop` RKNHardering и VPN-клиента, запустите их заново и повторите полный scan. Для Zygisk/Xposed/kernel-модулей обычно нужна перезагрузка. Сравнивайте не только эту строку, но и соседние сигналы: частичный hook часто создаёт несогласованность между API.
 
 ## Необходимые права и риски
 
-Проверка читает доступное приложению сетевое состояние. Изменения маршрутизации могут оборвать связь или доступ к серверу; сохраните конфигурацию и тестируйте отдельно.
+Сама проба выполняется с обычными правами приложения и не запрашивает root. ADB-команды ниже служат только для ориентира: `adb shell` работает под другим UID и может видеть больше или меньше, чем процесс приложения. Решающий тест — повторный запуск самой проверки после `force-stop`.
+
+### Риски
+
+Глобальный firewall flush может раскрыть трафик, отключить kill-switch и нарушить безопасность. Меняйте только подтверждённое UID-rule.
+
+### Откат
+
+Восстановите сохранённый ruleset/модуль и перезапустите firewall/VPN. Проверьте DNS и kill-switch.
 
 ## Уровень доказательности
 
-**Проверено проектом:** вектор реализован в RKNHardering и покрыт тестами checker/catalog. Заявления внешних проектов и конфигурации сообщества остаются условными.
+**Средняя.** Проверено по loopback destination, TTL=1 и единственной EACCES branch; medium default.
+
+Статус стороннего решения не переносится автоматически на это устройство. Заявление разработчика модуля — это исходная гипотеза; подтверждением служит повторяемый результат RKNHardering на конкретной версии Android, прошивки и ядра.
 
 ## Источники и дата последней проверки
 
-- Community reported / сообщено сообществом: [issue #48](https://github.com/xtclovver/RKNHardering/issues/48) and [RKNHardering-defense](https://github.com/jinndi/RKNHardering-defense).
-- Project verified / проверено проектом: RKNHardering source and tests.
-- Last verified / последняя проверка / آخرین بررسی / 最后核验: 2026-07-11.
+- Проверено по коду проекта: [`native_signs_probe.cpp` — нативная реализация проб](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/cpp/native_signs_probe.cpp).
+- Проверено по коду проекта: [`VpnNativeDetectorChecker.kt` — deep VPN verdict и confidence](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/checker/VpnNativeDetectorChecker.kt).
+- Проверено по коду проекта: [`NativeSignalId.kt` — полный реестр ID](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/model/NativeSignalId.kt).
+- Проверено по коду проекта: [`NativeSignalCatalog.kt` — категория, slug и mapping строк](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/NativeSignalCatalog.kt).
+- Внешняя первичная документация или официальный проект: [ip(7) IP_TTL](https://man7.org/linux/man-pages/man7/ip.7.html).
+- Внешняя первичная документация или официальный проект: [sendto(2)](https://man7.org/linux/man-pages/man2/sendto.2.html).
+- Последняя сверка реализации и ссылок: **19 июля 2026 года**.
+
+Связанные сигналы: `udp-pmtu-fail`, `syscall-unavailable`, `inet-diag-denied`.
 
 [К справочнику Native signs](../)
