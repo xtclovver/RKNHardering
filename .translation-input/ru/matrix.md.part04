@@ -1,0 +1,29 @@
+| `beta.fscrypt_identity` | `BETA_SANDBOX_IDENTITY` | `APP_VIRTUALIZATION` / `filesystem_identity` | fscrypt/user storage identity. | Оригинальный APK в обычном sandbox. | Не использовать virtual container/repack. | Root не делает контейнер обычным профилем. |
+| `beta.linker_integrity` | `BETA_HOOK_CONSISTENCY` | `HOOK_OR_TAMPERING` / `loader_integrity` | Linker/loader integrity и hooks. | Без process injection. | Kernel backend, target вне Zygisk/Xposed. | Частичный hook раскрывается альтернативным путём. |
+| `beta.dns_netid` | `BETA_DNS_NETID` | `NETWORK_PATH_DIVERGENCE` / `dns_path` | DNS resolver netId/path. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.native_dns_resolver` | `BETA_DNS_NETID` | `NETWORK_PATH_DIVERGENCE` / `dns_path` | Native resolver против framework DNS. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.proxy_selector` | `BETA_PROXY_SELECTOR` | `VPN_OR_PROXY` / `android_proxy` | Java ProxySelector/system proxy consistency. | Выключить proxy/control daemon. | UID/namespace block. | Listener/Unix socket может остаться видимым. |
+| `beta.transport_matrix` | `BETA_TRANSPORT_MATRIX` | `NETWORK_PATH_DIVERGENCE` / `active_egress` | HTTP/DNS/UDP матрица canary endpoints. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.tls_interception` | `BETA_TLS_INTERCEPTION` | `VPN_OR_PROXY` / `tls_path` | TLS interception/certificate path. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.pktinfo` | `BETA_PKTINFO` | `NETWORK_PATH_DIVERGENCE` / `kernel_socket` | IP_PKTINFO/IPv6 pktinfo входящего/исходящего пути. | Внешний gateway или отсутствие локального VPN. | Kernel-level filtering по конкретному каналу; Next advanced — эксперимент. | Denial часто neutral; kernel/ROM parity различается. |
+| `beta.netlink_transitions` | `BETA_NETWORK_TRANSITION` | `NETWORK_PATH_DIVERGENCE` / `network_timeline` | Временная последовательность netlink network events. | Внешний gateway или отсутствие локального VPN. | Kernel-level filtering по конкретному каналу; Next advanced — эксперимент. | Denial часто neutral; kernel/ROM parity различается. |
+| `beta.traceroute` | `BETA_TRACEROUTE` | `SYSTEM_NETWORK_CONTEXT` / `path_observation` | Traceroute/path observation. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.server_fingerprint` | `BETA_SERVER_FINGERPRINT` | `SYSTEM_NETWORK_CONTEXT` / `server_observation` | Удалённый fingerprint наблюдаемого канала. | Согласовать реальный route/DNS/TLS; внешний gateway. | Root не подменяет серверный путь; исключить MITM. | Network epoch и шум; server context сам по себе не всегда hard. |
+| `beta.root_emulator` | `NATIVE_ROOT_DETECTION` | `DEVICE_INTEGRITY` / `device_integrity` | Сводная β-оценка root/emulator/device integrity. | Физический сток без root. | Минимизировать root surface; эмулятор не spoofить частично. | Review/кворум возможен. |
+
+
+## 4. Приоритет исправления
+
+1. Сначала server-side и фактический egress: `GEO_IP`, IP consensus, DNS, CDN/STUN/call transport, underlying binding.
+2. Затем framework: direct/indirect capabilities, active VPN, LinkProperties и Binder β.
+3. Затем native kernel: interface, route, TUN type, netlink, ifindex, socket identity и TUN FD.
+4. Затем localhost/package visibility.
+5. В конце root/hook/isolation и эвристические PMTU/GSO/timing строки.
+
+Такой порядок минимизирует ложные выводы. Установка root-hiding модуля не имеет смысла, пока приложение видит открытый Clash API и иностранный egress; настройка MTU не имеет смысла, пока `TRANSPORT_VPN` остаётся прямым сигналом.
+
+## 5. Статус покрытия
+
+Матрица считается полной только если `_validate.py` подтверждает точное совпадение строк трёх разделов с исходниками и наличие заполненных колонок root/non-root. При добавлении нового `EvidenceSource`, `NativeSignalId` или `BetaCheckRegistry.definition()` локальная проверка должна упасть, пока отдельная строка не добавлена сюда.
+
+[Назад к оглавлению](../)
