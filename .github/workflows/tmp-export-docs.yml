@@ -59,6 +59,7 @@ jobs:
           EOF
           sed -i 's/^          //' /tmp/input-SHA256SUMS.txt
           sha256sum --check --strict /tmp/input-SHA256SUMS.txt
+          sed -i 's/use_fast=True/use_fast=False/' .translation-input/translate_nllb.py
           python -m py_compile .translation-input/translate_nllb.py
 
           python - <<'PY'
@@ -86,6 +87,7 @@ jobs:
             'transformers==4.56.2' \
             'accelerate>=1.0,<2' \
             'sentencepiece>=0.2,<1' \
+            'protobuf>=5,<7' \
             'safetensors>=0.4,<1'
           python -m pip freeze | sort | tee runtime-requirements.txt
 
