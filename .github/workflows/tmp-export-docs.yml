@@ -1,15 +1,16 @@
 name: Temporary export documentation snapshot
 
 on:
-  push:
+  pull_request:
     branches:
-      - tmp-translate-docs-20260720-kai
+      - main
 
 permissions:
   contents: read
 
 jobs:
   export:
+    if: github.head_ref == 'tmp-translate-docs-20260720-kai'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
