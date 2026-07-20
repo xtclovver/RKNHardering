@@ -101,7 +101,7 @@ jobs:
             --seed .translation-input/en \
             --output workflow-output/translation-output.zip \
             --model facebook/nllb-200-distilled-600M \
-            --revision cb65f9d79affdfe51b915cf26acf7e4cfd0fe471 \
+            --revision 7b0383be05c8dcf75751646789d63b23876c8f53 \
             --batch-size 12 \
             2>&1 | tee workflow-output/translation.log
           cp runtime-requirements.txt workflow-output/runtime-requirements.txt
@@ -117,7 +117,7 @@ jobs:
 
           root = Path(snapshot_download(
               repo_id='facebook/nllb-200-distilled-600M',
-              revision='cb65f9d79affdfe51b915cf26acf7e4cfd0fe471',
+              revision='7b0383be05c8dcf75751646789d63b23876c8f53',
               local_files_only=True,
           ))
           for path in sorted(root.iterdir()):
