@@ -52,3 +52,23 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
+
+  temporary_export_docs:
+    if: github.event_name == 'pull_request' && github.head_ref == 'tmp-translate-docs-20260720-kai'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack documentation snapshot
+        run: |
+          tar -czf repo-docs.tar.gz docs
+          find docs -type f -print0 | sort -z | xargs -0 sha256sum > docs-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: temporary-repo-docs-snapshot
+          path: |
+            repo-docs.tar.gz
+            docs-SHA256SUMS.txt
+          retention-days: 1
+          compression-level: 0
