@@ -21,7 +21,7 @@ jobs:
       HF_HUB_DISABLE_XET: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
       HF_HUB_DOWNLOAD_TIMEOUT: "1800"
-      TRANSFORMERS_VERBOSITY: "error"
+      TRANSFORMERS_VERBOSITY: error
     steps:
       - uses: actions/checkout@v4
 
@@ -43,44 +43,35 @@ jobs:
             .translation-input/ru/matrix.md.part04 \
             > .translation-input/ru/matrix.md
 
+          cat > /tmp/input-SHA256SUMS.txt <<'EOF'
+          c9bc8c457707868eb2ab700009f710c929a3f9528c7a0285b8e42d5cdf73d4ba  .translation-input/ru/beta.md
+          aa317291d60765a9ddeec092679e6e07b5b9344010a84b18a0f9506d5390b795  .translation-input/ru/matrix.md
+          0bb10d8928a0c237ce43cb1d5291a2d60a00202ef8cb280e343d367502dca96d  .translation-input/ru/sources.md
+          480e12c74fab4f3def063e6c32c14745204977934111ceb638672b425f639eaf  .translation-input/en/beta.md
+          cc6333dc8f3f71be9746005e02bfabbc971a972d09be7ab71bd1bba084ece85b  .translation-input/en/index.md
+          5821c9f45bfd912251bf5fa439f8b2a8b48bc929be57517c6afd05b931d07101  .translation-input/en/lab.md
+          69496925028f65a3c50c9bd5357dac8b6282a37261080e58460cc25677f192ca  .translation-input/en/local-signals.md
+          f60d10b59a527976b6ff891d54fb9bbd5dce6836d629cbb1b4dcd8b923da760b  .translation-input/en/network-path.md
+          f29998b7af730bcd24852f213e5c387cf5d072cd84f59a23835208fcfadb463f  .translation-input/en/profiles.md
+          e54f99280f4b0607fcf71fa3648351861ba1e323e57e13804cf4547f27fed25a  .translation-input/en/root-integrity.md
+          b9f84fba1565f72e38c82d6610219bf9a4bf57c56f5bf748bcba643983c053f4  .translation-input/en/root-vpnhide.md
+          b9b5e0fa7135aab08a974e3cc70d11a5075f4937f21d21ae010478dfd7bc43b6  .translation-input/en/threat-model.md
+          EOF
+          sed -i 's/^          //' /tmp/input-SHA256SUMS.txt
+          sha256sum --check --strict /tmp/input-SHA256SUMS.txt
+          python -m py_compile .translation-input/translate_nllb.py
+
           python - <<'PY'
           from pathlib import Path
-          import hashlib
-
-          expected = {
-              '.translation-input/ru/beta.md': (18606, 'c9bc8c457707868eb2ab700009f710c929a3f9528c7a0285b8e42d5cdf73d4ba'),
-              '.translation-input/ru/matrix.md': (77425, 'aa317291d60765a9ddeec092679e6e07b5b9344010a84b18a0f9506d5390b795'),
-              '.translation-input/ru/sources.md': (8559, '0bb10d8928a0c237ce43cb1d5291a2d60a00202ef8cb280e343d367502dca96d'),
-              '.translation-input/en/beta.md': (14246, '480e12c74fab4f3def063e6c32c14745204977934111ceb638672b425f639eaf'),
-              '.translation-input/en/index.md': (6351, 'cc6333dc8f3f71be9746005e02bfabbc971a972d09be7ab71bd1bba084ece85b'),
-              '.translation-input/en/lab.md': (7795, '5821c9f45bfd912251bf5fa439f8b2a8b48bc929be57517c6afd05b931d07101'),
-              '.translation-input/en/local-signals.md': (8244, '69496925028f65a3c50c9bd5357dac8b6282a37261080e58460cc25677f192ca'),
-              '.translation-input/en/network-path.md': (8785, 'f60d10b59a527976b6ff891d54fb9bbd5dce6836d629cbb1b4dcd8b923da760b'),
-              '.translation-input/en/profiles.md': (7015, 'f29998b7af730bcd24852f213e5c387cf5d072cd84f59a23835208fcfadb463f'),
-              '.translation-input/en/root-integrity.md': (8609, 'e54f99280f4b0607fcf71fa3648351861ba1e323e57e13804cf4547f27fed25a'),
-              '.translation-input/en/root-vpnhide.md': (12752, 'b9f84fba1565f72e38c82d6610219bf9a4bf57c56f5bf748bcba643983c053f4'),
-              '.translation-input/en/threat-model.md': (7613, 'b9b5e0fa7135aab08a974e3cc70d11a5075f4937f21d21ae010478dfd7bc43b6'),
-              '.translation-input/translate_nllb.py': (20174, '8576994a2e6aa870fdfeee5eebd80f2503f9f5647b65000961733bf0eb6547db'),
-          }
-          for raw_path, (size, digest) in expected.items():
-              path = Path(raw_path)
-              data = path.read_bytes()
-              actual = hashlib.sha256(data).hexdigest()
-              if len(data) != size or actual != digest:
-                  raise SystemExit(
-                      f'Input mismatch: {path}: size={len(data)} sha256={actual}; '
-                      f'expected size={size} sha256={digest}'
-                  )
-              print(f'OK {path}: {size} bytes {digest}')
-
-          en_names = sorted(p.name for p in Path('.translation-input/en').glob('*.md'))
-          expected_en = sorted([
+          names = sorted(p.name for p in Path('.translation-input/en').glob('*.md'))
+          expected = sorted([
               'beta.md', 'index.md', 'lab.md', 'local-signals.md',
               'network-path.md', 'profiles.md', 'root-integrity.md',
               'root-vpnhide.md', 'threat-model.md',
           ])
-          if en_names != expected_en:
-              raise SystemExit(f'Unexpected English seed set: {en_names}')
+          if names != expected:
+              raise SystemExit(f'Unexpected English seed set: {names}')
+          print('English seed set:', ', '.join(names))
           PY
 
       - name: Install pinned translation runtime
