@@ -1,4 +1,4 @@
-name: Temporary documentation translation
+name: Temporary high-quality documentation translation
 
 on:
   pull_request:
@@ -12,10 +12,16 @@ jobs:
   translate:
     if: github.head_ref == 'tmp-translate-docs-20260720-kai'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 240
     env:
       PYTHONUNBUFFERED: "1"
-      OMP_NUM_THREADS: "2"
+      TOKENIZERS_PARALLELISM: "false"
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_DOWNLOAD_TIMEOUT: "1800"
+      TRANSFORMERS_VERBOSITY: "error"
     steps:
       - uses: actions/checkout@v4
 
@@ -54,8 +60,8 @@ jobs:
               '.translation-input/en/root-integrity.md': (8609, 'e54f99280f4b0607fcf71fa3648351861ba1e323e57e13804cf4547f27fed25a'),
               '.translation-input/en/root-vpnhide.md': (12752, 'b9f84fba1565f72e38c82d6610219bf9a4bf57c56f5bf748bcba643983c053f4'),
               '.translation-input/en/threat-model.md': (7613, 'b9b5e0fa7135aab08a974e3cc70d11a5075f4937f21d21ae010478dfd7bc43b6'),
+              '.translation-input/translate_nllb.py': (20174, '8576994a2e6aa870fdfeee5eebd80f2503f9f5647b65000961733bf0eb6547db'),
           }
-
           for raw_path, (size, digest) in expected.items():
               path = Path(raw_path)
               data = path.read_bytes()
@@ -75,90 +81,73 @@ jobs:
           ])
           if en_names != expected_en:
               raise SystemExit(f'Unexpected English seed set: {en_names}')
-
-          script_path = Path('.translation-input/translate_plain.py')
-          script = script_path.read_text(encoding='utf-8')
-          old = 'source_names = sorted(p.name for p in source.glob("*.md"))'
-          new = 'source_names = sorted(p.name for p in (output_root / "en").glob("*.md"))'
-          if old not in script:
-              raise SystemExit('Expected validation expression was not found in translation runner')
-          script = script.replace(old, new, 1)
-          with script_path.open('w', encoding='utf-8', newline='\n') as handle:
-              handle.write(script)
-          print('Translation runner patched for seeded English file-set validation')
           PY
 
-      - name: Install translation runtime
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install 'argostranslate==1.11.0'
-
-      - name: Download and verify official language models
+      - name: Install pinned translation runtime
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p models
-
-          download_model() {
-            local filename="$1"
-            local target="models/${filename}"
-            local bases=(
-              'https://data.argosopentech.com/argospm/v1'
-              'https://argos-net.com/v1'
-            )
-            local base
-            for base in "${bases[@]}"; do
-              echo "Downloading ${filename} from ${base}"
-              rm -f "${target}"
-              if curl --fail --location --retry 5 --retry-all-errors \
-                --connect-timeout 30 --max-time 1800 \
-                "${base}/${filename}" --output "${target}"; then
-                if python - "${target}" <<'PY'
-          from pathlib import Path
-          import sys
-          import zipfile
-          path = Path(sys.argv[1])
-          valid = path.is_file() and path.stat().st_size > 20 * 1024 * 1024 and zipfile.is_zipfile(path)
-          print(f'{path}: size={path.stat().st_size if path.exists() else 0}, zip={zipfile.is_zipfile(path) if path.exists() else False}')
-          raise SystemExit(0 if valid else 1)
-          PY
-                then
-                  return 0
-                fi
-              fi
-            done
-            echo "Unable to download a valid model: ${filename}" >&2
-            return 1
-          }
-
-          download_model 'translate-ru_en-1_9.argosmodel'
-          download_model 'translate-en_fa-1_5.argosmodel'
-          download_model 'translate-en_zh-1_9.argosmodel'
-          sha256sum models/*.argosmodel | sort | tee model-SHA256SUMS.txt
+          python -m pip install --upgrade pip
+          python -m pip install \
+            --index-url https://download.pytorch.org/whl/cpu \
+            'torch==2.7.1'
+          python -m pip install \
+            'transformers==4.56.2' \
+            'accelerate>=1.0,<2' \
+            'sentencepiece>=0.2,<1' \
+            'safetensors>=0.4,<1'
+          python -m pip freeze | sort | tee runtime-requirements.txt
 
       - name: Translate and validate documentation
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p workflow-output
-          python .translation-input/translate_plain.py \
+          python .translation-input/translate_nllb.py \
             --source .translation-input/ru \
             --seed .translation-input/en \
-            --models models \
             --output workflow-output/translation-output.zip \
+            --model facebook/nllb-200-distilled-600M \
+            --revision cb65f9d79affdfe51b915cf26acf7e4cfd0fe471 \
+            --batch-size 12 \
             2>&1 | tee workflow-output/translation.log
-          cp model-SHA256SUMS.txt workflow-output/model-SHA256SUMS.txt
+          cp runtime-requirements.txt workflow-output/runtime-requirements.txt
+
+      - name: Record pinned model file hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' > workflow-output/model-SHA256SUMS.txt
+          from pathlib import Path
+          import hashlib
+          from huggingface_hub import snapshot_download
+
+          root = Path(snapshot_download(
+              repo_id='facebook/nllb-200-distilled-600M',
+              revision='cb65f9d79affdfe51b915cf26acf7e4cfd0fe471',
+              local_files_only=True,
+          ))
+          for path in sorted(root.iterdir()):
+              if not path.is_file():
+                  continue
+              h = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for block in iter(lambda: handle.read(1024 * 1024), b''):
+                      h.update(block)
+              print(f'{h.hexdigest()}  {path.name}')
+          PY
+          cat workflow-output/model-SHA256SUMS.txt
 
       - name: Upload translated documentation
         uses: actions/upload-artifact@v4
         with:
-          name: translated-documentation-anti-detection
+          name: translated-documentation-nllb
           path: |
             workflow-output/translation-output.zip
             workflow-output/localized-anti-detection/manifest.json
             workflow-output/translation.log
             workflow-output/model-SHA256SUMS.txt
+            workflow-output/runtime-requirements.txt
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
