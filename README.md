@@ -676,6 +676,12 @@ JNI-проверки (`nativeDetectEmulator`): QEMU system properties (`ro.kerne
 
 Бета-проверки охватывают контекст пользователя и профиля, скрытые read-only Binder API, собственные socket/netd/routing-дескрипторы, sandbox/linker consistency и контролируемые transport/DNS/TLS canary-пробы. Отказ, неполный ответ или смена сети всегда нейтральны. Глобальные WireGuard/OpenVPN DCO/XFRM/BPF-запросы не выполняются в обычном app sandbox: для них есть отдельный выключенный по умолчанию master и явный выбор Shizuku либо root без автоматического fallback. Provider предоставляет только фиксированный read-only AIDL, санитизирует ответ и не принимает команды или пути. Canary endpoint задаётся Gradle-свойствами `betaCanary*`; без конфигурации активные пробы честно возвращают `UNAVAILABLE`. Источники и ограничения зафиксированы в `docs/beta-checks-research.md`.
 
+Подраздел «VPNHide: тайминг хуков» включается отдельным переключателем и по умолчанию выключен. Проба ограничена 900 мс в native-коде и одной секундой вместе с JNI/Kotlin. В первой версии точная высокочастотная оценка поддерживается только на arm64; на других ABI результат явно помечается как `unsupported_arch`.
+
+Путь `libc` сравнивает libc-обёртки `ioctl()` с прямыми системными вызовами и ориентирован на наблюдаемую подмену в VPNHide Zygisk. Экспериментальный путь `kernel` ищет только временные и семантические противоречия между kernel-интерфейсами, поэтому Kernel module и KPM имеют другую наблюдаемость. Согласованная фильтрация одного интерфейса во всех источниках может остаться невыявленной и корректно отображается как `INCONCLUSIVE`.
+
+Сам тайминг не считается доказательством. Только устойчивое временное отклонение вместе с повторяемым семантическим расхождением даёт review-only источник `BETA_HOOK_TIMING`; он может повысить итог до `NEEDS_REVIEW`, но исключён из любого кворума, создающего `DETECTED`.
+
 **R3 — IP-консенсус:**
 
 `IpConsensusBuilder` агрегирует сигналы из GeoIP, IpComparison, CDN Pulling, TUN-проба, bypass и callTransportLeaks. Если определён `geoAxis` (иностранные IP, geo-country mismatch или Warp-индикатор) и одновременно имеет место `probeTargetDivergence`, `probeTargetDirectDivergence` или `crossChannelMismatch` → `DETECTED`.

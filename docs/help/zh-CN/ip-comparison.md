@@ -5,35 +5,35 @@ permalink: /help/zh-CN/ip-comparison/
 
 # IP 比较
 
-## 检查内容与目的
+## 检查内容与原因
 
-模块先判断 RU 与 non-RU 组内共识，再比较两组的规范公网 IP，以发现路由差异。
+该模块分别在俄罗斯服务组和非俄罗斯服务组内建立共识，然后比较两组得到的规范化公网 IP 地址，以暴露路由差异。
 
 ## 结果含义
 
-差异可能来自分流、VPN/代理、服务错误、IPv4/IPv6 差异或网络切换，不能单独证明具体原因。
+出现差异可能表示分流、VPN 或代理、服务错误、不同地址族，或网络正在切换。它不能单独证明任何一种具体原因。
 
 ## 限制与可能的误报
 
-临时服务故障、强制门户和网络切换可能破坏共识。采取措施前应在稳定网络上复测。
+部分服务故障、IPv4 与 IPv6 差异、强制门户或网络切换，都可能暂时破坏共识。在做出更改之前，应在稳定网络上重复测试。
 
-## 针对该向量的建议
+## 针对此向量的建议
 
-外部项目 [gowarp-server](https://github.com/paulkarpunin/gowarp-server) 声明可在具有 Root 权限的 Linux 服务器上配置 WARP；这不是项目验证的绕过保证。不要运行 curl-to-bash。应先审计脚本、检查防火墙与路由、备份服务器，并在具有明确恢复方法的测试 VPS 上试验。
+外部项目 [gowarp-server](https://github.com/paulkarpunin/gowarp-server) 介绍了如何在已 root 的 Linux 服务器上配置 WARP。这不是由本项目核验的“必然绕过 IP 比较”保证。不要在未审查的情况下执行 curl-to-bash 命令。应先检查脚本，核验其防火墙和路由改动，完成备份，并在具备明确恢复路径的独立 VPS 上测试。之后，再分别重复运行两个检查器分组。
 
 ## 所需权限与风险
 
-检查使用应用现有网络权限。WARP/VPS 修改需要服务器 Root，路由或防火墙错误可能导致失联。它不会隐藏设备原生信号、Root、自定义固件或服务器端检测。
+检查本身使用应用现有的网络访问权限。修改 WARP 或 VPS 需要服务器 root 权限；路由或防火墙配置错误可能中断连接。这些改动不会隐藏本地原生指标、设备 root、自定义固件或服务端检测。
 
-## 证据等级
+## 证据级别
 
-**项目验证：**共识和比较逻辑已在 RKNHardering 中实现并测试。**外部项目声明：**WARP/VPS 场景仍是有条件的。
+**本项目已核验：**RKNHardering 已实现并测试共识与比较逻辑。**外部项目声明：**WARP 或 VPS 布局仍然是有条件的方案。
 
 ## 来源与最后核验日期
 
 - 外部项目声明：[gowarp-server](https://github.com/paulkarpunin/gowarp-server)。
 - 讨论：[issue #79](https://github.com/xtclovver/RKNHardering/issues/79)。
-- 项目验证：IpComparisonChecker 与 README。
+- 本项目已核验：`IpComparisonChecker` 与 RKNHardering README。
 - 最后核验：2026-07-11。
 
-[返回语言目录](./)
+[返回简体中文目录](./)

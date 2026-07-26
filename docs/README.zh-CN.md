@@ -1,4 +1,4 @@
-> **Language:** [Русский](../README.md) | [English](README.en.md) | [فارسی](README.fa.md) | [中文](README.zh-CN.md)
+> **语言：**[俄语](../README.md) | [英语](README.en.md) | [波斯语](README.fa.md) | [中文](README.zh-CN.md)
 
 # RKNHardering
 
@@ -11,7 +11,7 @@
 
 ## 检查参考
 
-Native signs 与 IP comparison 的详细说明发布在 [RKNHardering 参考](https://xtclovver.github.io/RKNHardering/help/zh-CN/)。文章区分**项目验证**、**社区报告**和**外部项目声明**；后两者不代表有效性或安全保证。
+VPN、root、资料空间检测的应对措施，以及原生信号与 IP 比较的详细说明，发布在 [RKNHardering 参考文档](https://xtclovver.github.io/RKNHardering/help/zh-CN/)。文章区分**本项目已核验**、**社区报告**和**外部项目声明**；后两类标签不代表有效性或安全保证。
 
 您可以从以下位置下载本项目：
 <table>
@@ -22,19 +22,19 @@ Native signs 与 IP comparison 的详细说明发布在 [RKNHardering 参考](ht
   <tr>
     <td align="center">
       <a href="https://github.com/xtclovver/RKNHardering/releases/latest">
-        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
+        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="从 GitHub 下载" height="75">
       </a>
     </td>
     <td align="center">
       <a href="https://f-droid.org/en/packages/com.notcvnt.rknhardering/">
-        <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Download from F-Droid" height="75">
+        <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="从 F-Droid 下载" height="75">
       </a>
     </td>
   </tr>
 </table>
 
 
-## 需要社区帮助 / Community Help Wanted
+## 需要社区帮助
 
 本项目记录了在 Android 设备上检测 VPN 和代理的方法。然而，**反向问题**——如何防止 VPN 被检测到——的研究还远不够充分。
 
@@ -44,8 +44,8 @@ Native signs 与 IP comparison 的详细说明发布在 [RKNHardering 参考](ht
 - **伪造 NetworkCapabilities**（从 `ConnectivityManager` 的响应中移除 `TRANSPORT_VPN`、`IS_VPN`、`VpnTransportInfo`）
 - **隐藏 dumpsys 信息**（防止通过 `dumpsys vpn_management` 和 `dumpsys activity services android.net.VpnService` 泄露信息）
 - **MTU 标准化**（在不同客户端上将隧道接口的 MTU 设置为标准的 1500）
-- **DNS 泄漏**（防止在 VPN 激活时检测到 loopback/private DNS）
-- **隐藏 localhost 代理**（如何防止通过 `/proc/net/tcp` 和端口扫描被发现）
+- **DNS 泄漏**（防止在 VPN 激活时检测到 回环/私有 DNS）
+- **隐藏本地主机代理**（如何防止通过 `/proc/net/tcp` 和端口扫描被发现）
 - **绕过原生检查**（对抗通过 `/proc/self/maps`、`getifaddrs()`、`dlsym` 进行的 JNI 检查）
 - **隐藏已安装的应用**（对 `PackageManager` 隐藏 VPN 应用的包名）
 
@@ -59,18 +59,18 @@ Native signs 与 IP comparison 的详细说明发布在 [RKNHardering 参考](ht
 
 ```text
 VpnCheckRunner
-├── GeoIpChecker             — GeoIP + hosting/proxy 信号
-├── IpComparisonChecker      — RU/非 RU IP checker（诊断）
+├── GeoIpChecker             — GeoIP + 托管/代理信号
+├── IpComparisonChecker      — 俄罗斯/非俄罗斯 IP 检查器（诊断）
 ├── DirectSignsChecker       — NetworkCapabilities、系统代理、TUN 探测、已安装 VPN 应用
-├── IndirectSignsChecker     — 接口、路由、DNS、dumpsys、proxy-tech signals
+├── IndirectSignsChecker     — 接口、路由、DNS、dumpsys、代理技术信号
 ├── CallTransportChecker     — STUN/MTProto 探测（泄漏与连通性）
-├── CdnPullingChecker        — 对 CDN/redirector 的 HTTPS 请求
-├── LocationSignalsChecker   — MCC/SIM/cell/Wi-Fi/BeaconDB
-├── BypassChecker            — localhost 代理、Xray gRPC API、Clash/sing-box REST API、SOCKS5 认证探测、underlying-network leak
+├── CdnPullingChecker        — 对 CDN/重定向器的 HTTPS 请求
+├── LocationSignalsChecker   — MCC/SIM/蜂窝/Wi-Fi/BeaconDB
+├── BypassChecker            — 本地主机代理、Xray gRPC API、Clash/sing-box REST API、SOCKS5 认证探测、底层网络泄漏
 ├── RttTriangulationChecker  — SNITCH（β）：针对 RU/境外主机的 RTT 三角测量
 ├── IcmpSpoofingChecker      — 运营商 ICMP 欺骗检测（被封锁主机回复 ping）
 ├── DomainReachabilityChecker — DNS→TCP→TLS 流水线，用于检测 DPI 封锁
-├── NativeSignsChecker       — JNI 检查（路由、接口、host-route /32、按类型检测 TUN/TAP、钩子、root、模拟器、隔离）
+├── NativeSignsChecker       — JNI 检查（路由、接口、主机路由 /32、按类型检测 TUN/TAP、钩子、root、模拟器、隔离）
 └── IpConsensusBuilder       — 跨模块 IP 共识
         └── VerdictEngine    — 最终结论逻辑
 ```
@@ -83,8 +83,8 @@ VpnCheckRunner
 
 数据源：
 
-- `https://api.ipapi.is/` — GeoIP 字段以及 proxy/VPN/Tor/datacenter 信号的主来源
-- `https://www.iplocate.io/api/lookup` — GeoIP 字段的 fallback 来源，并提供一票额外的 hosting 判断（`privacy.is_hosting`）
+- `https://api.ipapi.is/` — GeoIP 字段以及代理/VPN/Tor/数据中心信号的主来源
+- `https://www.iplocate.io/api/lookup` — GeoIP 字段的备用来源，并提供一票额外的托管判断（`privacy.is_hosting`）
 
 逻辑：
 
@@ -92,7 +92,7 @@ VpnCheckRunner
 |------|----------|------|
 | `countryCode != RU` | 将 IP 视为境外地址 | 如果同时不存在 `hosting` 和 `proxy`，则 `needsReview` |
 | `hosting` | 对同一 IP 的兼容响应使用多数投票（`ipapi.is`, `iplocate.io`） | 如果多数兼容来源都说 `hosting=true`，则 `detected = true` |
-| `proxy` | 使用兼容的 HTTPS 提供方（`ipapi.is`, `iplocate.io`） | 如果至少一个兼容提供方报告 proxy/VPN/Tor，则 `detected = true` |
+| `proxy` | 使用兼容的 HTTPS 提供方（`ipapi.is`, `iplocate.io`） | 如果至少一个兼容提供方报告代理/VPN/Tor，则 `detected = true` |
 | `country`, `isp`, `org`, `as`, `query` | 首先取自 `ipapi.is`，仅对兼容 IP 用 `iplocate.io` 补齐缺失字段 | 不直接影响判定 |
 
 类别最终结果：
@@ -104,9 +104,9 @@ HTTP(S) 连接与读取超时：10 秒。`GeoIpChecker` 只使用 HTTPS 提供�
 
 ---
 
-### 2. IP checker 比较 (`IpComparisonChecker`)
+### 2. IP 检查器比较 (`IpComparisonChecker`)
 
-该模块比较 RU 与非 RU 公网 IP checker 的响应。在 UI 中作为诊断模块显示。不直接参与 `VerdictEngine`，但其数据会输入 `IpConsensusBuilder`，后者的结果用于 R3。
+该模块比较俄罗斯与非俄罗斯公网 IP 检查器的响应。在 UI 中作为诊断模块显示。不直接参与 `VerdictEngine`，但其数据会输入 `IpConsensusBuilder`，后者的结果用于 R3。
 
 服务分组：
 
@@ -180,7 +180,7 @@ API：`ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 ### 4. 间接迹象 (`IndirectSignsChecker`)
 
-#### 4.1 `NOT_VPN` capability (`checkNotVpnCapability`)
+#### 4.1 `NOT_VPN` 能力标志 (`checkNotVpnCapability`)
 
 通过 `ConnectivityManager.getNetworkCapabilities(activeNetwork).toString()` 检查是否包含 `NOT_VPN`。
 
@@ -224,7 +224,7 @@ API：`NetworkInterface.getNetworkInterfaces()`。仅检查活动接口（`isUp`
 数据来源：
 
 - 优先使用 Android API 中的 `LinkProperties.routes`；
-- fallback：若无法通过 API 获取默认路由，则读取 `/proc/net/route`。
+- 备用路径：若无法通过 API 获取默认路由，则读取 `/proc/net/route`。
 
 检测条件：
 
@@ -238,13 +238,13 @@ API：`NetworkInterface.getNetworkInterfaces()`。仅检查活动接口（`isUp`
 
 API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
-若 underlying 网络快照可用，DNS 会结合这些快照一起评估。
+若底层网络快照可用，DNS 会结合这些快照一起评估。
 
 | 信号 | 结果 |
 |------|------|
 | loopback DNS (`127.x.x.x`, `::1`) | `detected = true` |
 | 继承自主 non-VPN 网络相同私有/ULA 子网的 private DNS | 正常 |
-| VPN 活跃且 private DNS 与 underlying 网络不同 | `detected = true` |
+| VPN 活跃且私有 DNS 与底层网络不同 | `detected = true` |
 | 在缺少足够上下文时出现 private DNS | `needsReview = true` |
 | VPN 活跃时 public DNS 被替换 | `needsReview = true` |
 | link-local (`169.254.x.x`, `fe80::/10`) | 仅信息 |
@@ -253,14 +253,14 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
 检查内容：
 
-- `VpnAppCatalog` 中不带 `VPN_SERVICE`、但带有 `LOCAL_PROXY` 信号的 proxy-only 工具；
-- `/proc/net/tcp`, `/proc/net/tcp6`, `/proc/net/udp`, `/proc/net/udp6` 中已知代理端口上的本地 listener；
-- 高位端口上大量的 localhost listener。
+- `VpnAppCatalog` 中不带 `VPN_SERVICE`、但带有 `LOCAL_PROXY` 信号的仅代理工具；
+- `/proc/net/tcp`, `/proc/net/tcp6`, `/proc/net/udp`, `/proc/net/udp6` 中已知代理端口上的本地监听器；
+- 高位端口上存在大量本地主机监听器。
 
 逻辑：
 
-- 已知 localhost 代理端口上的 listener 会产生 `detected = true`；
-- proxy-only 工具或大量 localhost listener 会产生 `needsReview = true`。
+- 已知本地主机代理端口上的监听器 会产生 `detected = true`；
+- 仅代理工具或大量本地主机监听器 会产生 `needsReview = true`。
 
 同时还会单独记录一个限制：在没有 root/privileged access 的情况下，进程、`iptables`/`pf` 和系统证书的检查并不完整。
 
@@ -298,7 +298,7 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 - `TelephonyManager.simOperator`, `simCountryIso`, `isNetworkRoaming`
 - `requestCellInfoUpdate` / `allCellInfo`
 - `WifiManager.scanResults` 与当前 `BSSID`
-- `BeaconDB`（`https://api.beacondb.net/v1/geolocate`）用于 cell/Wi-Fi geolocation
+- `BeaconDB`（`https://api.beacondb.net/v1/geolocate`）用于蜂窝/Wi-Fi 地理定位
 - `countryCode` 的 reverse geocoding
 
 权限：
@@ -319,7 +319,7 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 
 ---
 
-### 6. Bypass 检查 (`BypassChecker`)
+### 6. 绕过检查 (`BypassChecker`)
 
 以下检查并行执行：
 
@@ -360,7 +360,7 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 此外：
 
 - 如果找到了 `SOCKS5`，但无法通过它获取 HTTP IP，且该端口又不像 Xray，则会启动 `MtProtoProber`；
-- MTProto probe 成功只会增加一条说明性 finding，不影响最终 verdict。
+- MTProto 探测成功只会增加一条说明性发现，不影响最终结论。
 
 **认证探测（`ProxyProber`，可选）。** 通过”代理本地认证探测”设置启用（`pref_proxy_auth_probe_enabled`，默认关闭）。仅适用于 loopback 地址上的 `SOCKS5` 端点：
 
@@ -387,7 +387,7 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 - endpoint 会产生 `detected = true`；
 - findings 中会加入最多 10 条 outbound 摘要（`tag`, `protocol`, `address`, `port`, `sni`）以及剩余数量计数。
 
-#### 6.3 Underlying network leak / VPN network binding (`UnderlyingNetworkProber`)
+#### 6.3 底层网络泄漏 / VPN 网络绑定 (`UnderlyingNetworkProber`)
 
 如果设备上 VPN 处于活动状态，该模块会：
 
@@ -396,7 +396,7 @@ API：`ConnectivityManager.getLinkProperties(activeNetwork).dnsServers`
 - 将 HTTP(S) 请求绑定到该网络；
 - 通过 `ifconfig.me`, `checkip.amazonaws.com`, `ipv4-internet.yandex.net`, `ipv6-internet.yandex.net` 请求公网 IP。
 
-如果在 VPN 激活时 underlying 网络仍可访问，则会被视为 `VPN gateway leak`，并产生 `detected = true`。
+如果在 VPN 激活时底层网络仍可访问，则会被视为 `VPN gateway leak`，并产生 `detected = true`。
 
 #### 6.4 Clash/sing-box REST API 扫描器 (`ClashApiScanner` + `ClashApiClient`)
 
@@ -422,11 +422,11 @@ API 存活或目标 IP 列表非空均会产生 `detected = true`（`EvidenceSou
 
 ---
 
-### 7. CDN Pulling (`CdnPullingChecker`)
+### 7. CDN 拉取 (`CdnPullingChecker`)
 
 向已知的 redirector 和 trace 端点（例如 Google Video、Cloudflare trace、Meduza）发送 HTTPS 请求，以查看暴露了什么公网 IP 或网络元数据。响应内容的不同往往能指示代理或隧道的存在。
 
-### 8. Call Transport (`CallTransportChecker`)
+### 8. 通话传输 (`CallTransportChecker`)
 
 检查全球与区域端点的 UDP/STUN 可达性，并通过本地代理测试 TCP MTProto 的连通性。该项检查能够揭示重定向的公网 IP 或是绕过常规隧道的底层网络泄漏。
 
@@ -504,7 +504,7 @@ TLS 步骤使用信任所有证书的 X.509 manager，因为目标是检测 DPI 
 
 对每个接口读取 `/sys/class/net/<name>/type`。若活动接口的值为 `65534`（`ARPHRD_TUNTAP`），且接口名称与已知 VPN 模式**不**匹配，则说明该 TUN/TAP 接口正在伪装成普通接口。结果：`detected = true`（`EvidenceSource.NATIVE_INTERFACE`）。
 
-#### 12.2 host-route /32 启发式
+#### 12.2 主机路由 /32 启发式
 
 路由表（NETLINK）只检查元数据完整、scope 为 `global` 或 `link`、目标为公开可路由地址、前缀长度为 `/32`（IPv4）或 `/128`（IPv6）的 `unicast` 路由，并且路由必须经过普通物理接口。内核创建的路由、`local` 表条目和元数据不完整的条目都不作为证据。该记录可能是 VPN 客户端到服务器的绕行路由，但仅凭一条 FIB 记录无法可靠地区分它与系统或运营商路由，尤其是在 `rmnet*`、`ccmni*`、`pdp*` 和 `seth*` 上。因此结果仅标记为需要复核（`EvidenceSource.NATIVE_HOST_ROUTE`），本身不确认 VPN。
 
@@ -583,7 +583,7 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 
 **直接迹象（Direct signs）— `EvidenceSource.NATIVE_INTERFACE`：**
 
-| 检查 (kind) | 查找内容 | 来源 |
+| 检查（kind） | 查找内容 | 来源 |
 |-------------|----------|------|
 | `sysfs_vpn_leak` | 通过 sysfs 泄漏 tun/wg/ppp/xfrm | `/sys/class/net`、`/sys/devices/virtual/net`、`/proc/sys/net/ipv4|6/conf|neigh` |
 | `getifaddrs_vpn` | `getifaddrs()` 列表中的 VPN 接口 | `getifaddrs()` |
@@ -597,7 +597,7 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 
 **网络迹象（Network signs）— `EvidenceSource.NATIVE_SOCKET`：**
 
-| 检查 (kind) | 查找内容 | 来源 |
+| 检查（kind） | 查找内容 | 来源 |
 |-------------|----------|------|
 | `fib_trie_denied` | `/proc/net/fib_trie` 不可用（SELinux EACCES） | `fopen("/proc/net/fib_trie")` |
 | `inet_diag_denied` | inet_diag netlink 被拒绝（SELinux） | `socket(NETLINK_SOCK_DIAG)` |
@@ -605,11 +605,11 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 | `getsockname_leak` | `getsockname()` 返回私有 VPN IP | UDP 套接字上的 `getsockname()` |
 | `udp_port_conflict_physical` | 物理 IP 上的 UDP 端口冲突（500/4500/1194/1701/51820） | 物理 IP 上的 `bind()` |
 | `route_count` | 路由数量和唯一接口数量 | Netlink `RTM_GETROUTE` dump |
-| `trim_oracle` | bind-probe 与 RTM_GETLINK 接口数不匹配 | `if_indextoname()` 对比 `RTM_GETLINK` |
+| `trim_oracle` | 绑定探测与 RTM_GETLINK 接口数不匹配 | `if_indextoname()` 对比 `RTM_GETLINK` |
 
 **间接迹象（Indirect signs）— `EvidenceSource.NATIVE_ROUTE`：**
 
-| 检查 (kind) | 查找内容 | 来源 |
+| 检查（kind） | 查找内容 | 来源 |
 |-------------|----------|------|
 | `pmtu_mss_combined` | UDP PMTU + TCP MSS（tcpi_snd_mss/rcv_mss） | `connect()` + `getsockopt(TCP_INFO)` |
 | `udp_pmtu_ok` / `udp_pmtu_fail` | 通过 UDP 发送 1500 字节成功/失败 | `sendto()` 1500 字节 |
@@ -619,9 +619,9 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 | `gso_failed` / `gso_send_failed` / `gso_ok` | UDP GSO 能力诊断；结果不是 VPN 证据 | `UDP_SEGMENT=1200` + 发送 4800 字节 |
 | `hw_timestamp` | 硬件时间戳（`SIOCSHWTSTAMP`、`SO_TIMESTAMPING`） | `ioctl(SIOCSHWTSTAMP)` |
 
-**环境探测（Environment probes）— `EvidenceSource.NATIVE_INTERFACE`：**
+**环境探测——`EvidenceSource.NATIVE_INTERFACE`：**
 
-| 检查 (kind) | 查找内容 | 来源 |
+| 检查（kind） | 查找内容 | 来源 |
 |-------------|----------|------|
 | `traceroute_denied` | traceroute 探测（TTL=1 UDP）被阻止 | `setsockopt(IP_TTL=1)` + `sendto()` |
 
@@ -648,17 +648,17 @@ JNI 检查（`nativeDetectEmulator`）：QEMU 系统属性（`ro.kernel.qemu*`�
 **R4 — 位置与 GeoIP 对比：**
 
 - 若位置信号确认设备在俄罗斯（`network_mcc_ru:true`、`cell_country_ru:true` 或 `location_country_ru:true`），而 GeoIP 同时显示境外 IP（`outsideRu = true`）→ `DETECTED`，home-routed 漫游除外。
-- 若位置确认在俄罗斯，但 GeoIP 显示 hosting/proxy 且无境外 IP，且无其他信号 → `NEEDS_REVIEW`。
+- 若位置确认在俄罗斯，但 GeoIP 显示托管/代理 且无境外 IP，且无其他信号 → `NEEDS_REVIEW`。
 
 `expectedRoamingExit` 标志（由 `HomeNetworkCatalog` 根据 SIM 卡的 MCC/MNC 和 ASN 确定）用于防止使用外国 SIM 卡并通过归属运营商路由时产生误报。
 
-**R5 — 三轴矩阵（geo × direct × indirect）：**
+**R5 — 三轴矩阵（地理 × 直接 × 间接）：**
 
 - `geoHit` = `GeoIP.outsideRu == true`（漫游除外）
 - `directHit` = 来自 `DIRECT_NETWORK_CAPABILITIES` 或 `SYSTEM_PROXY` 的 detected evidence
 - `indirectHit` = 来自 `INDIRECT_NETWORK_CAPABILITIES`、`ACTIVE_VPN`、`NETWORK_INTERFACE`、`ROUTING`、`DNS`、`PROXY_TECHNICAL_SIGNAL`、`NATIVE_INTERFACE`、`NATIVE_ROUTE`、`NATIVE_JVM_MISMATCH` 的 detected evidence，或高置信度 `NATIVE_SOCKET`
 
-| Geo | Direct | Indirect | Verdict |
+| 地理位置 | 直接信号 | 间接信号 | 结论 |
 |-----|--------|----------|---------|
 | 否 | 否 | 否 | `NOT_DETECTED` |
 | 否 | 是 | 否 | `NOT_DETECTED` |

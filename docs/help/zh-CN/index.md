@@ -1,12 +1,12 @@
 ---
-title: RKNHardering 帮助
+title: RKNHardering 参考文档
 permalink: /help/zh-CN/
 ---
 
-# RKNHardering 帮助
+# RKNHardering 参考文档
 
-本参考将项目验证的证据、社区报告和外部项目声明分开说明。建议取决于设备，不能保证隐藏 VPN、Root、固件或服务器端信号。
+本详细参考文档会明确区分本项目已核验的事实、社区报告和外部项目声明。建议会因设备而异，不能保证隐藏 VPN、root 权限、固件修改或服务端指标。
 
-- [Native signs 参考](./native/)
+- [VPN、root 与资料空间检测的实用应对措施](./anti-detection/)
+- [原生信号参考](./native/)
 - [IP 比较](./ip-comparison/)
-

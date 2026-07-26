@@ -1,39 +1,85 @@
 ---
-title: "原生信号：root-su-binary"
+title: "已知路径中的 su 文件"
 permalink: /help/zh-CN/native/root-su-binary/
 ---
 
-# 原生信号：root-su-binary
+# 已知路径中的 su 文件
+
+> **ID：** `ROOT_SU_BINARY`
+> **类别：** Root 与系统状态
+> **RKNHardering 2.10.0 中的状态：** 已启用的检查
+> **在最终判定中的作用：** 中
+
+本页说明 RKNHardering 2.10.0 中的实际实现，并分别指出无需 root 权限即可采取的措施、需要 root 权限的措施，以及哪些缓解方法只能减少单个信号而无法隐藏整个 VPN。
 
 ## 检查内容与目的
 
-RKNHardering 通过应用可见的 Android 与原生状态检查稳定向量 `root-su-binary`。
+C++ 针对 12 个路径调用 `access(F_OK)`：`/system/bin/su`、`/system/xbin/su`、`/sbin/su`、`/su/bin/su`、`/data/local/su`、`/data/local/bin/su`、`/data/local/xbin/su`、`/system/sd/xbin/su`、`/system/bin/failsafe/su`、`/vendor/bin/su`、`/product/bin/su` 和 `/apex/com.android.runtime/bin/su`。匹配路径获得高置信度，但该类别本身只设置待复核，不直接设置 `detected`。
+
+### 精确触发条件
+
+应用 UID 的存在性检查能看到固定列表中的任一文件。
 
 ## 结果含义
 
-Review 表示发现了需要与设备配置核对的项；它是辅助证据，不是独立结论。
+这是强本地 root 痕迹。文件存在不能证明 RKNHardering 可以执行 `su`，而文件不存在也不能排除内核级 root 或非标准路径。
+
+**该行如何影响报告：**该行本身不会直接得出最终判定，但会设置 `needsReview=true`，并加入中等置信度证据。
 
 ## 限制与可能的误报
 
-厂商固件、企业管理、模拟器、工作资料和合法开发工具可能产生相似状态。
+挂载命名空间可能只向特定 UID 隐藏路径。旧 ROM、工程构建和未完全取消 root 的残留都可能留下不可用的 `su`。
+
+必须把这一行与相邻信号一起评估。单个 API 返回干净结果，并不能同时覆盖 Java Binder、libc、原始 netlink/系统调用、procfs/sysfs、本地套接字以及服务器端指标。
 
 ## 针对该向量的建议
 
-将该项与 Root 管理器、固件、挂载、属性、UID 和 SELinux 核对。不要只为隐藏信号而获取 Root。
+### 无 root 权限
+
+若不需要 root，可靠的修复方法是通过官方流程让设备恢复原厂状态：使用对应管理器卸载 root，或刷入与当前构建完全匹配的原厂 `boot`/`init_boot` 和系统分区。即使管理器已移除，解锁的 bootloader、自定义内核和残留目录仍可能暴露修改痕迹。恢复前必须备份设备；在固件已修改时重新锁定 bootloader，可能导致数据丢失或设备无法启动。 若 root 已移除，不要从只读分区手工删除文件。先找出引入它的镜像或模块，再通过正常流程恢复分区。
+
+### 有 root 权限
+
+Root 权限只能减少可观察表面，不能证明 root 不存在。尽量只向少数应用授予 `su`，不要向 RKNHardering 授权，禁用不必要的模块，也不要把 SELinux 改为 permissive。App Profile/DenyList 行为与挂载隔离必须在具体固件上验证。SUSFS 等方案属于实验性技术，需要兼容内核，也可能产生自身痕迹。参考测试仍需要一台独立的原厂设备。 仅重命名 `su` 不会隐藏挂载、管理路径、属性或 UID 状态。应使用 root 方案官方的 App Profile/DenyList 限制可见性，并测试真实应用 UID。
+
+### 如何验证结果
+
+```bash
+adb shell 'for p in /system/bin/su /system/xbin/su /sbin/su /su/bin/su /data/local/su /data/local/bin/su /data/local/xbin/su /system/sd/xbin/su /system/bin/failsafe/su /vendor/bin/su /product/bin/su /apex/com.android.runtime/bin/su; do [ -e "$p" ] && ls -l "$p"; done'
+```
+shell 无输出不能保证应用所在命名空间相同。
+
+完成任何修改后，请对 RKNHardering 和 VPN 客户端都执行 `force-stop`，重新启动两者并再次进行完整扫描。Zygisk、Xposed 和内核模块通常还需要重启设备。不要只比较这一行，也要检查相邻信号：不完整的 Hook 往往会造成不同 API 之间的结果不一致。
 
 ## 所需权限与风险
 
-检查本身不需要额外权限。Root、固件、挂载、属性或资料修改可能导致无法启动、数据丢失或隔离减弱；必须先备份。
+探针本身以普通应用权限运行，不会请求 root。下方 ADB 命令仅用于辅助定位：`adb shell` 使用不同的 UID，所能看到的内容可能比应用进程更多，也可能更少。决定性测试是在 `force-stop` 后重新运行应用内检查。
+
+### 风险
+
+从系统分区删除二进制文件可能破坏 OTA 更新或启动。未备份镜像、未确认挂载来源前不要运行 `rm`。
+
+### 回滚
+
+恢复已保存的 boot/system 镜像；若该文件属于正常 root 安装，也可通过官方管理器重新安装。
 
 ## 证据等级
 
-**项目验证：**该向量由 checker/catalog 测试覆盖。外部缓解声明仍是有条件的。
+**中。**已根据精确的 `kSuPaths` 数组核验；Kotlin 分配高置信度并设置 `needsReview=true`。
+
+第三方方案的状态不能自动套用到当前设备。模块开发者的声明只是初始假设；只有在特定 Android 版本、固件和内核上得到可重复的 RKNHardering 结果，才能视为确认。
 
 ## 来源与最后核验日期
 
-- Project verified / проверено проектом: RKNHardering source and tests.
-- External project claim / заявлено внешним проектом: [VPN Hide](https://github.com/okhsunrog/vpnhide).
-- Last verified / последняя проверка / آخرین بررسی / 最后核验: 2026-07-11.
+- 已根据项目代码核验：[`native_signs_probe.cpp` — 原生探针实现](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/cpp/native_signs_probe.cpp).
+- 已根据项目代码核验：[`NativeSignsChecker.kt` — 原生/旧版信号的主要判定逻辑](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/checker/NativeSignsChecker.kt).
+- 已根据项目代码核验：[`NativeSignalId.kt` — 完整 ID 目录](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/model/NativeSignalId.kt).
+- 已根据项目代码核验：[`NativeSignalCatalog.kt` — 类别、slug 与输出行映射](https://github.com/xtclovver/RKNHardering/blob/main/app/src/main/java/com/notcvnt/rknhardering/NativeSignalCatalog.kt).
+- 外部第一方文档或官方项目：[Magisk official install](https://github.com/topjohnwu/Magisk/blob/master/docs/install.md).
+- 外部第一方文档或官方项目：[KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next).
+- 外部第一方文档或官方项目：[APatch](https://github.com/bmax121/APatch).
+- 实现与链接最后核验日期：**2026 年 7 月 19 日**。
 
-[返回 Native signs 参考](../)
+相关信号： `root-management`, `root-suspicious-mount`, `root-uid`.
 
+[返回原生检查参考](../)

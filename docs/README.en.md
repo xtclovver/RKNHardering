@@ -1,4 +1,4 @@
-> **Language:** [Русский](../README.md) | [English](README.en.md) | [فارسی](README.fa.md) | [中文](README.zh-CN.md)
+> **Language:** [Russian](../README.md) | [English](README.en.md) | [فارسی](README.fa.md) | [中文](README.zh-CN.md)
 
 # RKNHardering
 

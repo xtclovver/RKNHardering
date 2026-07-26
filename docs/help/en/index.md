@@ -1,12 +1,12 @@
 ---
-title: RKNHardering help
+title: RKNHardering Reference
 permalink: /help/en/
 ---
 
-# RKNHardering help
+# RKNHardering Reference
 
-The detailed reference distinguishes evidence verified by the project from community reports and claims made by external projects. Recommendations are conditional and do not guarantee that a device, VPN, root state, firmware, or server-side signal will be hidden.
+This detailed reference separates project-verified facts from community reports and claims made by external projects. Recommendations depend on the device and do not guarantee concealment of a VPN, root access, firmware modifications, or server-side indicators.
 
-- [Native signs reference](./native/)
+- [Practical countermeasures for VPN, root, and profile detection](./anti-detection/)
+- [Native signals reference](./native/)
 - [IP comparison](./ip-comparison/)
-

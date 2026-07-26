@@ -1,4 +1,4 @@
-> **Language:** [Русский](../README.md) | [English](README.en.md) | [فارسی](README.fa.md) | [中文](README.zh-CN.md)
+> **زبان:** [روسی](../README.md) | [انگلیسی](README.en.md) | [فارسی](README.fa.md) | [چینی](README.zh-CN.md)
 
 # RKNHardering
 
@@ -24,18 +24,18 @@
   <tr>
     <td align="center">
       <a href="https://github.com/xtclovver/RKNHardering/releases/latest">
-        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Download from GitHub" height="75">
+        <img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="دانلود از GitHub" height="75">
       </a>
     </td>
     <td align="center">
       <a href="https://f-droid.org/en/packages/com.notcvnt.rknhardering/">
-        <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Download from F-Droid" height="75">
+        <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="دانلود از F-Droid" height="75">
       </a>
     </td>
   </tr>
 </table>
 
-## به کمک جامعه نیاز داریم / Community Help Wanted
+## به کمک جامعه نیاز داریم
 
 این پروژه روش‌های شناسایی VPN و proxy روی دستگاه‌های Android را مستند می‌کند. با این حال، **مسئله معکوس** — یعنی چگونه از شناسایی VPN فعال جلوگیری کنیم — بسیار کمتر بررسی شده است.
 
@@ -80,7 +80,7 @@ VpnCheckRunner
 
 ## ماژول‌های بررسی
 
-### 1. GeoIP (`GeoIpChecker`)
+### 1. موقعیت جغرافیایی IP (GeoIP) (`GeoIpChecker`)
 
 منابع:
 
@@ -105,7 +105,7 @@ timeout اتصال و خواندن برای درخواست‌های HTTP(S): د�
 
 ---
 
-### 2. مقایسه IP checkerها (`IpComparisonChecker`)
+### 2. مقایسهٔ بررسی‌کننده‌های IP (`IpComparisonChecker`)
 
 این ماژول پاسخ checkerهای عمومی IP در RU و غیر RU را مقایسه می‌کند. در UI به‌عنوان یک بلوک تشخیصی نمایش داده می‌شود. مستقیماً در `VerdictEngine` شرکت نمی‌کند، اما داده‌های آن به `IpConsensusBuilder` می‌رسد که نتایجش در R3 استفاده می‌شود.
 
@@ -129,7 +129,7 @@ timeout اتصال و خواندن برای درخواست‌های HTTP(S): د�
 
 نشانه‌های سیستمی بدون اسکن فعال localhost.
 
-#### 3.1 NetworkCapabilities (`checkVpnTransport`)
+#### 3.1 قابلیت‌های شبکه (`NetworkCapabilities`، `checkVpnTransport`)
 
 API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
@@ -143,7 +143,7 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 در صورت وجود `VpnTransportInfo` (API 29+، از طریق reflection `getType()`) نوع transport در findings اضافه می‌شود: `SERVICE` (برنامه VpnService)، `PLATFORM` (always-on / IKEv2)، `LEGACY` (چارچوب legacy VPN) یا `OEM`. این یک فیلد اطلاعاتی است و روی `detected`/`needsReview` اثر نمی‌گذارد.
 
-#### 3.2 System proxy (`checkSystemProxy`)
+#### 3.2 پروکسی سامانه (`checkSystemProxy`)
 
 منابع:
 
@@ -163,11 +163,11 @@ API: `ConnectivityManager.getNetworkCapabilities(activeNetwork)`
 
 پورت‌های شناخته‌شده proxy: `80`, `443`, `1080`, `3127`, `3128`, `4080`, `5555`, `7000`, `7044`, `8000`, `8080`, `8081`, `8082`, `8888`, `9000`, `9050`, `9051`, `9150`, `12345` و همچنین بازه `16000..16100`.
 
-#### 3.3 TUN Active Probe (`checkTunActiveProbe`)
+#### 3.3 پروب فعال TUN (`checkTunActiveProbe`)
 
 اگر در هنگام راه‌اندازی یک اینترفیس TUN شناسایی شود، `UnderlyingNetworkProber` درخواست‌های HTTP را از طریق شبکه VPN به هدف‌های RU و non-RU ارسال می‌کند. اختلاف در IP (DNS path mismatch) یا خروج صریح برنامه از per-app VPN (tun0 وجود دارد اما `vpnActive = false`) منجر به `detected = true` می‌شود. این سیگنال از طریق `EvidenceSource.TUN_ACTIVE_PROBE` وارد `VerdictEngine` می‌شود.
 
-#### 3.4 برنامه‌های نصب‌شده VPN/Proxy (`InstalledVpnAppDetector`)
+#### 3.4 برنامه‌های نصب‌شدهٔ VPN/پروکسی (`InstalledVpnAppDetector`)
 
 ماژول سه منبع را بررسی می‌کند:
 
@@ -243,14 +243,14 @@ DNS همراه با snapshot شبکه‌های underlying ارزیابی می‌
 
 | سیگنال | نتیجه |
 |--------|-------|
-| loopback DNS (`127.x.x.x`, `::1`) | `detected = true` |
+| DNS حلقهٔ بازگشت (`127.x.x.x`، `::1`) | `detected = true` |
 | private DNS که از همان private/ULA subnet شبکه non-VPN اصلی به ارث رسیده | عادی |
 | private DNS هنگام فعال بودن VPN و تفاوت با شبکه underlying | `detected = true` |
 | private DNS بدون زمینه کافی | `needsReview = true` |
 | public DNS که هنگام VPN جایگزین شده | `needsReview = true` |
-| link-local (`169.254.x.x`, `fe80::/10`) | informational |
+| پیوند-محلی (`169.254.x.x`، `fe80::/10`) | اطلاعاتی |
 
-#### 4.6 نشانه‌های فنی اضافی proxy (`checkProxyTechnicalSignals`)
+#### 4.6 نشانه‌های فنی اضافی پروکسی (`checkProxyTechnicalSignals`)
 
 بررسی می‌شود:
 
@@ -320,7 +320,7 @@ DNS همراه با snapshot شبکه‌های underlying ارزیابی می‌
 
 ---
 
-### 6. بررسی bypass (`BypassChecker`)
+### 6. بررسی بای‌پس (`BypassChecker`)
 
 بررسی‌ها به‌صورت موازی اجرا می‌شوند:
 
@@ -329,7 +329,7 @@ DNS همراه با snapshot شبکه‌های underlying ارزیابی می‌
 - `ClashApiScanner`
 - `UnderlyingNetworkProber`
 
-#### 6.1 اسکنر proxy (`ProxyScanner` + `ProxyProber`)
+#### 6.1 اسکنر پروکسی (`ProxyScanner` + `ProxyProber`)
 
 آدرس‌های `127.0.0.1` و `::1` اسکن می‌شوند.
 
@@ -363,7 +363,7 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 - اگر `SOCKS5` پیدا شود، ولی دریافت HTTP IP از طریق آن ناموفق باشد و پورت شبیه Xray نباشد، `MtProtoProber` اجرا می‌شود؛
 - MTProto probe موفق فقط یک finding اطلاعاتی اضافه می‌کند و روی verdict نهایی اثری ندارد.
 
-**پروب احراز هویت (`ProxyProber`، اختیاری).** با تنظیم «Probe local proxy authentication» (`pref_proxy_auth_probe_enabled`، پیش‌فرض غیرفعال) فعال می‌شود. فقط روی endpointهای `SOCKS5` روی آدرس‌های loopback اعمال می‌شود:
+**پروب احراز هویت (`ProxyProber`، اختیاری).** با تنظیم «آزمون احراز هویت پراکسی محلی» (`pref_proxy_auth_probe_enabled`، پیش‌فرض غیرفعال) فعال می‌شود. فقط روی endpointهای `SOCKS5` روی آدرس‌های loopback اعمال می‌شود:
 
 - امتحان فرهنگ لغت اعتبارنامه‌های ضعیف (RFC 1929): جفت خالی، `admin/admin`، `user/password`، `proxy/proxy`، `test/test` و موارد مشابه — فقط اگر proxy احراز هویت بخواهد؛
 - پروب `UDP ASSOCIATE` روی proxy بدون احراز هویت.
@@ -388,7 +388,7 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 - endpoint مقدار `detected = true` می‌دهد؛
 - در findings حداکثر 10 خلاصه از outboundها (`tag`, `protocol`, `address`, `port`, `sni`) و یک شمارنده برای بقیه اضافه می‌شود.
 
-#### 6.3 Underlying network leak / VPN network binding (`UnderlyingNetworkProber`)
+#### 6.3 نشت شبکهٔ زیرین / اتصال به شبکهٔ VPN (`UnderlyingNetworkProber`)
 
 اگر VPN روی دستگاه فعال باشد، ماژول:
 
@@ -401,7 +401,7 @@ open localhost proxy به‌تنهایی bypass تأییدشده محسوب نم
 
 #### 6.4 اسکنر REST API Clash/sing-box (`ClashApiScanner` + `ClashApiClient`)
 
-بررسی اختیاری، تنظیم «Clash/sing-box REST API scan» (`pref_clash_api_scan_enabled`، پیش‌فرض فعال). loopback (`127.0.0.1`، `::1`) را برای REST API مدیران Clash، mihomo و sing-box اسکن می‌کند.
+بررسی اختیاری، با تنظیم «اسکن REST API مربوط به Clash/sing-box» (`pref_clash_api_scan_enabled`، پیش‌فرض فعال). loopback (`127.0.0.1`، `::1`) را برای REST API مدیران Clash، mihomo و sing-box اسکن می‌کند.
 
 پارامترها:
 
@@ -423,11 +423,11 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 ---
 
-### 7. CDN Pulling (`CdnPullingChecker`)
+### 7. واکشی CDN (`CdnPullingChecker`)
 
 درخواست‌های HTTPS را به redirectorها و endpointهای شناخته‌شده trace (مانند Google Video, Cloudflare trace, Meduza) ارسال می‌کند تا ببیند چه IP عمومی یا متادیتا شبکه‌ای نمایش داده می‌شود. تفاوت در پاسخ‌ها می‌تواند نشان‌دهنده پروکسی یا تونل باشد.
 
-### 8. Call Transport (`CallTransportChecker`)
+### 8. انتقال تماس (`CallTransportChecker`)
 
 دسترسی‌پذیری UDP/STUN را در endpointهای جهانی و منطقه‌ای بررسی می‌کند و دسترسی‌پذیری TCP MTProto را از طریق پروکسی‌های محلی آزمایش می‌کند. این می‌تواند IPهای عمومی نگاشت‌شده (mapped) یا نشت‌های شبکه‌های زیرین که تونل‌های معمولی را دور می‌زنند، آشکار کند.
 
@@ -478,10 +478,10 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 هر دامنه از لیست کاربر را از طریق پایپ‌لاین DNS → TCP → TLS بررسی می‌کند:
 
-| مرحله | فیلترینگ قابل تشخیص | timeout |
+| مرحله | فیلترینگ قابل تشخیص | مهلت زمانی |
 |-------|---------------------|---------|
-| DNS | NXDOMAIN، timeout | 8 ثانیه |
-| TCP :443 | Connection refused، timeout | 8 ثانیه |
+| DNS | NXDOMAIN یا پایان مهلت | 8 ثانیه |
+| TCP :443 | رد اتصال یا پایان مهلت | 8 ثانیه |
 | TLS (SNI) | Connection reset — نشانه DPI | 10 ثانیه |
 
 مرحله TLS از trust-all X.509 manager استفاده می‌کند، چون هدف تشخیص قطع اتصال توسط DPI است نه اعتبارسنجی گواهی. `SSLHandshakeException` ناشی از گواهی نامعتبر به‌عنوان موفقیت TLS تلقی می‌شود.
@@ -490,7 +490,7 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 ---
 
-### 12. نشانه‌های بومی/Native (`NativeSignsChecker`)
+### 12. نشانه‌های بومی (`NativeSignsChecker`)
 
 بررسی‌های JNI سطح پایین را مستقیماً از C++ انجام می‌دهد:
 - لیست کردن اینترفیس‌های بومی و بررسی‌های `getifaddrs()`
@@ -505,7 +505,7 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 برای هر اینترفیس، فایل `/sys/class/net/<name>/type` خوانده می‌شود. مقدار `65534` (`ARPHRD_TUNTAP`) در یک اینترفیس فعالی که نامش با الگوهای شناخته‌شده VPN **تطبیق ندارد**، نشانه TUN/TAP در حال جعل هویت اینترفیس معمولی است. نتیجه: `detected = true` (`EvidenceSource.NATIVE_INTERFACE`).
 
-#### 12.2 هیوریستیک host-route /32
+#### 12.2 روش ابتکاری مسیر میزبان /32 (`host-route`)
 
 در جدول مسیریابی (`NETLINK`) مسیر `unicast` با اطلاعات کامل، scope برابر `global` یا `link`، پیشوند `/32` (IPv4) یا `/128` (IPv6) و مقصد عمومی از طریق اینترفیس فیزیکی معمولی بررسی می‌شود. مسیر نباید ساختهٔ کرنل یا متعلق به جدول `local` باشد و ردیف ناقص مدرک محسوب نمی‌شود. چنین ردیفی ممکن است مسیر دورزن کلاینت VPN به سرور باشد، اما تنها با یک ردیف FIB نمی‌توان آن را با اطمینان از مسیر سیستمی یا اپراتور، به‌ویژه روی `rmnet*`، `ccmni*`، `pdp*` و `seth*`، تشخیص داد. بنابراین نتیجه فقط نیازمند بررسی است (`EvidenceSource.NATIVE_HOST_ROUTE`) و به‌تنهایی VPN را تأیید نمی‌کند.
 
@@ -571,10 +571,10 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 | RTM_GETQDISC | dump انضباط صف | تونل‌های qdisc VPN |
 | RTM_GETNEIST | dump جدول همسایه | آدرس‌های MAC پنهان (LLADDR صفر) |
 | TCP_INFO MSS | اتصال به 8.8.8.8:443، خواندن `snd_mss` | کاهش MSS (شاخص تونل) |
-| SO_BINDTODEVICE | probe bind به رابط غیرموجود | VPN hook intercepting setsockopt |
+| SO_BINDTODEVICE | آزمون bind روی رابطی که وجود ندارد | رهگیری `setsockopt` توسط هوک VPN |
 | اتصال پورت loopback | تلاش برای اشغال پورت‌های 51820/1194/443/8443 | تداخل پورت (listener VPN) |
 | BPF OBJ GET | تلاش برای باز کردن نقشه‌های `/sys/fs/bpf/` | دسترسی به نقشه‌های BPF netd |
-| IP_RECVERR | probe setsockopt IP_RECVERR | VPN hook intercepting IP_RECVERR |
+| IP_RECVERR | آزمون `setsockopt` برای IP_RECVERR | رهگیری IP_RECVERR توسط هوک VPN |
 
 اطمینان بالا: `vpn_policy_rules`، `hidden_mac_neighbors`، `tcp_mss_low`، `loopback_port_conflict`، `bpf_map_accessible`.
 
@@ -583,20 +583,20 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 
 بررسی‌های جدید در زیربخش جداگانه‌ای در دسته Native و در ۴ زیرمجموعه گروه‌بندی شده‌اند. داده‌ها از متد JNI جدید `nativeDetectVpnDetector()` با پیشوند `vdet|` می‌آید:
 
-**نشانه‌های مستقیم (Direct signs) — `EvidenceSource.NATIVE_INTERFACE`:**
+**نشانه‌های مستقیم — `EvidenceSource.NATIVE_INTERFACE`:**
 
 | بررسی (kind) | چه چیزی جستجو می‌شود | منبع |
 |--------------|---------------------|------|
 | `sysfs_vpn_leak` | نشت tun/wg/ppp/xfrm از طریق sysfs | `/sys/class/net`، `/sys/devices/virtual/net`، `/proc/sys/net/ipv4|6/conf|neigh` |
 | `getifaddrs_vpn` | اینترفیس‌های VPN در لیست `getifaddrs()` | `getifaddrs()` |
 | `sysclassnet_vpn` | اینترفیس‌های VPN در `/sys/class/net` | `stat("/sys/class/net/<if>")` |
-| `rtm_getlink_vpn` | اینترفیس‌های VPN از طریق netlink RTM_GETLINK | Netlink `RTM_GETLINK` dump |
+| `rtm_getlink_vpn` | اینترفیس‌های VPN از طریق netlink RTM_GETLINK | تخلیهٔ Netlink با `RTM_GETLINK` |
 | `proc_if_inet6_vpn` | اینترفیس‌های VPN در `/proc/net/if_inet6` | `/proc/net/if_inet6` |
 | `proc_ipv6_route_vpn` | مسیرهای VPN در `/proc/net/ipv6_route` | `/proc/net/ipv6_route` |
 | `proc_net_dev_vpn` | ترافیک VPN (RX/TX) در `/proc/net/dev` | `/proc/net/dev` |
 | `ifindexname_vpn` | اینترفیس‌های VPN از طریق `if_indextoname()` | پیمایش ifindex با `if_indextoname()` |
-| `vpn_policy_rules_netlink` | قوانین مسیریابی VPN policy (table 100–200، oif=tun) | Netlink `RTM_GETRULE` dump |
-**نشانه‌های شبکه (Network signs) — `EvidenceSource.NATIVE_SOCKET`:**
+| `vpn_policy_rules_netlink` | قوانین مسیریابی policy برای VPN (جدول‌های 100–200، oif=tun) | تخلیهٔ Netlink با `RTM_GETRULE` |
+**نشانه‌های شبکه — `EvidenceSource.NATIVE_SOCKET`:**
 
 | بررسی (kind) | چه چیزی جستجو می‌شود | منبع |
 |--------------|---------------------|------|
@@ -605,13 +605,13 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 | `bindtodevice_leak` | `SO_BINDTODEVICE` به tun + تایید `getsockopt` | `setsockopt(SO_BINDTODEVICE)` |
 | `getsockname_leak` | `getsockname()` IP خصوصی VPN را برمی‌گرداند | `getsockname()` روی سوکت UDP |
 | `udp_port_conflict_physical` | تداخل پورت UDP (500/4500/1194/1701/51820) روی IP فیزیکی | `bind()` روی IP فیزیکی |
-| `route_count` | تعداد مسیرها و اینترفیس‌های یکتا | Netlink `RTM_GETROUTE` dump |
+| `route_count` | تعداد مسیرها و اینترفیس‌های یکتا | تخلیهٔ Netlink با `RTM_GETROUTE` |
 | `trim_oracle` | عدم تطابق تعداد iface بین bind-probe و RTM_GETLINK | `if_indextoname()` در مقابل `RTM_GETLINK` |
-**نشانه‌های غیرمستقیم (Indirect signs) — `EvidenceSource.NATIVE_ROUTE`:**
+**نشانه‌های غیرمستقیم — `EvidenceSource.NATIVE_ROUTE`:**
 
 | بررسی (kind) | چه چیزی جستجو می‌شود | منبع |
 |--------------|---------------------|------|
-| `pmtu_mss_combined` | UDP PMTU + TCP MSS (tcpi_snd_mss/rcv_mss) | `connect()` + `getsockopt(TCP_INFO)` |
+| `pmtu_mss_combined` | PMTU مربوط به UDP به‌همراه MSS مربوط به TCP (`tcpi_snd_mss/rcv_mss`) | `connect()` + `getsockopt(TCP_INFO)` |
 | `udp_pmtu_ok` / `udp_pmtu_fail` | موفقیت/شکست ارسال 1500 بایت روی UDP | `sendto()` 1500 بایت |
 | `normal_pmtu` | Path MTU اینترفیس فیزیکی اصلی | `fetchMtu()` از طریق `getifaddrs()` |
 | `timing_oracle` | چرخه‌های ARM CNTVCT برای `sendto()` (min/max/avg) | `mrs cntvct_el0` (aarch64) |
@@ -619,7 +619,7 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 | `gso_failed` / `gso_send_failed` / `gso_ok` | تشخیص قابلیت UDP GSO؛ نتیجه مدرک VPN نیست | `UDP_SEGMENT=1200` + ارسال 4800 بایت |
 | `hw_timestamp` | تایم‌استمپینگ سخت‌افزاری (`SIOCSHWTSTAMP`، `SO_TIMESTAMPING`) | `ioctl(SIOCSHWTSTAMP)` |
 
-**پراbe‌های محیطی (Environment probes) — `EvidenceSource.NATIVE_INTERFACE`:**
+**پروب‌های محیطی — `EvidenceSource.NATIVE_INTERFACE`:**
 
 | بررسی (kind) | چه چیزی جستجو می‌شود | منبع |
 |--------------|---------------------|------|
@@ -658,8 +658,8 @@ API زنده یا لیست غیرخالی IP مقصد، `detected = true` می�
 - `directHit` = detected-evidence از `DIRECT_NETWORK_CAPABILITIES` یا `SYSTEM_PROXY`
 - `indirectHit` = detected-evidence از `INDIRECT_NETWORK_CAPABILITIES`، `ACTIVE_VPN`، `NETWORK_INTERFACE`، `ROUTING`، `DNS`، `PROXY_TECHNICAL_SIGNAL`، `NATIVE_INTERFACE`، `NATIVE_ROUTE`، `NATIVE_JVM_MISMATCH` یا `NATIVE_SOCKET` با اطمینان بالا
 
-| Geo | Direct | Indirect | Verdict |
-|-----|--------|----------|---------|
+| جغرافیا | مستقیم | غیرمستقیم | نتیجه |
+|---------|--------|-----------|-------|
 | خیر | خیر | خیر | `NOT_DETECTED` |
 | خیر | بله | خیر | `NOT_DETECTED` |
 | خیر | خیر | بله | `NOT_DETECTED` |
