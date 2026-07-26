@@ -65,6 +65,7 @@ import com.notcvnt.rknhardering.ui.main.SimpleCardModel
 import com.notcvnt.rknhardering.ui.main.SimpleResultModels
 import com.notcvnt.rknhardering.ui.main.SimpleResultStatus
 import com.notcvnt.rknhardering.ui.main.TileSpec
+import com.notcvnt.rknhardering.ui.main.render.BetaChecksRenderer
 import com.notcvnt.rknhardering.ui.main.render.BypassRenderer
 import com.notcvnt.rknhardering.ui.main.render.CallTransportRenderer
 import com.notcvnt.rknhardering.ui.main.render.CategoryCardRenderer
@@ -279,6 +280,7 @@ class MainActivity : AppCompatActivity() {
     private val categoryCards by lazy { CategoryCardRenderer(renderEnv, findingViews) }
     private val ipComparisonRenderer by lazy { IpComparisonRenderer(renderEnv) }
     private val nativeSignsRenderer by lazy { NativeSignsRenderer(renderEnv, findingViews) }
+    private val betaChecksRenderer by lazy { BetaChecksRenderer(renderEnv, findingViews) }
     private val cdnPullingRenderer by lazy { CdnPullingRenderer(renderEnv, findingViews) }
     private val callTransportRenderer by lazy { CallTransportRenderer(renderEnv, findingViews) }
     private val bypassRenderer by lazy { BypassRenderer(renderEnv, findingViews) }
@@ -833,6 +835,7 @@ class MainActivity : AppCompatActivity() {
             portRangeEnd = portRangeEnd,
             beta = BetaCheckSettings(
                 enabled = prefs.getBoolean(SettingsPrefs.PREF_BETA_CHECKS_ENABLED, false),
+                hookTiming = prefs.getBoolean(SettingsPrefs.PREF_BETA_HOOK_TIMING, false),
                 hiddenAndroidApis = prefs.getBoolean(SettingsPrefs.PREF_BETA_HIDDEN_ANDROID_APIS, true),
                 kernelNetlink = prefs.getBoolean(SettingsPrefs.PREF_BETA_KERNEL_NETLINK, true),
                 socketOracles = prefs.getBoolean(SettingsPrefs.PREF_BETA_SOCKET_ORACLES, true),
@@ -1220,14 +1223,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (cardBetaChecks.isVisible || result.betaChecks.category.findings.isNotEmpty()) {
-            displayCategory(
-                result.betaChecks.category,
-                cardBetaChecks,
-                iconBetaChecks,
-                statusBetaChecks,
-                findingsBetaChecks,
-                privacyMode,
-            )
+            displayBetaChecks(result.betaChecks.category, privacyMode)
             updateTileFromCategory(CATEGORY_BET, result.betaChecks.category)
         }
     }
@@ -1466,14 +1462,7 @@ class MainActivity : AppCompatActivity() {
             is CheckUpdate.BetaChecksReady -> {
                 markStageCompleted(RunningStage.BETA_CHECKS)
                 ensureCardVisible(cardBetaChecks)
-                displayCategory(
-                    update.result.category,
-                    cardBetaChecks,
-                    iconBetaChecks,
-                    statusBetaChecks,
-                    findingsBetaChecks,
-                    activeCheckPrivacyMode,
-                )
+                displayBetaChecks(update.result.category, activeCheckPrivacyMode)
                 updateTileFromCategory(CATEGORY_BET, update.result.category)
                 if (animate) animateContentReveal(findingsBetaChecks)
             }
@@ -1988,6 +1977,17 @@ class MainActivity : AppCompatActivity() {
             statusNativeSigns,
             textNativeSignsSummary,
             findingsNativeSigns,
+            privacyMode,
+        )
+    }
+
+    private fun displayBetaChecks(result: CategoryResult, privacyMode: Boolean) {
+        betaChecksRenderer.render(
+            result,
+            cardBetaChecks,
+            iconBetaChecks,
+            statusBetaChecks,
+            findingsBetaChecks,
             privacyMode,
         )
     }

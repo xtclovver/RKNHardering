@@ -228,10 +228,14 @@ loc=FI
 - STUN probe groups: 0
 - Geo facts: <none>
 
-### Findings
-- β Exact socket cookie confirmed | informational=true | source=BETA_SOCKET_DIAG | confidence=LOW | maturity=BETA | checkId=beta.inet_diag_cookie | availability=AVAILABLE | rawConfidence=LOW | group=socket_diag | domain=NETWORK_PATH_DIVERGENCE | facts=cookie=12345678,cookie_match=true,matched=true
-- β WireGuard Genl failure | error=true | source=BETA_WIREGUARD_GENL | confidence=LOW | maturity=BETA | checkId=beta.wireguard_genl | availability=ERROR | rawConfidence=LOW | group=kernel_vpn | domain=VPN_OR_PROXY | facts=errno=13,error=Permission denied,stage=family
+### Android and profiles
 - β Check skipped or not executed | informational=true | source=BETA_USER_PROFILE | confidence=LOW | maturity=BETA | checkId=beta.user_profile | availability=SKIPPED | rawConfidence=LOW | group=android_user_manager | domain=ISOLATED_PROFILE
+
+### Sockets and routing
+- β Exact socket cookie confirmed | informational=true | source=BETA_SOCKET_DIAG | confidence=LOW | maturity=BETA | checkId=beta.inet_diag_cookie | availability=AVAILABLE | rawConfidence=LOW | group=socket_diag | domain=NETWORK_PATH_DIVERGENCE | facts=cookie=12345678,cookie_match=true,matched=true
+
+### VPN and kernel policy
+- β WireGuard Genl failure | error=true | source=BETA_WIREGUARD_GENL | confidence=LOW | maturity=BETA | checkId=beta.wireguard_genl | availability=ERROR | rawConfidence=LOW | group=kernel_vpn | domain=VPN_OR_PROXY | facts=errno=13,error=Permission denied,stage=family
 
 ### Evidence
 - source=BETA_SOCKET_DIAG | detected=true | confidence=LOW | maturity=BETA | checkId=beta.inet_diag_cookie | independenceGroup=socket_diag | detectionDomain=NETWORK_PATH_DIVERGENCE | hardSignal=false | description=β Exact socket cookie confirmed

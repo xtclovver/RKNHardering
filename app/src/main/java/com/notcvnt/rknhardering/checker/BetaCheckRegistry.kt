@@ -3,12 +3,25 @@ package com.notcvnt.rknhardering.checker
 import com.notcvnt.rknhardering.model.DetectionDomain
 import com.notcvnt.rknhardering.model.EvidenceSource
 import com.notcvnt.rknhardering.model.ObservationAuthority
+import com.notcvnt.rknhardering.R
+
+enum class BetaDisplayGroup(val id: String, val titleRes: Int) {
+    OVERVIEW("overview", R.string.beta_group_overview),
+    ANDROID_PROFILE("android_profile", R.string.beta_group_android_profile),
+    SOCKETS_ROUTING("sockets_routing", R.string.beta_group_sockets_routing),
+    VPN_KERNEL_POLICY("vpn_kernel_policy", R.string.beta_group_vpn_kernel_policy),
+    ACTIVE_NETWORK("active_network", R.string.beta_group_active_network),
+    INTEGRITY_ISOLATION("integrity_isolation", R.string.beta_group_integrity_isolation),
+    HOOK_TIMING("hook_timing", R.string.beta_group_hook_timing),
+}
 
 data class BetaCheckDefinition(
     val checkId: String,
     val source: EvidenceSource,
     val detectionDomain: DetectionDomain,
     val independenceGroup: String,
+    val displayGroup: BetaDisplayGroup,
+    val expectedAuthority: ObservationAuthority? = null,
     val hardAuthorities: Set<ObservationAuthority> = emptySet(),
 )
 
@@ -19,7 +32,15 @@ object BetaCheckRegistry {
         domain: DetectionDomain,
         group: String,
         vararg hardAuthorities: ObservationAuthority,
-    ) = BetaCheckDefinition(checkId, source, domain, group, hardAuthorities.toSet())
+    ) = BetaCheckDefinition(
+        checkId,
+        source,
+        domain,
+        group,
+        displayGroupFor(checkId),
+        expectedAuthorityFor(checkId),
+        hardAuthorities.toSet(),
+    )
 
     val definitions: Map<String, BetaCheckDefinition> = listOf(
         definition("beta.vpn_binder", EvidenceSource.BETA_VPN_BINDER, DetectionDomain.VPN_OR_PROXY, "android_vpn_service", ObservationAuthority.BINDER_SERVICE),
@@ -63,7 +84,56 @@ object BetaCheckRegistry {
         definition("beta.traceroute", EvidenceSource.BETA_TRACEROUTE, DetectionDomain.SYSTEM_NETWORK_CONTEXT, "path_observation"),
         definition("beta.server_fingerprint", EvidenceSource.BETA_SERVER_FINGERPRINT, DetectionDomain.SYSTEM_NETWORK_CONTEXT, "server_observation"),
         definition("beta.root_emulator", EvidenceSource.NATIVE_ROOT_DETECTION, DetectionDomain.DEVICE_INTEGRITY, "device_integrity"),
+        definition(
+            "beta.vpnhide_hook_timing.libc",
+            EvidenceSource.BETA_HOOK_TIMING,
+            DetectionDomain.HOOK_OR_TAMPERING,
+            "hook_consistency",
+        ),
+        definition(
+            "beta.vpnhide_hook_timing.kernel",
+            EvidenceSource.BETA_HOOK_TIMING,
+            DetectionDomain.HOOK_OR_TAMPERING,
+            "hook_consistency",
+        ),
     ).associateBy(BetaCheckDefinition::checkId)
 
     fun get(checkId: String): BetaCheckDefinition? = definitions[checkId]
+
+    fun displayGroup(checkId: String?): BetaDisplayGroup =
+        checkId?.let(definitions::get)?.displayGroup ?: BetaDisplayGroup.OVERVIEW
+
+    private fun displayGroupFor(checkId: String): BetaDisplayGroup = when (checkId) {
+        "beta.vpn_binder", "beta.connectivity_binder", "beta.user_profile",
+        "beta.foreground_user", "beta.proxy_selector" -> BetaDisplayGroup.ANDROID_PROFILE
+
+        "beta.netd_netid", "beta.socket_identity", "beta.inet_diag_cookie",
+        "beta.route_lookup", "beta.policy_rules", "beta.rtnl_address",
+        "beta.extended_rtnetlink", "beta.interface_driver", "beta.interface_traffic",
+        "beta.pktinfo", "beta.netlink_transitions", "beta.traceroute" ->
+            BetaDisplayGroup.SOCKETS_ROUTING
+
+        "beta.wireguard_genl", "beta.ovpn_genl", "beta.xfrm", "beta.unix_diag",
+        "beta.unix_peer_identity", "beta.tun_fd", "beta.bpf_netd", "beta.cgroup_bpf",
+        "beta.netfilter_path", "beta.original_destination" -> BetaDisplayGroup.VPN_KERNEL_POLICY
+
+        "beta.dns_netid", "beta.native_dns_resolver", "beta.transport_matrix",
+        "beta.tls_interception", "beta.server_fingerprint" -> BetaDisplayGroup.ACTIVE_NETWORK
+
+        "beta.direct_syscall_consistency", "beta.io_uring_consistency", "beta.fd_identity",
+        "beta.sandbox_identity.process", "beta.sandbox_identity.filesystem",
+        "beta.sandbox_identity.namespace", "beta.fscrypt_identity", "beta.linker_integrity",
+        "beta.root_emulator" -> BetaDisplayGroup.INTEGRITY_ISOLATION
+
+        "beta.vpnhide_hook_timing.libc", "beta.vpnhide_hook_timing.kernel" ->
+            BetaDisplayGroup.HOOK_TIMING
+
+        else -> BetaDisplayGroup.OVERVIEW
+    }
+
+    private fun expectedAuthorityFor(checkId: String): ObservationAuthority? = when (checkId) {
+        "beta.vpnhide_hook_timing.libc" -> ObservationAuthority.LIBC_OR_PRIVATE_LIBRARY
+        "beta.vpnhide_hook_timing.kernel" -> ObservationAuthority.KERNEL_QUERY
+        else -> null
+    }
 }

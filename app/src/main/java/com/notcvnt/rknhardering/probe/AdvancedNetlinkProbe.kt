@@ -29,14 +29,22 @@ internal object BetaProbeRowParser {
     private const val MAX_TOTAL_CHARS = 16_384
     private const val MAX_FIELDS = 64
 
-    fun parse(rows: Array<String>, expectedCheckId: String): ParsedBetaProbeRow {
+    fun parse(
+        rows: Array<String>,
+        expectedCheckId: String,
+        maxRows: Int = MAX_ROWS,
+    ): ParsedBetaProbeRow {
         if (rows.isEmpty()) return unavailable(expectedCheckId)
-        if (rows.size > MAX_ROWS || rows.sumOf(String::length) > MAX_TOTAL_CHARS) {
+        if (rows.size > maxRows || rows.sumOf(String::length) > MAX_TOTAL_CHARS) {
             return ParsedBetaProbeRow(expectedCheckId, ProbeAvailability.TRUNCATED, emptyMap())
         }
-        val matching = rows.firstOrNull { row -> row.contains("check=$expectedCheckId") }
-            ?: return ParsedBetaProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-        val parts = matching.split('|')
+        val matching = rows.filter { row ->
+            row.split('|').any { it == "check=$expectedCheckId" }
+        }
+        if (matching.size != 1) {
+            return ParsedBetaProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
+        }
+        val parts = matching.single().split('|')
         if (parts.firstOrNull() != PREFIX || parts.size > MAX_FIELDS + 1) {
             return ParsedBetaProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
         }

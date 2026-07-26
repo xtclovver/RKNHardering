@@ -470,6 +470,32 @@
       "activeApps": [],
       "callTransportLeaks": [],
       "stunProbeGroups": [],
+      "groups": [
+        {
+          "id": "android_profile",
+          "localizedTitle": "Android and profiles",
+          "status": "SKIPPED",
+          "checkIds": [
+            "beta.user_profile"
+          ]
+        },
+        {
+          "id": "sockets_routing",
+          "localizedTitle": "Sockets and routing",
+          "status": "CLEAN",
+          "checkIds": [
+            "beta.inet_diag_cookie"
+          ]
+        },
+        {
+          "id": "vpn_kernel_policy",
+          "localizedTitle": "VPN and kernel policy",
+          "status": "ERROR",
+          "checkIds": [
+            "beta.wireguard_genl"
+          ]
+        }
+      ],
       "availabilitySummary": {
         "AVAILABLE": 1,
         "ERROR": 1,

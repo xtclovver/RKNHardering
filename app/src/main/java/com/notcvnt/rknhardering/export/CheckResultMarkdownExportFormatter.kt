@@ -4,6 +4,7 @@ import android.content.Context
 import com.notcvnt.rknhardering.BuildConfig
 import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
 import com.notcvnt.rknhardering.R
+import com.notcvnt.rknhardering.checker.BetaChecksGrouping
 import com.notcvnt.rknhardering.model.ActiveVpnApp
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
@@ -69,7 +70,7 @@ internal object CheckResultMarkdownExportFormatter {
         appendCategorySection(builder, context.getString(R.string.main_card_direct_signs), result.directSigns, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_indirect_signs), result.indirectSigns, snapshot.privacyMode)
         appendCategorySection(builder, context.getString(R.string.main_card_native_signs), result.nativeSigns, snapshot.privacyMode)
-        appendCategorySection(builder, context.getString(R.string.main_card_beta_checks), result.betaChecks.category, snapshot.privacyMode)
+        appendBetaCategorySection(builder, context, result.betaChecks.category, snapshot.privacyMode)
         appendExecutionContextSection(builder, result.betaChecks.executionContext, snapshot.privacyMode)
         appendNetworkEpochChanges(
             builder,
@@ -303,6 +304,42 @@ internal object CheckResultMarkdownExportFormatter {
             }
             builder.appendLine()
         }
+    }
+
+    private fun appendBetaCategorySection(
+        builder: StringBuilder,
+        context: Context,
+        category: CategoryResult,
+        privacyMode: Boolean,
+    ) {
+        builder.appendLine("## ${context.getString(R.string.main_card_beta_checks)}")
+        builder.appendLine("- Status: ${sectionStatusTag(category.detected, category.needsReview, category.hasError)}")
+        builder.appendLine("- Name: ${maskExportValue(category.name, privacyMode)}")
+        builder.appendLine("- Findings count: ${category.findings.size}")
+        builder.appendLine("- Evidence count: ${category.evidence.size}")
+        builder.appendLine("- Matched apps: ${category.matchedApps.size}")
+        builder.appendLine("- Active apps: ${category.activeApps.size}")
+        builder.appendLine("- Call transport signals: ${category.callTransportLeaks.size}")
+        builder.appendLine("- STUN probe groups: ${category.stunProbeGroups.size}")
+        builder.appendLine("- Geo facts: ${if (category.geoFacts != null) "present" else NONE}")
+        builder.appendLine()
+        BetaChecksGrouping.sections(category.findings).forEach { section ->
+            builder.appendLine("### ${context.getString(section.group.titleRes)}")
+            appendStringList(builder, section.findings.map { formatFinding(it, privacyMode) })
+            builder.appendLine()
+        }
+        builder.appendLine("### Evidence")
+        appendStringList(builder, category.evidence.map { formatEvidence(it, privacyMode) })
+        builder.appendLine()
+        builder.appendLine("### Matched apps")
+        appendStringList(builder, category.matchedApps.map(::formatMatchedApp))
+        builder.appendLine()
+        builder.appendLine("### Active apps")
+        appendStringList(builder, category.activeApps.map(::formatActiveApp))
+        builder.appendLine()
+        builder.appendLine("### Call transport")
+        appendStringList(builder, category.callTransportLeaks.map { formatCallTransportLeak(it, privacyMode) })
+        builder.appendLine()
     }
 
     private fun appendIpComparisonSection(

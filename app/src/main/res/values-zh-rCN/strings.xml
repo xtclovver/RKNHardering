@@ -1219,4 +1219,18 @@
     <string name="beta_canary_tls_checked">已检查受控 TLS 路径</string>
     <string name="beta_canary_server_checked">已以保护隐私的形式收集服务器端传输信息</string>
     <string name="beta_checks_error">无法完成测试版检查</string>
+    <string name="settings_beta_hook_timing">β VPNHide：系统钩子计时</string>
+    <string name="beta_group_overview">概览</string>
+    <string name="beta_group_android_profile">Android 与配置文件</string>
+    <string name="beta_group_sockets_routing">套接字与路由</string>
+    <string name="beta_group_vpn_kernel_policy">VPN 与内核策略</string>
+    <string name="beta_group_active_network">活动网络</string>
+    <string name="beta_group_integrity_isolation">完整性与隔离</string>
+    <string name="beta_group_hook_timing">VPNHide：钩子计时</string>
+    <string name="beta_hook_timing_corroborated">稳定计时异常已由可重复的语义差异佐证</string>
+    <string name="beta_hook_timing_unsupported">此架构不支持高频计时</string>
+    <string name="beta_hook_timing_inconclusive">钩子计时探测结果不确定</string>
+    <string name="beta_hook_timing_only">计时异常未得到语义差异佐证</string>
+    <string name="beta_hook_semantic_only">语义差异未得到计时异常佐证</string>
+    <string name="beta_hook_timing_not_confirmed">未发现已佐证的钩子计时异常</string>
 </resources>

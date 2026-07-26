@@ -34,6 +34,7 @@ internal object SettingsPrefs {
     const val PREF_ICON_STYLE = "pref_icon_style"
     const val PREF_CUSTOM_CHECKS_ENABLED = "pref_custom_checks_enabled"
     const val PREF_BETA_CHECKS_ENABLED = "pref_beta_checks_enabled"
+    const val PREF_BETA_HOOK_TIMING = "pref_beta_hook_timing"
     const val PREF_BETA_HIDDEN_ANDROID_APIS = "pref_beta_hidden_android_apis"
     const val PREF_BETA_KERNEL_NETLINK = "pref_beta_kernel_netlink"
     const val PREF_BETA_SOCKET_ORACLES = "pref_beta_socket_oracles"

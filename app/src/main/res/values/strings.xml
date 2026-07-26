@@ -1255,4 +1255,18 @@
     <string name="beta_canary_tls_checked">The controlled TLS path was checked</string>
     <string name="beta_canary_server_checked">Server-side transport facts were collected in privacy-safe form</string>
     <string name="beta_checks_error">Beta checks could not be completed</string>
+    <string name="settings_beta_hook_timing">β VPNHide: system hook timing</string>
+    <string name="beta_group_overview">Overview</string>
+    <string name="beta_group_android_profile">Android and profiles</string>
+    <string name="beta_group_sockets_routing">Sockets and routing</string>
+    <string name="beta_group_vpn_kernel_policy">VPN and kernel policy</string>
+    <string name="beta_group_active_network">Active network</string>
+    <string name="beta_group_integrity_isolation">Integrity and isolation</string>
+    <string name="beta_group_hook_timing">VPNHide: hook timing</string>
+    <string name="beta_hook_timing_corroborated">Stable timing anomaly corroborated by a repeatable semantic mismatch</string>
+    <string name="beta_hook_timing_unsupported">High-frequency timing is unsupported on this architecture</string>
+    <string name="beta_hook_timing_inconclusive">Hook timing probe was inconclusive</string>
+    <string name="beta_hook_timing_only">Timing anomaly was not corroborated by a semantic mismatch</string>
+    <string name="beta_hook_semantic_only">Semantic mismatch was not corroborated by a timing anomaly</string>
+    <string name="beta_hook_timing_not_confirmed">No corroborated hook-timing anomaly was found</string>
 </resources>

@@ -15,6 +15,7 @@ import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
 import com.notcvnt.rknhardering.model.EvidenceItem
 import com.notcvnt.rknhardering.model.Finding
+import com.notcvnt.rknhardering.checker.BetaCheckRegistry
 import com.notcvnt.rknhardering.model.GeoIpResponse
 import com.notcvnt.rknhardering.model.IpCheckerGroupResult
 import com.notcvnt.rknhardering.model.IpCheckerResponse
@@ -80,7 +81,7 @@ object DebugDiagnosticsFormatter {
         appendLocationSignalsDiagnostics(builder, result.locationSignals)
         appendBypass(builder, result.bypassResult)
         appendCategory(builder, "nativeSigns", result.nativeSigns)
-        appendCategory(builder, "betaChecks", result.betaChecks.category)
+        appendCategory(builder, "betaChecks", result.betaChecks.category, includeBetaDisplayGroup = true)
         builder.appendLine("betaNetworkEpochRetryCount: ${result.betaChecks.networkEpochRetryCount}")
         builder.appendLine(
             "betaNetworkEpochChanges: " +
@@ -387,6 +388,7 @@ object DebugDiagnosticsFormatter {
         builder: StringBuilder,
         key: String,
         category: CategoryResult,
+        includeBetaDisplayGroup: Boolean = false,
     ) {
         builder.appendLine()
         builder.appendLine("[$key]")
@@ -405,7 +407,7 @@ object DebugDiagnosticsFormatter {
             builder.appendLine(NONE_DASH)
         } else {
             category.findings.forEach { finding ->
-                builder.appendLine("- ${formatFinding(finding)}")
+                builder.appendLine("- ${formatFinding(finding, includeBetaDisplayGroup)}")
             }
         }
 
@@ -645,11 +647,14 @@ object DebugDiagnosticsFormatter {
         }
     }
 
-    private fun formatFinding(finding: Finding): String {
+    private fun formatFinding(finding: Finding, includeBetaDisplayGroup: Boolean = false): String {
         return buildList {
             add("description=${maskIpsInText(finding.displayDescription())}")
             add("maturity=${finding.maturity}")
             finding.checkId?.let { add("checkId=$it") }
+            if (includeBetaDisplayGroup) {
+                add("displayGroup=${BetaCheckRegistry.displayGroup(finding.checkId).id}")
+            }
             finding.availability?.let { add("availability=$it") }
             finding.rawConfidence?.let { add("rawConfidence=$it") }
             finding.independenceGroup?.let { add("group=$it") }

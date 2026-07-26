@@ -25,6 +25,7 @@ internal class SettingsBetaChecksFragment : Fragment(R.layout.fragment_settings_
     private var warningDialog: AlertDialog? = null
 
     private val childSwitches = listOf(
+        ChildSwitch(R.id.switchBetaHookTiming, SettingsPrefs.PREF_BETA_HOOK_TIMING, false, available = true),
         ChildSwitch(R.id.switchBetaHiddenAndroidApis, SettingsPrefs.PREF_BETA_HIDDEN_ANDROID_APIS, true, available = true),
         ChildSwitch(R.id.switchBetaKernelNetlink, SettingsPrefs.PREF_BETA_KERNEL_NETLINK, true, available = true),
         ChildSwitch(R.id.switchBetaSocketOracles, SettingsPrefs.PREF_BETA_SOCKET_ORACLES, true, available = true),

@@ -46,6 +46,24 @@ class AdvancedNetlinkProbeTest {
     }
 
     @Test
+    fun `parser rejects duplicate rows and missing required envelope fields`() {
+        val row = "beta_v1|check=socket_identity|status=available"
+
+        assertEquals(
+            ProbeAvailability.MALFORMED_RESPONSE,
+            BetaProbeRowParser.parse(arrayOf(row, row), "socket_identity").availability,
+        )
+        assertEquals(
+            ProbeAvailability.MALFORMED_RESPONSE,
+            parse("beta_v1|check=socket_identity|matched=true").availability,
+        )
+        assertEquals(
+            ProbeAvailability.MALFORMED_RESPONSE,
+            parse("beta_v1|status=available|matched=true").availability,
+        )
+    }
+
+    @Test
     fun `matching exact cookie is benign and unavailable is neutral`() {
         val benign = AdvancedNetlinkProbe.diagObservation(
             ParsedBetaProbeRow(

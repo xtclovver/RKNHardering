@@ -85,6 +85,9 @@ object NativeSignsBridge {
     internal var betaSandboxSnapshotOverride: ((Array<String>, Boolean) -> Array<String>)? = null
 
     @Volatile
+    internal var betaHookTimingProbeOverride: ((ScanCancellationSignal?) -> Array<String>)? = null
+
+    @Volatile
     internal var detectRootOverride: (() -> Array<String>)? = null
 
     @Volatile
@@ -348,6 +351,14 @@ object NativeSignsBridge {
                 }.getOrDefault(emptyArray())
         }
 
+    fun betaHookTimingProbe(cancellationSignal: ScanCancellationSignal? = null): Array<String> =
+        traceArray("betaHookTimingProbe") {
+            betaHookTimingProbeOverride?.invoke(cancellationSignal)
+                ?: if (!isLibraryLoaded()) emptyArray() else runCatching {
+                    nativeBetaHookTimingProbe(cancellationSignal)
+                }.getOrDefault(emptyArray())
+        }
+
     fun detectRoot(): Array<String> {
         return traceArray("detectRoot") {
             detectRootOverride?.invoke()
@@ -462,6 +473,7 @@ object NativeSignsBridge {
         betaTransitionMonitorOverride = null
         betaExtendedRouteProbeOverride = null
         betaSandboxSnapshotOverride = null
+        betaHookTimingProbeOverride = null
         detectRootOverride = null
         detectEmulatorOverride = null
         detectVpnPropertiesOverride = null
@@ -516,6 +528,7 @@ object NativeSignsBridge {
         cancellationSignal: ScanCancellationSignal?,
     ): Array<String>
     private external fun nativeBetaSandboxSnapshot(paths: Array<String>, aggressive: Boolean): Array<String>
+    private external fun nativeBetaHookTimingProbe(cancellationSignal: ScanCancellationSignal?): Array<String>
     private external fun nativeDetectRoot(): Array<String>
     private external fun nativeDetectEmulator(): Array<String>
     private external fun nativeDetectVpnProperties(): Array<String>

@@ -99,6 +99,7 @@ add_library(
     beta_kernel_probe.cpp
     beta_local_probe.cpp
     beta_sandbox_probe.cpp
+    beta_hook_timing_probe.cpp
 )
 
 target_compile_options(

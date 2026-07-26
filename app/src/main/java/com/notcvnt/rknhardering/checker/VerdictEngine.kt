@@ -60,6 +60,10 @@ object VerdictEngine {
         EvidenceSource.SANDBOX_ISOLATION,
     )
 
+    private val BETA_REVIEW_ONLY_SOURCES = setOf(
+        EvidenceSource.BETA_HOOK_TIMING,
+    )
+
     private val STABLE_NETWORK_GROUPS = mapOf(
         EvidenceSource.DIRECT_NETWORK_CAPABILITIES to "android_connectivity",
         EvidenceSource.SYSTEM_PROXY to "android_proxy",
@@ -328,7 +332,8 @@ object VerdictEngine {
             it.detected &&
                 it.maturity == EvidenceMaturity.BETA &&
                 it.confidence != EvidenceConfidence.LOW &&
-                it.detectionDomain != DetectionDomain.SYSTEM_NETWORK_CONTEXT
+                it.detectionDomain != DetectionDomain.SYSTEM_NETWORK_CONTEXT &&
+                it.source !in BETA_REVIEW_ONLY_SOURCES
         }
         if (positive.isEmpty()) return null
 

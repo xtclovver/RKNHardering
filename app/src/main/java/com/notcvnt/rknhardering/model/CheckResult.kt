@@ -141,6 +141,7 @@ enum class EvidenceSource {
     BETA_NETWORK_TRANSITION,
     BETA_TRACEROUTE,
     BETA_SERVER_FINGERPRINT,
+    BETA_HOOK_TIMING,
 }
 
 enum class StunScope {

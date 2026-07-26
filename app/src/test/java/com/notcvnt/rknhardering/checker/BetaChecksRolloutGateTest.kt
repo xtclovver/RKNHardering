@@ -41,6 +41,14 @@ class BetaChecksRolloutGateTest {
         assertTrue(BetaChecksChecker.SOCKET_ORACLES_ROLLOUT_READY)
         assertEquals(null, result.availabilitySummary[ProbeAvailability.SKIPPED])
         assertEquals(7, result.availabilitySummary.values.sum())
+        assertEquals(
+            setOf("beta.vpnhide_hook_timing.libc", "beta.vpnhide_hook_timing.kernel"),
+            result.category.findings
+                .filter { it.checkId?.startsWith("beta.vpnhide_hook_timing.") == true }
+                .onEach { assertEquals(ProbeAvailability.SKIPPED, it.availability) }
+                .mapNotNull { it.checkId }
+                .toSet(),
+        )
         assertFalse(result.category.detected)
     }
 }

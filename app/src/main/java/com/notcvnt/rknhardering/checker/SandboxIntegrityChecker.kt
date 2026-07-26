@@ -13,12 +13,10 @@ import com.notcvnt.rknhardering.model.ObservationAuthority
 import com.notcvnt.rknhardering.model.ObservationPolarity
 import com.notcvnt.rknhardering.model.ProbeAvailability
 import com.notcvnt.rknhardering.probe.NativeSignsBridge
+import com.notcvnt.rknhardering.probe.BetaProbeRowParser
+import com.notcvnt.rknhardering.probe.ParsedBetaProbeRow
 
-internal data class SandboxProbeRow(
-    val checkId: String,
-    val availability: ProbeAvailability,
-    val fields: Map<String, String>,
-)
+internal typealias SandboxProbeRow = ParsedBetaProbeRow
 
 internal data class ProcessIdentitySnapshot(
     val uid: Int,
@@ -38,57 +36,8 @@ internal data class SandboxProbeDefinition(
 )
 
 internal object SandboxProbeRowParser {
-    private const val PREFIX = "beta_v1"
-    private const val MAX_ROWS = 16
-    private const val MAX_TOTAL_CHARS = 16_384
-    private const val MAX_FIELDS = 64
-
-    fun parse(rows: Array<String>, expectedCheckId: String): SandboxProbeRow {
-        if (rows.isEmpty()) return unavailable(expectedCheckId)
-        if (rows.size > MAX_ROWS || rows.sumOf(String::length) > MAX_TOTAL_CHARS) {
-            return SandboxProbeRow(expectedCheckId, ProbeAvailability.TRUNCATED, emptyMap())
-        }
-        val matching = rows.filter { row ->
-            row.split('|').any { it == "check=$expectedCheckId" }
-        }
-        if (matching.size != 1) {
-            return SandboxProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-        }
-        val parts = matching.single().split('|')
-        if (parts.firstOrNull() != PREFIX || parts.size > MAX_FIELDS + 1) {
-            return SandboxProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-        }
-        val fields = linkedMapOf<String, String>()
-        for (part in parts.drop(1)) {
-            val separator = part.indexOf('=')
-            if (separator <= 0 || separator == part.lastIndex) {
-                return SandboxProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-            }
-            val key = part.substring(0, separator)
-            if (fields.put(key, part.substring(separator + 1)) != null) {
-                return SandboxProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-            }
-        }
-        if (fields["check"] != expectedCheckId) {
-            return SandboxProbeRow(expectedCheckId, ProbeAvailability.MALFORMED_RESPONSE, emptyMap())
-        }
-        val availability = when (fields["status"]) {
-            "available" -> ProbeAvailability.AVAILABLE
-            "permission_denied" -> ProbeAvailability.PERMISSION_DENIED
-            "unsupported" -> ProbeAvailability.UNSUPPORTED
-            "unavailable" -> ProbeAvailability.UNAVAILABLE
-            "truncated" -> ProbeAvailability.TRUNCATED
-            "malformed_response" -> ProbeAvailability.MALFORMED_RESPONSE
-            "race" -> ProbeAvailability.RACE
-            "skipped" -> ProbeAvailability.SKIPPED
-            "error" -> ProbeAvailability.ERROR
-            else -> ProbeAvailability.MALFORMED_RESPONSE
-        }
-        return SandboxProbeRow(expectedCheckId, availability, fields)
-    }
-
-    private fun unavailable(checkId: String) =
-        SandboxProbeRow(checkId, ProbeAvailability.UNAVAILABLE, emptyMap())
+    fun parse(rows: Array<String>, expectedCheckId: String): SandboxProbeRow =
+        BetaProbeRowParser.parse(rows, expectedCheckId, maxRows = 16)
 }
 
 internal object SandboxIntegrityChecker {

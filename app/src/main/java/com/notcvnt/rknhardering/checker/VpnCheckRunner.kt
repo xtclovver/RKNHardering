@@ -56,6 +56,7 @@ import kotlinx.coroutines.withContext
 
 data class BetaCheckSettings(
     val enabled: Boolean = false,
+    val hookTiming: Boolean = false,
     val hiddenAndroidApis: Boolean = true,
     val kernelNetlink: Boolean = true,
     val socketOracles: Boolean = true,

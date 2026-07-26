@@ -1243,4 +1243,18 @@
     <string name="beta_canary_tls_checked">Контрольный TLS-путь проверен</string>
     <string name="beta_canary_server_checked">Серверные транспортные признаки собраны в безопасном для приватности виде</string>
     <string name="beta_checks_error">Не удалось завершить бета-проверки</string>
+    <string name="settings_beta_hook_timing">β VPNHide: тайминг системных хуков</string>
+    <string name="beta_group_overview">Обзор</string>
+    <string name="beta_group_android_profile">Android и профиль</string>
+    <string name="beta_group_sockets_routing">Сокеты и маршрутизация</string>
+    <string name="beta_group_vpn_kernel_policy">VPN и политика ядра</string>
+    <string name="beta_group_active_network">Активная сеть</string>
+    <string name="beta_group_integrity_isolation">Целостность и изоляция</string>
+    <string name="beta_group_hook_timing">VPNHide: тайминг хуков</string>
+    <string name="beta_hook_timing_corroborated">Устойчивое отклонение тайминга подтверждено повторяемым семантическим расхождением</string>
+    <string name="beta_hook_timing_unsupported">Высокочастотный тайминг не поддерживается на этой архитектуре</string>
+    <string name="beta_hook_timing_inconclusive">Проверка тайминга хуков не дала определённого результата</string>
+    <string name="beta_hook_timing_only">Временная аномалия не подтверждена семантическим расхождением</string>
+    <string name="beta_hook_semantic_only">Семантическое расхождение не подтверждено временной аномалией</string>
+    <string name="beta_hook_timing_not_confirmed">Подтверждённая аномалия тайминга хуков не обнаружена</string>
 </resources>

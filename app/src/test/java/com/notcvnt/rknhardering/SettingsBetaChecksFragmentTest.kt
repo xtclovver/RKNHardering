@@ -38,6 +38,7 @@ class SettingsBetaChecksFragmentTest {
         val scenario = betaFragment()
 
         assertFalse(scenario.switch(R.id.switchBetaChecks).isChecked)
+        assertChildState(scenario, R.id.switchBetaHookTiming, checked = false, visible = true)
         assertChildState(scenario, R.id.switchBetaSocketOracles, checked = true, visible = true)
         assertChildState(scenario, R.id.switchBetaProfileIsolation, checked = true, visible = true)
         assertChildState(scenario, R.id.switchBetaHiddenAndroidApis, checked = true, visible = true)
@@ -106,6 +107,25 @@ class SettingsBetaChecksFragmentTest {
     }
 
     @Test
+    fun `hook timing choice persists independently from aggressive mode`() {
+        val prefs = AppUiSettings.prefs(context)
+        prefs.edit()
+            .putBoolean(SettingsPrefs.PREF_BETA_WARNING_ACCEPTED, true)
+            .putBoolean(SettingsPrefs.PREF_BETA_CHECKS_ENABLED, true)
+            .commit()
+        val scenario = betaFragment()
+        val hookTiming = scenario.switch(R.id.switchBetaHookTiming)
+        val aggressive = scenario.switch(R.id.switchBetaAggressiveScan)
+
+        hookTiming.performClick()
+
+        assertTrue(hookTiming.isChecked)
+        assertFalse(aggressive.isChecked)
+        assertTrue(prefs.getBoolean(SettingsPrefs.PREF_BETA_HOOK_TIMING, false))
+        assertTrue(betaFragment().switch(R.id.switchBetaHookTiming).isChecked)
+    }
+
+    @Test
     fun `privileged probes require separate consent and persist explicit provider`() {
         val prefs = AppUiSettings.prefs(context)
         prefs.edit()
@@ -141,6 +161,7 @@ class SettingsBetaChecksFragmentTest {
         val titleResources = listOf(
             R.string.settings_cat_beta_checks,
             R.string.settings_beta_checks_enabled,
+            R.string.settings_beta_hook_timing,
             R.string.settings_beta_hidden_android_apis,
             R.string.settings_beta_kernel_netlink,
             R.string.settings_beta_privileged_checks,

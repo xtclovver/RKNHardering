@@ -111,6 +111,33 @@ class VerdictEngineBetaTest {
         assertEquals(Verdict.NOT_DETECTED, context.verdict)
     }
 
+    @Test
+    fun `hook timing is review only and never joins tamper quorum`() {
+        val hookTiming = beta(
+            group = "hook_consistency",
+            source = EvidenceSource.BETA_HOOK_TIMING,
+            domain = DetectionDomain.HOOK_OR_TAMPERING,
+        )
+        val anotherHook = beta(
+            group = "loader_integrity",
+            source = EvidenceSource.BETA_HOOK_CONSISTENCY,
+            domain = DetectionDomain.HOOK_OR_TAMPERING,
+        )
+        val virtualization = beta(
+            group = "process_identity",
+            source = EvidenceSource.BETA_SANDBOX_IDENTITY,
+            domain = DetectionDomain.APP_VIRTUALIZATION,
+        )
+
+        assertEquals(Verdict.NEEDS_REVIEW, evaluate(beta = category(hookTiming)).verdict)
+        assertEquals(Verdict.NEEDS_REVIEW, evaluate(beta = category(hookTiming, anotherHook)).verdict)
+        assertEquals(Verdict.NEEDS_REVIEW, evaluate(beta = category(hookTiming, virtualization)).verdict)
+        assertEquals(
+            Verdict.NEEDS_REVIEW,
+            evaluate(beta = category(hookTiming.copy(confidence = EvidenceConfidence.HIGH, hardSignal = true))).verdict,
+        )
+    }
+
     private fun evaluate(
         betaEnabled: Boolean = true,
         beta: CategoryResult = category(),

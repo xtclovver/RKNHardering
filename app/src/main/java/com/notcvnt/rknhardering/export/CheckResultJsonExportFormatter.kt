@@ -3,6 +3,7 @@ package com.notcvnt.rknhardering.export
 import android.content.Context
 import com.notcvnt.rknhardering.BuildConfig
 import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
+import com.notcvnt.rknhardering.checker.BetaChecksGrouping
 import com.notcvnt.rknhardering.model.ActiveVpnApp
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CallTransportLeakResult
@@ -134,6 +135,16 @@ internal object CheckResultJsonExportFormatter {
                 put("indirectSigns", categoryToJson(snapshot.result.indirectSigns, snapshot.privacyMode))
                 put("nativeSigns", categoryToJson(snapshot.result.nativeSigns, snapshot.privacyMode))
                 put("betaChecks", categoryToJson(snapshot.result.betaChecks.category, snapshot.privacyMode).apply {
+                    put("groups", JSONArray().apply {
+                        BetaChecksGrouping.sections(snapshot.result.betaChecks.category.findings).forEach { section ->
+                            put(JSONObject().apply {
+                                put("id", section.group.id)
+                                put("localizedTitle", context.getString(section.group.titleRes))
+                                put("status", section.status.name)
+                                put("checkIds", jsonArray(section.checkIds))
+                            })
+                        }
+                    })
                     put("availabilitySummary", JSONObject().apply {
                         snapshot.result.betaChecks.availabilitySummary.forEach { (availability, count) ->
                             put(availability.name, count)

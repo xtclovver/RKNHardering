@@ -1221,4 +1221,18 @@
     <string name="beta_canary_tls_checked">مسیر کنترل‌شدهٔ TLS بررسی شد</string>
     <string name="beta_canary_server_checked">داده‌های انتقال سمت سرور به‌شکل امن برای حریم خصوصی جمع‌آوری شد</string>
     <string name="beta_checks_error">بررسی‌های بتا کامل نشدند</string>
+    <string name="settings_beta_hook_timing">β VPNHide: زمان‌بندی هوک‌های سیستم</string>
+    <string name="beta_group_overview">نمای کلی</string>
+    <string name="beta_group_android_profile">Android و نمایه‌ها</string>
+    <string name="beta_group_sockets_routing">سوکت‌ها و مسیریابی</string>
+    <string name="beta_group_vpn_kernel_policy">VPN و سیاست هسته</string>
+    <string name="beta_group_active_network">شبکهٔ فعال</string>
+    <string name="beta_group_integrity_isolation">یکپارچگی و جداسازی</string>
+    <string name="beta_group_hook_timing">VPNHide: زمان‌بندی هوک‌ها</string>
+    <string name="beta_hook_timing_corroborated">ناهنجاری پایدار زمان‌بندی با ناسازگاری معنایی تکرارپذیر تأیید شد</string>
+    <string name="beta_hook_timing_unsupported">زمان‌بندی پربسامد در این معماری پشتیبانی نمی‌شود</string>
+    <string name="beta_hook_timing_inconclusive">کاوش زمان‌بندی هوک نتیجهٔ قطعی نداشت</string>
+    <string name="beta_hook_timing_only">ناهنجاری زمان‌بندی با ناسازگاری معنایی تأیید نشد</string>
+    <string name="beta_hook_semantic_only">ناسازگاری معنایی با ناهنجاری زمان‌بندی تأیید نشد</string>
+    <string name="beta_hook_timing_not_confirmed">ناهنجاری تأییدشده‌ای در زمان‌بندی هوک پیدا نشد</string>
 </resources>

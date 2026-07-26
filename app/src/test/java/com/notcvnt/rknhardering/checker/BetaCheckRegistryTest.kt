@@ -9,6 +9,7 @@ import com.notcvnt.rknhardering.model.ObservationPolarity
 import com.notcvnt.rknhardering.model.ProbeAvailability
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BetaCheckRegistryTest {
@@ -28,9 +29,46 @@ class BetaCheckRegistryTest {
             "beta.native_dns_resolver", "beta.proxy_selector", "beta.transport_matrix",
             "beta.tls_interception", "beta.pktinfo", "beta.netlink_transitions",
             "beta.traceroute", "beta.server_fingerprint", "beta.root_emulator",
+            "beta.vpnhide_hook_timing.libc", "beta.vpnhide_hook_timing.kernel",
         )
 
         assertEquals(expected, BetaCheckRegistry.definitions.keys)
+    }
+
+    @Test
+    fun `every registry check belongs to exactly one ordered display group`() {
+        assertEquals(
+            listOf(
+                "overview", "android_profile", "sockets_routing", "vpn_kernel_policy",
+                "active_network", "integrity_isolation", "hook_timing",
+            ),
+            BetaDisplayGroup.entries.map { it.id },
+        )
+        assertEquals(
+            BetaDisplayGroup.HOOK_TIMING,
+            BetaCheckRegistry.get("beta.vpnhide_hook_timing.libc")?.displayGroup,
+        )
+        assertEquals(
+            BetaDisplayGroup.HOOK_TIMING,
+            BetaCheckRegistry.get("beta.vpnhide_hook_timing.kernel")?.displayGroup,
+        )
+        assertEquals(BetaDisplayGroup.OVERVIEW, BetaCheckRegistry.displayGroup("beta.unknown.forward"))
+        assertEquals(BetaDisplayGroup.OVERVIEW, BetaCheckRegistry.displayGroup("beta.coverage"))
+        assertEquals(BetaDisplayGroup.OVERVIEW, BetaCheckRegistry.displayGroup("beta.runner"))
+    }
+
+    @Test
+    fun `hook timing registry contract is review only`() {
+        val libc = BetaCheckRegistry.get("beta.vpnhide_hook_timing.libc")!!
+        val kernel = BetaCheckRegistry.get("beta.vpnhide_hook_timing.kernel")!!
+
+        assertEquals(EvidenceSource.BETA_HOOK_TIMING, libc.source)
+        assertEquals(DetectionDomain.HOOK_OR_TAMPERING, libc.detectionDomain)
+        assertEquals("hook_consistency", libc.independenceGroup)
+        assertEquals(ObservationAuthority.LIBC_OR_PRIVATE_LIBRARY, libc.expectedAuthority)
+        assertEquals(ObservationAuthority.KERNEL_QUERY, kernel.expectedAuthority)
+        assertTrue(libc.hardAuthorities.isEmpty())
+        assertTrue(kernel.hardAuthorities.isEmpty())
     }
 
     @Test

@@ -68,6 +68,19 @@
                 android:layout_marginBottom="8dp">
 
                 <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchBetaHookTiming"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:padding="16dp"
+                    android:text="@string/settings_beta_hook_timing" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/SettingsGroupCard"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchBetaHiddenAndroidApis"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

@@ -56,6 +56,15 @@ internal object BetaChecksChecker : BetaChecksDependency {
 
     override suspend fun check(request: BetaChecksRequest): BetaCheckResult {
         if (!request.settings.enabled) return BetaCheckResult.disabled()
+        val hookTimingObservations = if (request.settings.hookTiming) {
+            VpnHideHookTimingBetaChecker.check(
+                context = request.context,
+                observedAtElapsedMs = SystemClock.elapsedRealtime(),
+                executionContext = request.executionContext,
+            )
+        } else {
+            emptyList()
+        }
         val retry = retryOnceOnNetworkEpochChange(
             beforeRetry = {
                 request.executionContext.throwIfCancelled()
@@ -63,7 +72,7 @@ internal object BetaChecksChecker : BetaChecksDependency {
                 request.executionContext.throwIfCancelled()
             },
         ) {
-            val attempt = checkAttempt(request)
+            val attempt = checkAttempt(request, hookTimingObservations)
             NetworkEpochAttempt(attempt.result, attempt.epochStable)
         }
         return retry.value.copy(
@@ -72,7 +81,10 @@ internal object BetaChecksChecker : BetaChecksDependency {
         )
     }
 
-    private suspend fun checkAttempt(request: BetaChecksRequest): BetaCheckAttempt = withContext(Dispatchers.IO) {
+    private suspend fun checkAttempt(
+        request: BetaChecksRequest,
+        hookTimingObservations: List<BetaObservation>,
+    ): BetaCheckAttempt = withContext(Dispatchers.IO) {
         request.executionContext.throwIfCancelled()
         val initialEpoch = captureNetworkEpoch(request.context)
         return@withContext withCloseableResource(NetworkEpochMonitor(request.context, initialEpoch)) { epochMonitor ->
@@ -281,6 +293,7 @@ internal object BetaChecksChecker : BetaChecksDependency {
             }
         }
         val runObservations = listOfNotNull(executionContext?.observation) + sandboxObservations +
+            hookTimingObservations +
             foregroundObservations + effectiveNetworkObservations
         val runCheckIds = runObservations.map { it.checkId }.toSet()
         val observations = runObservations.toMutableList().apply {

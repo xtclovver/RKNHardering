@@ -3,6 +3,7 @@
 #include "beta_socket_probe.h"
 #include "beta_netlink_probe.h"
 #include "beta_sandbox_probe.h"
+#include "beta_hook_timing_probe.h"
 #include "beta_kernel_probe.h"
 #include "beta_local_probe.h"
 
@@ -2268,6 +2269,7 @@ const JNINativeMethod kMethods[] = {
     {"nativeBetaTransitionMonitor", "(ILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaTransitionMonitor)},
     {"nativeBetaExtendedRouteProbe", "(IILcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaExtendedRouteProbe)},
     {"nativeBetaSandboxSnapshot", "([Ljava/lang/String;Z)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaSandboxSnapshot)},
+    {"nativeBetaHookTimingProbe", "(Lcom/notcvnt/rknhardering/ScanCancellationSignal;)[Ljava/lang/String;", reinterpret_cast<void *>(nativeBetaHookTimingProbe)},
     {"nativeDetectRoot", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectRoot)},
     {"nativeDetectEmulator", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectEmulator)},
     {"nativeDetectVpnProperties", "()[Ljava/lang/String;", reinterpret_cast<void *>(nativeDetectVpnProperties)},

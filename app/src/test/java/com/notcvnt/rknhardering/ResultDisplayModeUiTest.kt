@@ -13,6 +13,7 @@ import com.notcvnt.rknhardering.checker.CheckSettings
 import com.notcvnt.rknhardering.checker.CheckUpdate
 import com.notcvnt.rknhardering.diagnostics.DiagnosticEntry
 import com.notcvnt.rknhardering.diagnostics.DiagnosticSnapshot
+import com.notcvnt.rknhardering.model.BetaCheckResult
 import com.notcvnt.rknhardering.model.BypassResult
 import com.notcvnt.rknhardering.model.CategoryResult
 import com.notcvnt.rknhardering.model.CheckResult
@@ -111,6 +112,64 @@ class ResultDisplayModeUiTest {
         assertTrue(text.indexOf("route first") < text.indexOf("route second"))
         assertEquals(1, Regex("route first").findAll(text).count())
         assertTrue(findByTag(activity, "native-group-header:ROUTES").contentDescription.toString().contains(activity.getString(R.string.accessibility_expanded)))
+    }
+
+    @Test
+    fun `beta progressive rendering keeps fixed group order and expansion rules`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        invokePrivate<Unit>(activity, "prepareCheckSessionUi", CheckSettings(), false, ResultDisplayMode.NORMAL)
+        val beta = BetaCheckResult(
+            category = CategoryResult(
+                name = "beta",
+                detected = false,
+                needsReview = true,
+                findings = listOf(
+                    Finding("hook clean", checkId = "beta.vpnhide_hook_timing.libc", isInformational = true),
+                    Finding("coverage", checkId = "beta.coverage", isInformational = true),
+                    Finding("android review", checkId = "beta.vpn_binder", needsReview = true),
+                    Finding("routing error", checkId = "beta.route_lookup", isError = true),
+                ),
+            ),
+        )
+
+        invokePrivate<Unit>(activity, "applyScanEvent", ScanEvent.Update(CheckUpdate.BetaChecksReady(beta)), false)
+
+        val container = activity.findViewById<LinearLayout>(R.id.findingsBetaChecks)
+        assertEquals(
+            listOf(
+                "beta-group:OVERVIEW",
+                "beta-group:ANDROID_PROFILE",
+                "beta-group:SOCKETS_ROUTING",
+                "beta-group:HOOK_TIMING",
+            ),
+            (0 until container.childCount).map { container.getChildAt(it).tag },
+        )
+        assertEquals(View.VISIBLE, findByTag(activity, "beta-group-details:OVERVIEW").visibility)
+        assertEquals(View.VISIBLE, findByTag(activity, "beta-group-details:ANDROID_PROFILE").visibility)
+        assertEquals(View.VISIBLE, findByTag(activity, "beta-group-details:SOCKETS_ROUTING").visibility)
+        assertEquals(View.GONE, findByTag(activity, "beta-group-details:HOOK_TIMING").visibility)
+    }
+
+    @Test
+    fun `beta completed rendering uses grouped renderer`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val beta = BetaCheckResult(
+            category = CategoryResult(
+                name = "beta",
+                detected = false,
+                findings = listOf(Finding("coverage", checkId = "beta.coverage", isInformational = true)),
+            ),
+        )
+
+        invokePrivate<Unit>(
+            activity,
+            "applyScanEvent",
+            ScanEvent.Completed(checkResult(betaChecks = beta), false, ResultDisplayMode.NORMAL),
+            false,
+        )
+
+        assertNotNull(findByTag(activity, "beta-group:OVERVIEW"))
+        assertEquals(View.VISIBLE, findByTag(activity, "beta-group-details:OVERVIEW").visibility)
     }
 
     @Test
@@ -411,6 +470,7 @@ class ResultDisplayModeUiTest {
     private fun checkResult(
         snapshot: DiagnosticSnapshot? = null,
         nativeSigns: CategoryResult = category("native"),
+        betaChecks: BetaCheckResult = BetaCheckResult.disabled(),
     ): CheckResult = CheckResult(
         geoIp = category("geo"),
         ipComparison = IpComparisonResult(
@@ -433,6 +493,7 @@ class ResultDisplayModeUiTest {
         verdict = Verdict.NOT_DETECTED,
         diagnosticSnapshot = snapshot,
         nativeSigns = nativeSigns,
+        betaChecks = betaChecks,
     )
 
     private fun category(name: String) = CategoryResult(name, detected = false, findings = emptyList())

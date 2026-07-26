@@ -39,7 +39,8 @@ object BetaEvidencePolicy {
             if (definition == null ||
                 definition.source != observation.source ||
                 definition.detectionDomain != observation.detectionDomain ||
-                definition.independenceGroup != observation.independenceGroup
+                definition.independenceGroup != observation.independenceGroup ||
+                (definition.expectedAuthority != null && definition.expectedAuthority != observation.authority)
             ) {
                 add(BetaSuppressionRuleId.ABI_OR_PARSER_MISMATCH)
             }
