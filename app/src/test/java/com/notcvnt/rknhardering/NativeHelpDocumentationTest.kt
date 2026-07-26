@@ -39,18 +39,28 @@ class NativeHelpDocumentationTest {
             linkRegex.findAll(text).forEach link@{ match ->
                 val target = match.groupValues[1]
                 if (target.startsWith("http://") || target.startsWith("https://") || target.startsWith("#")) return@link
-                assertTrue("Broken link $target in $file", resolves(requireNotNull(file.parentFile), target))
+                assertTrue("Broken link $target in $file", resolves(helpRoot, text, target))
             }
         }
     }
 
-    private fun resolves(base: File, rawTarget: String): Boolean {
+    private fun resolves(helpRoot: File, sourceText: String, rawTarget: String): Boolean {
         val clean = rawTarget.substringBefore('#').substringBefore('?')
-        val direct = File(base, clean).canonicalFile
-        if (direct.isFile) return true
-        if (File(direct, "index.md").isFile) return true
-        val withoutSlash = direct.path.trimEnd(File.separatorChar)
-        return File("$withoutSlash.md").isFile
+        val permalink = requireNotNull(permalinkRegex.find(sourceText)) {
+            "Help page lacks a permalink"
+        }.groupValues[1]
+        val routeBase = File(helpRoot, permalink.removePrefix("/help/").trim('/'))
+        val direct = if (clean.startsWith("/help/")) {
+            File(helpRoot, clean.removePrefix("/help/"))
+        } else if (clean.startsWith("/")) {
+            return false
+        } else {
+            File(routeBase, clean)
+        }
+        val canonical = direct.canonicalFile
+        return canonical.isFile ||
+            File(canonical, "index.md").isFile ||
+            File("${canonical.path.trimEnd(File.separatorChar)}.md").isFile
     }
 
     private fun projectRoot(): File {
@@ -64,6 +74,7 @@ class NativeHelpDocumentationTest {
 
     companion object {
         private val linkRegex = Regex("\\[[^]]*]\\(([^)]+)\\)")
+        private val permalinkRegex = Regex("""(?m)^permalink:\s*(\S+)\s*$""")
         private val headings = mapOf(
             "en" to listOf(
                 "What is checked and why", "What the result means",
@@ -76,9 +87,9 @@ class NativeHelpDocumentationTest {
                 "Необходимые права и риски", "Уровень доказательности", "Источники и дата последней проверки",
             ),
             "fa" to listOf(
-                "چه چیزی و چرا بررسی می‌شود", "نتیجه چه معنایی دارد",
-                "محدودیت‌ها و مثبت کاذب احتمالی", "توصیه‌های همین بردار",
-                "مجوزهای لازم و خطرها", "سطح شواهد", "منابع و تاریخ آخرین بررسی",
+                "چه چیزی بررسی می‌شود و چرا", "معنای نتیجه",
+                "محدودیت‌ها و مثبت‌های کاذب احتمالی", "توصیه‌ها برای این بردار",
+                "مجوزهای لازم و خطرها", "سطح شواهد", "منابع و تاریخ آخرین راستی‌آزمایی",
             ),
             "zh-CN" to listOf(
                 "检查内容与目的", "结果含义", "限制与可能的误报", "针对该向量的建议",
