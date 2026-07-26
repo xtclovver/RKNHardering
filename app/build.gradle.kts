@@ -32,8 +32,8 @@ android {
         applicationId = "com.notcvnt.rknhardering"
         minSdk = 26
         targetSdk = 36
-        versionCode = 21000
-        versionName = "2.10.0"
+        versionCode = 21100
+        versionName = "2.11.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         androidResources.localeFilters += listOf("en", "ru", "fa", "zh-rCN")
         buildConfigField("String", "BETA_CANARY_IPV4", quotedBuildConfig(betaCanaryProperty("betaCanaryIpv4")))

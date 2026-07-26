@@ -1,0 +1,5 @@
+1. Added grouped Native signs categories, signal-level results, and online help pages.
+2. Added privacy-safe beta checks, including VPNHide system-hook timing detection.
+3. Expanded native VPN and VPNHide detection for kernel and network signals.
+4. Fixed spoofed ICMP response handling, CDN-check UI, and host-route false positives.
+5. Improved documentation and translations.
