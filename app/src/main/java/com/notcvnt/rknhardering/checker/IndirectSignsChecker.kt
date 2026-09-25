@@ -3,6 +3,7 @@
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.RouteInfo
 import android.os.Build
 import com.notcvnt.rknhardering.LocalProxyOwnerFormatter
 import com.notcvnt.rknhardering.R
@@ -53,6 +54,8 @@ object IndirectSignsChecker {
         val gateway: String?,
         val interfaceName: String?,
         val isDefault: Boolean,
+        // RTN_THROW: the VpnService excluded this prefix from the tunnel (Builder.excludeRoute).
+        val isExcluded: Boolean = false,
     )
 
     internal data class InterfaceAddressSnapshot(
@@ -353,6 +356,8 @@ object IndirectSignsChecker {
                                 route.`interface` ?: linkProperties.interfaceName,
                             ),
                             isDefault = route.isDefaultRoute,
+                            isExcluded = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                route.type == RouteInfo.RTN_THROW,
                         )
                     },
                     dnsServers = linkProperties.dnsServers.mapNotNull { it.hostAddress?.let(::normalizeIpAddress) },
@@ -555,8 +560,33 @@ object IndirectSignsChecker {
                 detected = true
             }
 
+            if (snapshot.isVpn) {
+                val excludedHosts = snapshot.routes.filter { it.isExcluded && isPublicHostRoute(it.destination) }
+                if (excludedHosts.isNotEmpty()) {
+                    val hostsPreview = excludedHosts.take(3).joinToString { it.destination }
+                    findings.add(
+                        Finding(
+                            description = context.getString(R.string.checker_indirect_vpn_excluded_host_route, hostsPreview),
+                            detected = true,
+                            source = EvidenceSource.ROUTING,
+                            confidence = EvidenceConfidence.HIGH,
+                        ),
+                    )
+                    evidence.add(
+                        EvidenceItem(
+                            source = EvidenceSource.ROUTING,
+                            detected = true,
+                            confidence = EvidenceConfidence.HIGH,
+                            description = "VPN network excludes a public host route, likely its server: $hostsPreview",
+                        ),
+                    )
+                    detected = true
+                }
+            }
+
             val dedicatedRoutes = snapshot.routes.filter { route ->
                 !route.isDefault &&
+                    !route.isExcluded &&
                     route.interfaceName != null &&
                     isSuspiciousRoutingInterface(route.interfaceName, snapshotByInterface)
             }
@@ -625,6 +655,7 @@ object IndirectSignsChecker {
         val hasVpnRoutes = snapshotsWithRoutes.any { snapshot ->
             snapshot.routes.any { route ->
                 !route.isDefault &&
+                    !route.isExcluded &&
                     isSuspiciousRoutingInterface(route.interfaceName ?: snapshot.interfaceName, snapshotByInterface)
             }
         }
@@ -1115,6 +1146,16 @@ object IndirectSignsChecker {
         return ((addressBytes[fullBytes].toInt() xor prefixBytes[fullBytes].toInt()) and mask) == 0
     }
 
+
+    // A /32 or /128 to a public address: the one prefix a VPN client excludes for its own server.
+    internal fun isPublicHostRoute(destination: String): Boolean {
+        val address = destination.substringBefore('/')
+        val prefixLength = destination.substringAfter('/', "").toIntOrNull() ?: return false
+        val parsed = parseInetAddressOrNull(normalizeIpAddress(address)) ?: return false
+        if (prefixLength != parsed.address.size * 8) return false
+        val classification = classifyDnsAddress(address)
+        return classification == DnsClassification.KNOWN_PUBLIC_RESOLVER || classification == DnsClassification.OTHER_PUBLIC
+    }
 
     internal fun classifyDnsAddress(addr: String): DnsClassification {
         val normalized = normalizeIpAddress(addr)

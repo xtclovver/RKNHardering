@@ -543,6 +543,72 @@ class IndirectSignsCheckerTest {
         assertTrue(result.hasError)
     }
 
+    @Test
+    fun `public host route excluded from vpn network is reported as its likely server`() {
+        val evaluation = IndirectSignsChecker.checkRoutingTable(
+            context,
+            listOf(
+                snapshot(
+                    isActive = true,
+                    isVpn = true,
+                    interfaceName = "tun0",
+                    routes = listOf(
+                        route("0.0.0.0/0", "tun0", isDefault = true),
+                        route("203.0.113.10/32", "tun0", isDefault = false, gateway = null, isExcluded = true),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(evaluation.detected)
+        assertTrue(
+            evaluation.evidence.any {
+                it.source == EvidenceSource.ROUTING && it.confidence == EvidenceConfidence.HIGH &&
+                    it.description.contains("203.0.113.10/32")
+            },
+        )
+        // The excluded route leaves the tunnel, so it is not one of the routes through it.
+        assertFalse(evaluation.evidence.any { it.description == "Dedicated routes found on VPN/non-standard interfaces" })
+    }
+
+    @Test
+    fun `excluded private or wider routes and excluded routes off vpn stay unreported`() {
+        val evaluation = IndirectSignsChecker.checkRoutingTable(
+            context,
+            listOf(
+                snapshot(
+                    isActive = true,
+                    isVpn = true,
+                    interfaceName = "tun0",
+                    routes = listOf(
+                        route("0.0.0.0/0", "tun0", isDefault = true),
+                        route("192.168.1.10/32", "tun0", isDefault = false, gateway = null, isExcluded = true),
+                        route("198.51.100.0/24", "tun0", isDefault = false, gateway = null, isExcluded = true),
+                    ),
+                ),
+                snapshot(
+                    isActive = false,
+                    isVpn = false,
+                    interfaceName = "wlan0",
+                    routes = listOf(route("203.0.113.10/32", "wlan0", isDefault = false, isExcluded = true)),
+                ),
+            ),
+        )
+
+        assertFalse(evaluation.evidence.any { it.confidence == EvidenceConfidence.HIGH })
+    }
+
+    @Test
+    fun `public host route needs a full length prefix`() {
+        assertTrue(IndirectSignsChecker.isPublicHostRoute("203.0.113.10/32"))
+        assertTrue(IndirectSignsChecker.isPublicHostRoute("2001:db8::10/128"))
+        assertFalse(IndirectSignsChecker.isPublicHostRoute("203.0.113.0/24"))
+        assertFalse(IndirectSignsChecker.isPublicHostRoute("2001:db8::/64"))
+        assertFalse(IndirectSignsChecker.isPublicHostRoute("10.8.1.1/32"))
+        assertFalse(IndirectSignsChecker.isPublicHostRoute("fd00::1/128"))
+        assertFalse(IndirectSignsChecker.isPublicHostRoute("203.0.113.10"))
+    }
+
     private fun snapshot(
         isActive: Boolean,
         isVpn: Boolean,
@@ -586,12 +652,14 @@ class IndirectSignsCheckerTest {
         interfaceName: String?,
         isDefault: Boolean,
         gateway: String? = "192.0.2.1",
+        isExcluded: Boolean = false,
     ): RouteSnapshot {
         return RouteSnapshot(
             destination = destination,
             gateway = gateway,
             interfaceName = interfaceName,
             isDefault = isDefault,
+            isExcluded = isExcluded,
         )
     }
 

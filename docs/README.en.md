@@ -230,6 +230,7 @@ Detections:
 - default route through a non-standard interface;
 - dedicated non-default routes through VPN/non-standard interfaces;
 - split tunneling pattern: tunnel routes visible together with a normal default route through a standard network.
+- a public /32 or /128 route excluded from the VPN network (type `RTN_THROW`, Android 13+): this is how a VPN client that calls `VpnService.Builder.excludeRoute()` takes its own server out of the tunnel. Such a route is not counted as a dedicated tunnel route and is reported separately, with high confidence.
 
 A default route through `wlan.*`, `rmnet.*`, `eth.*`, `lo` is treated as normal if the network itself is not marked as VPN.
 

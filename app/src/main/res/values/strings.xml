@@ -457,6 +457,7 @@
     <string name="checker_indirect_default_route_standard">Default route: %1$s (standard)</string>
     <string name="checker_indirect_default_route_nonstandard">Default route via a non-standard interface: %1$s</string>
     <string name="checker_indirect_dedicated_routes">Dedicated routes via VPN/non-standard interface: %1$s</string>
+    <string name="checker_indirect_vpn_excluded_host_route">VPN network excludes a public host route: %1$s (likely the VPN server address)</string>
     <string name="checker_indirect_proc_default_route_standard">Default route (/proc/net/route): %1$s (standard)</string>
     <string name="checker_indirect_proc_default_route_nonstandard">Default route (/proc/net/route) via a non-standard interface: %1$s</string>
     <string name="checker_indirect_split_tunnel_routes">Routing indicates split tunneling: both direct and tunnel routes are visible</string>

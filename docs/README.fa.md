@@ -232,6 +232,7 @@ API: `NetworkInterface.getNetworkInterfaces()`. فقط اینترفیس‌های
 - default route از طریق اینترفیس غیر استاندارد؛
 - routeهای non-default اختصاصی از طریق VPN/اینترفیس غیر استاندارد؛
 - الگوی split tunneling: هم‌زمان routeهای tunnel و یک default route معمولی از طریق شبکه استاندارد دیده می‌شوند.
+- route عمومی /32 یا /128 که از شبکه VPN مستثنی شده است (نوع `RTN_THROW`، Android 13+): کلاینت VPN که `VpnService.Builder.excludeRoute()` را فراخوانی می‌کند، آدرس سرور خود را این‌گونه از tunnel خارج می‌کند. چنین routeی جزو routeهای اختصاصی tunnel شمرده نمی‌شود و جداگانه و با اطمینان بالا گزارش می‌شود.
 
 اگر default route از طریق `wlan.*`, `rmnet.*`, `eth.*`, `lo` باشد و خود شبکه VPN نباشد، حالت عادی محسوب می‌شود.
 

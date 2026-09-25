@@ -473,6 +473,7 @@
     <string name="checker_indirect_default_route_standard">مسیر پیش‌فرض: %1$s (استاندارد)</string>
     <string name="checker_indirect_default_route_nonstandard">مسیر پیش‌فرض از طریق اینترفیس غیر استاندارد: %1$s</string>
     <string name="checker_indirect_dedicated_routes">مسیرهای اختصاصی از طریق VPN/اینترفیس غیر استاندارد: %1$s</string>
+    <string name="checker_indirect_vpn_excluded_host_route">شبکه VPN یک مسیر میزبان عمومی را مستثنی می‌کند: %1$s (احتمالاً آدرس سرور VPN)</string>
     <string name="checker_indirect_proc_default_route_standard">مسیر پیش‌فرض (/proc/net/route): %1$s (استاندارد)</string>
     <string name="checker_indirect_proc_default_route_nonstandard">مسیر پیش‌فرض (/proc/net/route) از طریق اینترفیس غیر استاندارد: %1$s</string>
     <string name="checker_indirect_split_tunnel_routes">مسیریابی نشان‌دهنده split tunneling است: هم‌زمان مسیرهای direct و tunnel دیده می‌شوند</string>

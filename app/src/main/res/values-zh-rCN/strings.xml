@@ -472,6 +472,7 @@
     <string name="checker_indirect_default_route_standard">默认路由：%1$s（标准）</string>
     <string name="checker_indirect_default_route_nonstandard">通过非标准接口的默认路由：%1$s</string>
     <string name="checker_indirect_dedicated_routes">通过 VPN/非标准接口的专用路由：%1$s</string>
+    <string name="checker_indirect_vpn_excluded_host_route">VPN 网络排除了一条到公网主机的路由：%1$s（可能是 VPN 服务器地址）</string>
     <string name="checker_indirect_proc_default_route_standard">默认路由（/proc/net/route）：%1$s（标准）</string>
     <string name="checker_indirect_proc_default_route_nonstandard">默认路由（/proc/net/route）通过非标准接口：%1$s</string>
     <string name="checker_indirect_split_tunnel_routes">路由显示存在 split tunneling：同时可见 direct 与 tunnel 路由</string>
