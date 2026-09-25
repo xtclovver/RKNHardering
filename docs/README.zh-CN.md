@@ -231,6 +231,7 @@ API：`NetworkInterface.getNetworkInterfaces()`。仅检查活动接口（`isUp`
 - 默认路由经过非标准接口；
 - 专用的非默认路由经过 VPN/非标准接口；
 - split tunneling 模式：同时可见 tunnel 路由与经过标准网络的正常默认路由。
+- 从 VPN 网络中排除的公网 /32 或 /128 路由（类型 `RTN_THROW`，Android 13+）：调用 `VpnService.Builder.excludeRoute()` 的 VPN 客户端就是这样把自己的服务器地址移出隧道的。此类路由不计入经过隧道的专用路由，而是以高置信度单独报告。
 
 如果默认路由经过 `wlan.*`, `rmnet.*`, `eth.*`, `lo`，且该网络本身没有被标记为 VPN，则视为正常。
 

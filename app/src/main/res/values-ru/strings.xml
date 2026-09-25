@@ -459,6 +459,7 @@
     <string name="checker_indirect_default_route_standard">Маршрут по умолчанию: %1$s (стандартный)</string>
     <string name="checker_indirect_default_route_nonstandard">Маршрут по умолчанию через нестандартный интерфейс: %1$s</string>
     <string name="checker_indirect_dedicated_routes">Выделенные маршруты через VPN/нестандартный интерфейс: %1$s</string>
+    <string name="checker_indirect_vpn_excluded_host_route">VPN-сеть исключает маршрут к публичному адресу: %1$s (вероятно, адрес VPN-сервера)</string>
     <string name="checker_indirect_proc_default_route_standard">Маршрут по умолчанию (/proc/net/route): %1$s (стандартный)</string>
     <string name="checker_indirect_proc_default_route_nonstandard">Маршрут по умолчанию (/proc/net/route) через нестандартный интерфейс: %1$s</string>
     <string name="checker_indirect_split_tunnel_routes">Маршрутизация указывает на split tunneling: одновременно видны direct и tunnel routes</string>
